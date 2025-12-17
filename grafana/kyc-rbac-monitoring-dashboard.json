@@ -1,0 +1,378 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "kyc-rbac-monitoring-001",
+    "title": "RBAC权限管理监控",
+    "tags": ["rbac", "admin", "security", "permissions"],
+    "timezone": "Asia/Shanghai",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "权限管理概览",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "管理员操作成功率",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(business_operations_total{operation=~\"admin_.*\",status=\"success\"}[5m]) / rate(business_operations_total{operation=~\"admin_.*\"}[5m]) * 100",
+            "legendFormat": "成功率 (%)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "decimals": 2,
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 95},
+                {"color": "green", "value": 99}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 1}
+      },
+      {
+        "id": 3,
+        "title": "管理员操作QPS",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(business_operations_total{operation=~\"admin_.*\"}[1m])",
+            "legendFormat": "操作QPS"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 5},
+                {"color": "red", "value": 20}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 1}
+      },
+      {
+        "id": 4,
+        "title": "权限拒绝次数",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(business_operations_total{error_type=\"permission_denied\"})",
+            "legendFormat": "拒绝次数"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 5},
+                {"color": "red", "value": 20}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 1}
+      },
+      {
+        "id": 5,
+        "title": "活跃管理员数量",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "count(count by (user_id) (business_operations_total{operation=~\"admin_.*\"}))",
+            "legendFormat": "活跃管理员"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 1}
+      },
+      {
+        "id": 6,
+        "title": "管理员操作趋势",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(business_operations_total{operation=\"admin_user_list\"}[1m])",
+            "legendFormat": "用户列表查询"
+          },
+          {
+            "expr": "rate(business_operations_total{operation=\"admin_org_list\"}[1m])",
+            "legendFormat": "组织列表查询"
+          },
+          {
+            "expr": "rate(business_operations_total{operation=\"admin_audit_logs\"}[1m])",
+            "legendFormat": "审计日志查询"
+          },
+          {
+            "expr": "rate(business_operations_total{operation=\"admin_update_user_status\"}[1m])",
+            "legendFormat": "用户状态更新"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps"
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5}
+      },
+      {
+        "id": 7,
+        "title": "权限错误趋势",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(business_operations_total{error_type=\"permission_denied\"}[1m])",
+            "legendFormat": "权限拒绝率"
+          },
+          {
+            "expr": "rate(business_operations_total{error_type=\"permission_denied\",operation=~\"admin_.*\"}[1m])",
+            "legendFormat": "管理员权限拒绝"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "custom": {
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "drawStyle": "line",
+              "fillOpacity": 10,
+              "gradientMode": "none",
+              "hideFrom": {
+                "tooltip": false,
+                "viz": false,
+                "legend": false
+              },
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5}
+      },
+      {
+        "id": 8,
+        "title": "管理员操作性能分析",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 13}
+      },
+      {
+        "id": 9,
+        "title": "管理员操作响应时间 (P95)",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(business_operation_duration_seconds_bucket{operation=~\"admin_.*\"}[5m]))",
+            "legendFormat": "P95响应时间"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(business_operation_duration_seconds_bucket{operation=~\"admin_.*\"}[5m]))",
+            "legendFormat": "P50响应时间"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "custom": {
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "drawStyle": "line",
+              "fillOpacity": 10,
+              "gradientMode": "none",
+              "hideFrom": {
+                "tooltip": false,
+                "viz": false,
+                "legend": false
+              },
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 0.5},
+                {"color": "red", "value": 1}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 14}
+      },
+      {
+        "id": 10,
+        "title": "管理员操作分布",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum by (operation) (rate(business_operations_total{operation=~\"admin_.*\"}[5m]))",
+            "legendFormat": "{{operation}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "custom": {
+              "hideFrom": {
+                "tooltip": false,
+                "viz": false,
+                "legend": false
+              },
+              "pieType": "pie"
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 14}
+      },
+      {
+        "id": 11,
+        "title": "安全事件分析",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 22}
+      },
+      {
+        "id": 12,
+        "title": "认证失败类型分布",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "sum by (error_type, operation) (rate(business_operations_total{status=\"failed\",operation=~\"admin_.*\"}[5m]))",
+            "format": "table"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {},
+              "indexByName": {},
+              "renameByName": {
+                "error_type": "错误类型",
+                "operation": "操作类型",
+                "Value": "错误率 (req/s)"
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "custom": {
+              "displayMode": "color-background",
+              "thresholds": {
+                "steps": [
+                  {"color": "green", "value": 0},
+                  {"color": "yellow", "value": 0.01},
+                  {"color": "red", "value": 0.1}
+                ]
+              }
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 23}
+      },
+      {
+        "id": 13,
+        "title": "异常访问模式",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(business_operations_total{status=\"failed\",operation=~\"admin_.*\"}[1m])",
+            "legendFormat": "失败操作率"
+          },
+          {
+            "expr": "rate(business_operations_total{error_type=\"permission_denied\"}[1m])",
+            "legendFormat": "权限拒绝率"
+          },
+          {
+            "expr": "rate(business_operations_total{error_type=\"invalid_request\"}[1m])",
+            "legendFormat": "无效请求率"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "custom": {
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "drawStyle": "line",
+              "fillOpacity": 10,
+              "gradientMode": "none",
+              "hideFrom": {
+                "tooltip": false,
+                "viz": false,
+                "legend": false
+              },
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 23}
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "admin_user",
+          "type": "query",
+          "query": "label_values(business_operations_total{operation=~\"admin_.*\"}, user_id)",
+          "label": "管理员用户",
+          "includeAll": true,
+          "multi": true
+        },
+        {
+          "name": "time_range",
+          "type": "interval",
+          "query": "1m,5m,10m,30m,1h,6h,12h,1d,7d,30d",
+          "current": {"value": "5m"}
+        }
+      ]
+    }
+  }
+}

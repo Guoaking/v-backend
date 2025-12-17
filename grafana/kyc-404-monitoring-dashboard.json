@@ -1,0 +1,190 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "KYC 404错误监控Dashboard",
+    "tags": ["kyc", "404", "error", "monitoring"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "404错误总数",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{status=\"404\"}[5m]))",
+            "legendFormat": "404错误率 (req/s)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 0.1},
+                {"color": "red", "value": 1}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "404错误占比",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{status=\"404\"}[5m])) / sum(rate(http_requests_total[5m])) * 100",
+            "legendFormat": "404占比 (%)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 5}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "按路径的404错误分布",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum by (endpoint) (rate(http_requests_total{status=\"404\"}[5m]))",
+            "legendFormat": "{{endpoint}}"
+          }
+        ],
+        "options": {
+          "pieType": "pie",
+          "displayLabels": ["name", "percentage"]
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 4,
+        "title": "404错误趋势",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum by (endpoint) (rate(http_requests_total{status=\"404\"}[5m]))",
+            "legendFormat": "{{endpoint}} - 404错误"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "错误率 (req/s)",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4}
+      },
+      {
+        "id": 5,
+        "title": "Kong vs 服务404错误对比",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(http_requests_total{status=\"404\",job=\"kong\"}[5m]))",
+            "legendFormat": "Kong 404错误"
+          },
+          {
+            "expr": "sum(rate(http_requests_total{status=\"404\",job=\"kyc-service\"}[5m]))",
+            "legendFormat": "KYC服务 404错误"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "错误率 (req/s)",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      },
+      {
+        "id": 6,
+        "title": "HTTP状态码分布",
+        "type": "bargauge",
+        "targets": [
+          {
+            "expr": "sum by (status) (rate(http_requests_total[5m]))",
+            "legendFormat": "{{status}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 10},
+                {"color": "red", "value": 50}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 12}
+      },
+      {
+        "id": 7,
+        "title": "404错误告警配置",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "sum by (endpoint, method) (rate(http_requests_total{status=\"404\"}[5m])) > 0.1",
+            "legendFormat": "{{endpoint}} - {{method}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "thresholds": {
+              "steps": [
+                {"color": "yellow", "value": 0.1},
+                {"color": "red", "value": 1}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 16}
+      },
+      {
+        "id": 8,
+        "title": "响应时间P95 (404 vs 其他)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{status=\"404\"}[5m])) by (le, endpoint))",
+            "legendFormat": "{{endpoint}} - 404 P95"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{status!=\"404\"}[5m])) by (le, endpoint))",
+            "legendFormat": "{{endpoint}} - 其他 P95"
+          }
+        ],
+        "yAxes": [
+          {
+            "label": "响应时间 (s)",
+            "min": 0
+          }
+        ],
+        "gridPos": {"h": 6, "w": 24, "x": 0, "y": 22}
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "30s",
+    "schemaVersion": 27,
+    "version": 1
+  }
+}

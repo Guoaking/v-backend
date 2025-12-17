@@ -1,0 +1,1812 @@
+basePath: /api/v1
+definitions:
+  api.ClientListResponse:
+    properties:
+      client_id:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      name:
+        type: string
+      redirect_uri:
+        type: string
+      scopes:
+        type: string
+      status:
+        type: string
+    type: object
+  api.ClientRegistrationRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+      redirect_uri:
+        type: string
+      scopes:
+        type: string
+      token_ttl_seconds:
+        type: integer
+    required:
+    - name
+    - redirect_uri
+    - scopes
+    type: object
+  api.ClientRegistrationResponse:
+    properties:
+      client_id:
+        type: string
+      client_secret:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      name:
+        type: string
+      redirect_uri:
+        type: string
+      scopes:
+        type: string
+      status:
+        type: string
+    type: object
+  api.ConsoleCreateAPIKeyRequest:
+    properties:
+      name:
+        maxLength: 100
+        minLength: 1
+        type: string
+      scopes:
+        items:
+          type: string
+        minItems: 1
+        type: array
+    required:
+    - name
+    - scopes
+    type: object
+  api.ConsoleLoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        minLength: 6
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  api.ConsoleRegisterRequest:
+    properties:
+      avatar:
+        type: string
+      company:
+        minLength: 2
+        type: string
+      email:
+        type: string
+      full_name:
+        minLength: 2
+        type: string
+      password:
+        minLength: 6
+        type: string
+    required:
+    - company
+    - email
+    - full_name
+    - password
+    type: object
+  api.ConsoleUpdateUserRequest:
+    properties:
+      avatar:
+        type: string
+      company:
+        type: string
+      name:
+        type: string
+    type: object
+  api.CreateAPIKeyRequest:
+    properties:
+      ip_whitelist:
+        description: IP白名单，CIDR格式
+        items:
+          type: string
+        type: array
+      name:
+        type: string
+      scopes:
+        items:
+          type: string
+        type: array
+    required:
+    - name
+    - scopes
+    type: object
+  api.ErrorCodeEntry:
+    properties:
+      code:
+        $ref: '#/definitions/api.ResponseCode'
+      http_status:
+        type: integer
+      message:
+        type: string
+      name:
+        type: string
+    type: object
+  api.ErrorCodesDoc:
+    properties:
+      business_errors:
+        items:
+          $ref: '#/definitions/api.ErrorCodeEntry'
+        type: array
+      client_errors:
+        items:
+          $ref: '#/definitions/api.ErrorCodeEntry'
+        type: array
+      payment_errors:
+        items:
+          $ref: '#/definitions/api.ErrorCodeEntry'
+        type: array
+      server_errors:
+        items:
+          $ref: '#/definitions/api.ErrorCodeEntry'
+        type: array
+    type: object
+  api.ErrorResponse:
+    properties:
+      code:
+        allOf:
+        - $ref: '#/definitions/api.ResponseCode'
+        description: response code
+      error:
+        description: error detail
+        type: string
+      errors:
+        description: field errors
+        items:
+          $ref: '#/definitions/api.FieldError'
+        type: array
+      message:
+        description: response message
+        type: string
+      request_id:
+        description: request id
+        type: string
+      timestamp:
+        description: timestamp (ms)
+        type: integer
+    type: object
+  api.FaceCompareDTO:
+    properties:
+      code:
+        type: integer
+      comparison_results:
+        properties:
+          confidence:
+            type: number
+          confidence_exist:
+            items:
+              type: number
+            type: array
+          detection_result:
+            type: string
+          is_face_exist:
+            type: integer
+          is_same_face:
+            type: integer
+        type: object
+      filename:
+        items:
+          type: string
+        type: array
+      msg:
+        type: string
+    type: object
+  api.FaceCompareSuccessResponse:
+    properties:
+      code:
+        allOf:
+        - $ref: '#/definitions/api.ResponseCode'
+        description: response code
+      data:
+        $ref: '#/definitions/api.FaceCompareDTO'
+      message:
+        description: response message
+        type: string
+      request_id:
+        description: request id
+        type: string
+      timestamp:
+        description: timestamp (ms)
+        type: integer
+    type: object
+  api.FaceDetectDTO:
+    properties:
+      code:
+        type: integer
+      detection_results:
+        properties:
+          face_num:
+            type: integer
+          faces_detected:
+            items:
+              properties:
+                confidence:
+                  type: number
+                facial_area:
+                  properties:
+                    h:
+                      type: integer
+                    left_eye:
+                      items:
+                        type: integer
+                      type: array
+                    right_eye:
+                      items:
+                        type: integer
+                      type: array
+                    w:
+                      type: integer
+                    x:
+                      type: integer
+                    "y":
+                      type: integer
+                  type: object
+              type: object
+            type: array
+          is_face_exist:
+            type: integer
+        type: object
+      filename:
+        type: string
+      msg:
+        type: string
+    type: object
+  api.FaceDetectSuccessResponse:
+    properties:
+      code:
+        allOf:
+        - $ref: '#/definitions/api.ResponseCode'
+        description: response code
+      data:
+        $ref: '#/definitions/api.FaceDetectDTO'
+      message:
+        description: response message
+        type: string
+      request_id:
+        description: request id
+        type: string
+      timestamp:
+        description: timestamp (ms)
+        type: integer
+    type: object
+  api.FaceSearchDTO:
+    properties:
+      code:
+        type: integer
+      filename:
+        type: string
+      msg:
+        type: string
+      searching_results:
+        properties:
+          has_similar_picture:
+            type: integer
+          searched_similar_pictures:
+            items:
+              $ref: '#/definitions/api.FaceSearchItem'
+            type: array
+        type: object
+    type: object
+  api.FaceSearchItem:
+    properties:
+      confidence:
+        type: number
+      id:
+        type: string
+    type: object
+  api.FaceSearchSuccessResponse:
+    properties:
+      code:
+        allOf:
+        - $ref: '#/definitions/api.ResponseCode'
+        description: response code
+      data:
+        $ref: '#/definitions/api.FaceSearchDTO'
+      message:
+        description: response message
+        type: string
+      request_id:
+        description: request id
+        type: string
+      timestamp:
+        description: timestamp (ms)
+        type: integer
+    type: object
+  api.FieldError:
+    properties:
+      field:
+        description: field name
+        type: string
+      message:
+        description: error message
+        type: string
+      value:
+        description: field value
+        type: string
+    type: object
+  api.GoogleTokenRequest:
+    properties:
+      id_token:
+        type: string
+    required:
+    - id_token
+    type: object
+  api.InviteMemberRequest:
+    properties:
+      email:
+        type: string
+      role:
+        type: string
+    required:
+    - email
+    - role
+    type: object
+  api.LivenessSilentDTO:
+    properties:
+      code:
+        type: integer
+      filename:
+        type: string
+      liveness_results:
+        properties:
+          confidence:
+            type: number
+          face_exist_confidence:
+            type: number
+          is_face_exist:
+            type: integer
+          is_liveness:
+            type: integer
+        type: object
+      msg:
+        type: string
+    type: object
+  api.LivenessSilentSuccessResponse:
+    properties:
+      code:
+        allOf:
+        - $ref: '#/definitions/api.ResponseCode'
+        description: response code
+      data:
+        $ref: '#/definitions/api.LivenessSilentDTO'
+      message:
+        description: response message
+        type: string
+      request_id:
+        description: request id
+        type: string
+      timestamp:
+        description: timestamp (ms)
+        type: integer
+    type: object
+  api.LivenessVideoDTO:
+    properties:
+      code:
+        type: integer
+      filename:
+        type: string
+      liveness_results:
+        properties:
+          confidence:
+            type: number
+          face_exist_confidence:
+            type: number
+          is_face_exist:
+            type: integer
+          is_liveness:
+            type: integer
+        type: object
+      msg:
+        type: string
+    type: object
+  api.LivenessVideoSuccessResponse:
+    properties:
+      code:
+        allOf:
+        - $ref: '#/definitions/api.ResponseCode'
+        description: response code
+      data:
+        $ref: '#/definitions/api.LivenessVideoDTO'
+      message:
+        description: response message
+        type: string
+      request_id:
+        description: request id
+        type: string
+      timestamp:
+        description: timestamp (ms)
+        type: integer
+    type: object
+  api.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        minLength: 6
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  api.OCRPublicResult:
+    properties:
+      code:
+        type: integer
+      filename:
+        type: string
+      full_text:
+        type: string
+      msg:
+        type: string
+      parsing_results:
+        additionalProperties:
+          $ref: '#/definitions/api.OCRTextItem'
+        type: object
+    type: object
+  api.OCRSuccessResponse:
+    properties:
+      code:
+        allOf:
+        - $ref: '#/definitions/api.ResponseCode'
+        description: response code
+      data:
+        $ref: '#/definitions/api.OCRPublicResult'
+      message:
+        description: response message
+        type: string
+      request_id:
+        description: request id
+        type: string
+      timestamp:
+        description: timestamp (ms)
+        type: integer
+    type: object
+  api.OCRTextItem:
+    properties:
+      confidence:
+        type: number
+      text:
+        type: string
+    type: object
+  api.PasswordResetRequest:
+    properties:
+      email:
+        type: string
+    required:
+    - email
+    type: object
+  api.RefreshTokenRequest:
+    properties:
+      client_id:
+        type: string
+      refresh_token:
+        type: string
+    required:
+    - client_id
+    - refresh_token
+    type: object
+  api.RegisterRequest:
+    properties:
+      avatar_url:
+        description: 可选头像URL
+        type: string
+      company:
+        type: string
+      email:
+        type: string
+      name:
+        type: string
+      password:
+        minLength: 6
+        type: string
+    required:
+    - email
+    - name
+    - password
+    type: object
+  api.ResetPasswordConfirmRequest:
+    properties:
+      new_password:
+        minLength: 6
+        type: string
+      token:
+        type: string
+    required:
+    - new_password
+    - token
+    type: object
+  api.ResponseCode:
+    enum:
+    - 200
+    - 1000
+    - 1001
+    - 1002
+    - 1003
+    - 1004
+    - 1005
+    - 1006
+    - 1007
+    - 2000
+    - 2001
+    - 2002
+    - 2003
+    - 2004
+    - 2005
+    - 2006
+    - 2007
+    - 40201
+    - 5000
+    - 5001
+    - 5002
+    - 5003
+    - 5004
+    type: integer
+    x-enum-comments:
+      CodeBadRequest: invalid request parameters
+      CodeBusinessError: generic business error
+      CodeConflict: resource conflict
+      CodeDatabaseError: database error
+      CodeEncryptionError: encryption error
+      CodeFaceNotMatch: face not matched
+      CodeFaceVerifyFailed: face verification failed
+      CodeForbidden: forbidden
+      CodeIDCardNotMatch: id card information not matched
+      CodeInternalError: internal server error
+      CodeInvalidParameter: invalid parameter
+      CodeKYCFailed: kyc verification failed
+      CodeLivenessFailed: liveness detection failed
+      CodeMethodNotAllowed: method not allowed
+      CodeMissingParameter: missing parameter
+      CodeNotFound: resource not found
+      CodeOCRFailed: ocr recognition failed
+      CodePaymentRequired: quota exceeded, please upgrade your plan
+      CodeServiceUnavailable: service unavailable
+      CodeThirdPartyError: third party service error
+      CodeTooManyRequests: too many requests
+      CodeUnauthorized: unauthorized
+    x-enum-descriptions:
+    - ""
+    - invalid request parameters
+    - unauthorized
+    - forbidden
+    - resource not found
+    - method not allowed
+    - too many requests
+    - invalid parameter
+    - missing parameter
+    - generic business error
+    - ocr recognition failed
+    - face verification failed
+    - liveness detection failed
+    - kyc verification failed
+    - id card information not matched
+    - face not matched
+    - resource conflict
+    - quota exceeded, please upgrade your plan
+    - internal server error
+    - database error
+    - third party service error
+    - service unavailable
+    - encryption error
+    x-enum-varnames:
+    - CodeSuccess
+    - CodeBadRequest
+    - CodeUnauthorized
+    - CodeForbidden
+    - CodeNotFound
+    - CodeMethodNotAllowed
+    - CodeTooManyRequests
+    - CodeInvalidParameter
+    - CodeMissingParameter
+    - CodeBusinessError
+    - CodeOCRFailed
+    - CodeFaceVerifyFailed
+    - CodeLivenessFailed
+    - CodeKYCFailed
+    - CodeIDCardNotMatch
+    - CodeFaceNotMatch
+    - CodeConflict
+    - CodePaymentRequired
+    - CodeInternalError
+    - CodeDatabaseError
+    - CodeThirdPartyError
+    - CodeServiceUnavailable
+    - CodeEncryptionError
+  api.SecurityGuide:
+    properties:
+      api_key:
+        properties:
+          curl:
+            items:
+              type: string
+            type: array
+          format:
+            type: string
+          header:
+            type: string
+          scopes:
+            items:
+              type: string
+            type: array
+        type: object
+      auth_methods:
+        items:
+          type: string
+        type: array
+      oauth2:
+        properties:
+          curl:
+            items:
+              type: string
+            type: array
+          grant_type:
+            type: string
+          scopes:
+            items:
+              type: string
+            type: array
+          token_url:
+            type: string
+        type: object
+    type: object
+  api.SuccessResponse:
+    properties:
+      code:
+        allOf:
+        - $ref: '#/definitions/api.ResponseCode'
+        description: response code
+      data:
+        description: response data
+      message:
+        description: response message
+        type: string
+      request_id:
+        description: request id
+        type: string
+      timestamp:
+        description: timestamp (ms)
+        type: integer
+    type: object
+  api.TokenRequest:
+    properties:
+      client_id:
+        type: string
+      client_secret:
+        type: string
+      grant_type:
+        type: string
+      scope:
+        type: string
+    required:
+    - client_id
+    - client_secret
+    - grant_type
+    type: object
+  api.UpdatePasswordRequest:
+    properties:
+      current_password:
+        minLength: 6
+        type: string
+      new_password:
+        minLength: 6
+        type: string
+    required:
+    - current_password
+    - new_password
+    type: object
+  api.UpdatePlanRequest:
+    properties:
+      plan_id:
+        enum:
+        - starter
+        - growth
+        - scale
+        type: string
+    required:
+    - plan_id
+    type: object
+  api.UpdateUserStatusRequest:
+    properties:
+      status:
+        enum:
+        - active
+        - suspended
+        type: string
+    required:
+    - status
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: 企业级KYC认证服务
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: KYC Service API
+  version: "1.0"
+paths:
+  /api/v1/admin/audit-logs:
+    get:
+      consumes:
+      - application/json
+      description: 超级管理员获取全平台审计日志，支持多种筛选条件
+      parameters:
+      - default: 1
+        description: 页码，从1开始
+        in: query
+        name: page
+        type: integer
+      - default: 50
+        description: 每页数量，默认50
+        in: query
+        name: limit
+        type: integer
+      - description: 偏移量，可选，如果提供则优先使用
+        in: query
+        name: offset
+        type: integer
+      - description: 用户ID筛选
+        in: query
+        name: user_id
+        type: string
+      - description: 操作类型筛选
+        in: query
+        name: action
+        type: string
+      - description: 状态筛选
+        in: query
+        name: status
+        type: string
+      - description: 开始日期 (YYYY-MM-DD)
+        in: query
+        name: date_from
+        type: string
+      - description: 结束日期 (YYYY-MM-DD)
+        in: query
+        name: date_to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SuccessResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: 管理员获取审计日志
+      tags:
+      - Admin
+  /api/v1/admin/organizations:
+    get:
+      consumes:
+      - application/json
+      description: 超级管理员获取所有组织列表，包含成员数量和用量统计
+      parameters:
+      - default: 1
+        description: 页码，从1开始
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: 每页数量，默认10
+        in: query
+        name: limit
+        type: integer
+      - description: 偏移量，可选，如果提供则优先使用
+        in: query
+        name: offset
+        type: integer
+      - description: 搜索关键词
+        in: query
+        name: search
+        type: string
+      - description: 组织状态
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SuccessResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: 管理员获取组织列表
+      tags:
+      - Admin
+  /api/v1/admin/users:
+    get:
+      consumes:
+      - application/json
+      description: 管理员获取所有用户列表，包含组织信息和用量统计
+      parameters:
+      - default: 1
+        description: 页码，从1开始
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: 每页数量，默认10
+        in: query
+        name: limit
+        type: integer
+      - description: 偏移量，可选，如果提供则优先使用
+        in: query
+        name: offset
+        type: integer
+      - description: 搜索关键词
+        in: query
+        name: search
+        type: string
+      - description: 用户状态
+        in: query
+        name: status
+        type: string
+      - description: 用户角色
+        in: query
+        name: role
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SuccessResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: 管理员获取用户列表
+      tags:
+      - Admin
+  /api/v1/admin/users/{id}/status:
+    put:
+      consumes:
+      - application/json
+      description: 管理员更新用户状态（激活/禁用）
+      parameters:
+      - description: 用户ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 状态更新请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.UpdateUserStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: 管理员更新用户状态
+      tags:
+      - Admin
+  /api/v1/auth/google:
+    post:
+      consumes:
+      - application/json
+      description: 使用Google ID Token进行登录或注册
+      parameters:
+      - description: Google ID Token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.GoogleTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Google OAuth登录/注册
+      tags:
+      - Auth
+  /api/v1/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: 用户使用邮箱和密码登录
+      parameters:
+      - description: 登录信息
+        in: body
+        name: login
+        required: true
+        schema:
+          $ref: '#/definitions/api.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: 用户登录
+      tags:
+      - Auth
+  /api/v1/auth/logout:
+    post:
+      consumes:
+      - application/json
+      description: 用户登出系统
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SuccessResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: 用户登出
+      tags:
+      - Auth
+  /api/v1/auth/me:
+    get:
+      consumes:
+      - application/json
+      description: 获取当前登录用户的信息
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SuccessResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: 获取当前用户信息
+      tags:
+      - Auth
+  /api/v1/auth/password-reset/confirm:
+    post:
+      consumes:
+      - application/json
+      description: 使用令牌重置用户密码
+      parameters:
+      - description: 重置密码请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.ResetPasswordConfirmRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: 重置密码
+      tags:
+      - Auth
+  /api/v1/auth/password-reset/request:
+    post:
+      consumes:
+      - application/json
+      description: 发送密码重置邮件到用户邮箱
+      parameters:
+      - description: 密码重置请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.PasswordResetRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: 请求密码重置
+      tags:
+      - Auth
+  /api/v1/auth/register:
+    post:
+      consumes:
+      - application/json
+      description: 用户注册新账户
+      parameters:
+      - description: 注册信息
+        in: body
+        name: register
+        required: true
+        schema:
+          $ref: '#/definitions/api.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: 用户注册
+      tags:
+      - Auth
+  /api/v1/console/users/me/password:
+    put:
+      consumes:
+      - application/json
+      description: 修改当前用户的密码
+      parameters:
+      - description: 修改密码请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.UpdatePasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: 修改用户密码
+      tags:
+      - Auth
+  /api/v1/keys:
+    get:
+      consumes:
+      - application/json
+      description: 获取当前用户的所有API密钥
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SuccessResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: 获取用户API密钥列表
+      tags:
+      - Credentials
+    post:
+      consumes:
+      - application/json
+      description: 创建新的API密钥
+      parameters:
+      - description: 创建API密钥请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.ConsoleCreateAPIKeyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: 创建API密钥
+      tags:
+      - Console
+  /api/v1/keys/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: 撤销指定的API密钥
+      parameters:
+      - description: API密钥ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: 撤销API密钥
+      tags:
+      - Console
+  /api/v1/orgs/current:
+    get:
+      consumes:
+      - application/json
+      description: 组织管理员获取当前组织的基本信息
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SuccessResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: 获取当前组织信息
+      tags:
+      - Organization
+  /api/v1/orgs/members:
+    get:
+      consumes:
+      - application/json
+      description: 组织管理员获取组织成员列表
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SuccessResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: 获取组织成员列表
+      tags:
+      - Organization
+    post:
+      consumes:
+      - application/json
+      description: 组织管理员邀请新成员加入组织
+      parameters:
+      - description: 邀请成员请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.InviteMemberRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: 邀请组织成员
+      tags:
+      - Organization
+  /api/v1/orgs/plan:
+    put:
+      consumes:
+      - application/json
+      description: 组织所有者更新组织套餐
+      parameters:
+      - description: 更新套餐请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.UpdatePlanRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: 更新组织套餐
+      tags:
+      - Organization
+  /api/v1/users/me:
+    get:
+      consumes:
+      - application/json
+      description: 获取当前登录用户的详细信息和API密钥列表
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SuccessResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: 获取当前用户信息
+      tags:
+      - Console
+    put:
+      consumes:
+      - application/json
+      description: 更新当前用户的个人资料
+      parameters:
+      - description: 更新用户资料请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.ConsoleUpdateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: 更新用户资料
+      tags:
+      - Console
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Use the refresh token to obtain a new access token
+      parameters:
+      - description: Refresh token request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.RefreshTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SuccessResponse'
+      summary: Refresh Access Token
+      tags:
+      - Auth
+      - Public
+  /auth/token:
+    post:
+      consumes:
+      - application/json
+      description: Use Client credentials to obtain access tokens
+      parameters:
+      - description: Token request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.TokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SuccessResponse'
+      summary: Obtain access token
+      tags:
+      - Auth
+      - Public
+  /clients:
+    get:
+      consumes:
+      - application/json
+      description: List OAuth clients in current organization
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.ClientListResponse'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List OAuth clients
+      tags:
+      - Client Management
+  /clients/{client_id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete specified OAuth client
+      parameters:
+      - description: Client ID
+        in: path
+        name: client_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Delete OAuth client
+      tags:
+      - Client Management
+  /clients/register:
+    post:
+      consumes:
+      - application/json
+      description: 注册新的OAuth客户端，获取client_id和client_secret
+      parameters:
+      - description: Client registration request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.ClientRegistrationRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/api.ClientRegistrationResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 注册OAuth客户端
+      tags:
+      - Client Management
+  /docs/error-codes:
+    get:
+      description: Client, business, payment and server error codes with messages
+        and HTTP status mapping
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ErrorCodesDoc'
+      summary: Error Codes Reference
+  /docs/security:
+    get:
+      description: How to use ApiKey and OAuth2 Client Credentials, scopes and cURL
+        examples
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SecurityGuide'
+      summary: Security Access Guide
+      tags:
+      - Docs
+  /kyc/face/compare:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload two images for face comparison
+      parameters:
+      - description: Source image
+        in: formData
+        name: source_image
+        required: true
+        type: file
+      - description: Target image
+        in: formData
+        name: target_image
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.FaceCompareSuccessResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Face comparison
+      tags:
+      - Public
+  /kyc/face/detect:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload an image for face detection
+      parameters:
+      - description: Face image
+        in: formData
+        name: picture
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.FaceDetectSuccessResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Face detection
+      tags:
+      - Public
+  /kyc/face/search:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload a face image to search similar faces
+      parameters:
+      - description: Face image
+        in: formData
+        name: picture
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.FaceSearchSuccessResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Face search
+      tags:
+      - Public
+  /kyc/liveness/silent:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload an image for silent liveness detection
+      parameters:
+      - description: Image
+        in: formData
+        name: picture
+        required: true
+        type: file
+      - description: Language
+        enum:
+        - zh
+        - zh-CN
+        - en
+        - en-US
+        example: zh-CN
+        in: formData
+        name: language
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.LivenessSilentSuccessResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Silent liveness
+      tags:
+      - Public
+  /kyc/liveness/video:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload a video for movement liveness detection
+      parameters:
+      - description: Video
+        in: formData
+        name: video
+        required: true
+        type: file
+      - description: Language
+        enum:
+        - zh
+        - zh-CN
+        - en
+        - en-US
+        example: en-US
+        in: formData
+        name: language
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.LivenessVideoSuccessResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Video liveness
+  /kyc/liveness/ws:
+    get:
+      description: Real-time liveness detection via WebSocket
+      responses:
+        "101":
+          description: Switching Protocols
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Liveness WebSocket
+      tags:
+      - KYC
+  /kyc/ocr:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload ID card image for OCR recognition
+      parameters:
+      - description: ID card image
+        in: formData
+        name: picture
+        required: true
+        type: file
+      - description: Language default:thai
+        enum:
+        - thai
+        - vietnamese
+        - indonesian
+        - chinese
+        - english
+        - tagalog
+        - malay
+        example: thai
+        in: formData
+        name: language
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.OCRSuccessResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: OCR recognition
+      tags:
+      - Public
+      - OCR
+  /kyc/status/{request_id}:
+    get:
+      description: 根据请求ID查询KYC认证状态
+      parameters:
+      - description: 请求ID
+        in: path
+        name: request_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SuccessResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: 查询KYC状态
+      tags:
+      - KYC
+  /kyc/verify:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload ID card image, face image and basic info for full KYC verification
+      parameters:
+      - description: ID card image
+        in: formData
+        name: idcard_image
+        required: true
+        type: file
+      - description: Face image
+        in: formData
+        name: face_image
+        required: true
+        type: file
+      - description: Name
+        in: formData
+        name: name
+        required: true
+        type: string
+      - description: ID card number
+        in: formData
+        name: idcard
+        required: true
+        type: string
+      - description: Phone number
+        in: formData
+        name: phone
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SuccessResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Complete KYC verification
+      tags:
+      - KYC
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

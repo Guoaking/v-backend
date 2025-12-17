@@ -1,0 +1,466 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "KYC业务监控Dashboard - 专业版",
+    "tags": ["kyc", "business", "monitoring", "fintech"],
+    "timezone": "browser",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "🚀 实时业务概览",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "KYC请求成功率",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(kyc_requests_total{status=\"success\"}[5m]) / rate(kyc_requests_total[5m]) * 100",
+            "legendFormat": "成功率 (%)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "decimals": 2,
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 85},
+                {"color": "green", "value": 95}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 1}
+      },
+      {
+        "id": 3,
+        "title": "KYC QPS (每秒查询数)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(kyc_requests_total[1m])",
+            "legendFormat": "QPS"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "decimals": 2,
+            "color": {"mode": "palette-classic"}
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 1}
+      },
+      {
+        "id": 4,
+        "title": "今日KYC处理量",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "business_kyc_today_volume",
+            "legendFormat": "处理量"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {"mode": "palette-classic"}
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 1}
+      },
+      {
+        "id": 5,
+        "title": "平均处理时间",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "business_kyc_processing_time_seconds",
+            "legendFormat": "处理时间 (秒)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "decimals": 2,
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 5},
+                {"color": "red", "value": 10}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 1}
+      },
+      {
+        "id": 6,
+        "title": "📊 业务趋势分析",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 5}
+      },
+      {
+        "id": 7,
+        "title": "KYC请求趋势 (按类型)",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(kyc_requests_total{type=\"ocr\"}[5m])",
+            "legendFormat": "OCR识别"
+          },
+          {
+            "expr": "rate(kyc_requests_total{type=\"face\"}[5m])",
+            "legendFormat": "人脸识别"
+          },
+          {
+            "expr": "rate(kyc_requests_total{type=\"liveness\"}[5m])",
+            "legendFormat": "活体检测"
+          },
+          {
+            "expr": "rate(kyc_requests_total{type=\"complete\"}[5m])",
+            "legendFormat": "完整KYC"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "custom": {"drawStyle": "line", "lineInterpolation": "smooth"}
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 6}
+      },
+      {
+        "id": 8,
+        "title": "KYC成功率趋势",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(kyc_requests_total{status=\"success\",type=\"ocr\"}[5m]) / rate(kyc_requests_total{type=\"ocr\"}[5m]) * 100",
+            "legendFormat": "OCR成功率"
+          },
+          {
+            "expr": "rate(kyc_requests_total{status=\"success\",type=\"face\"}[5m]) / rate(kyc_requests_total{type=\"face\"}[5m]) * 100",
+            "legendFormat": "人脸识别成功率"
+          },
+          {
+            "expr": "rate(kyc_requests_total{status=\"success\",type=\"liveness\"}[5m]) / rate(kyc_requests_total{type=\"liveness\"}[5m]) * 100",
+            "legendFormat": "活体检测成功率"
+          },
+          {
+            "expr": "rate(kyc_requests_total{status=\"success\",type=\"complete\"}[5m]) / rate(kyc_requests_total{type=\"complete\"}[5m]) * 100",
+            "legendFormat": "完整KYC成功率"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "custom": {"drawStyle": "line", "lineInterpolation": "smooth"}
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 6}
+      },
+      {
+        "id": 9,
+        "title": "⏱️ 性能监控",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 14}
+      },
+      {
+        "id": 10,
+        "title": "KYC处理耗时 P95/P50",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(kyc_duration_seconds_bucket[5m]))",
+            "legendFormat": "P95"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(kyc_duration_seconds_bucket[5m]))",
+            "legendFormat": "P50"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "custom": {"drawStyle": "line", "lineInterpolation": "smooth"}
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 15}
+      },
+      {
+        "id": 11,
+        "title": "第三方服务调用耗时",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(third_party_duration_seconds_bucket{service=\"ocr\"}[5m]))",
+            "legendFormat": "OCR服务 P95"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(third_party_duration_seconds_bucket{service=\"face\"}[5m]))",
+            "legendFormat": "人脸识别 P95"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(third_party_duration_seconds_bucket{service=\"liveness\"}[5m]))",
+            "legendFormat": "活体检测 P95"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "custom": {"drawStyle": "line", "lineInterpolation": "smooth"}
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 15}
+      },
+      {
+        "id": 12,
+        "title": "🔍 详细业务指标",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 23}
+      },
+      {
+        "id": 13,
+        "title": "OCR识别成功率",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "business_ocr_success_rate * 100",
+            "legendFormat": "OCR成功率 (%)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "decimals": 2,
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 80},
+                {"color": "green", "value": 90}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 24}
+      },
+      {
+        "id": 14,
+        "title": "人脸识别成功率",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "business_face_verify_success_rate * 100",
+            "legendFormat": "人脸识别成功率 (%)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "decimals": 2,
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 85},
+                {"color": "green", "value": 95}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 24}
+      },
+      {
+        "id": 15,
+        "title": "活体检测成功率",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "business_liveness_success_rate * 100",
+            "legendFormat": "活体检测成功率 (%)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "decimals": 2,
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 90},
+                {"color": "green", "value": 98}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 24}
+      },
+      {
+        "id": 16,
+        "title": "第三方服务调用QPS",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(third_party_requests_total[1m])",
+            "legendFormat": "第三方QPS"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "decimals": 2
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 24}
+      },
+      {
+        "id": 17,
+        "title": "📈 业务分布",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 28}
+      },
+      {
+        "id": 18,
+        "title": "KYC请求类型分布",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum by (type) (rate(kyc_requests_total[5m]))",
+            "legendFormat": "{{type}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "custom": {"pieType": "pie"}
+          }
+        },
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 29}
+      },
+      {
+        "id": 19,
+        "title": "KYC状态分布",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum by (status) (rate(kyc_requests_total[5m]))",
+            "legendFormat": "{{status}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "custom": {"pieType": "donut"}
+          }
+        },
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 29}
+      },
+      {
+        "id": 20,
+        "title": "错误类型分布",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum by (type) (rate(errors_total[5m]))",
+            "legendFormat": "{{type}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "errorsps",
+            "custom": {"pieType": "pie"}
+          }
+        },
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 29}
+      },
+      {
+        "id": 21,
+        "title": "⚠️ 错误监控",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 37}
+      },
+      {
+        "id": 22,
+        "title": "错误率趋势",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(errors_total[5m]) / rate(kyc_requests_total[5m]) * 100",
+            "legendFormat": "总体错误率 (%)"
+          },
+          {
+            "expr": "rate(errors_total{type=\"kyc\"}[5m]) / rate(kyc_requests_total[5m]) * 100",
+            "legendFormat": "KYC错误率 (%)"
+          },
+          {
+            "expr": "rate(errors_total{type=\"third_party\"}[5m]) / rate(third_party_requests_total[5m]) * 100",
+            "legendFormat": "第三方服务错误率 (%)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "custom": {"drawStyle": "line", "lineInterpolation": "smooth"}
+          }
+        },
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 38}
+      },
+      {
+        "id": 23,
+        "title": "📋 详细统计表",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "sum by (type, status) (rate(kyc_requests_total[5m]))",
+            "legendFormat": "{{type}}-{{status}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "custom": {"displayMode": "color-background"}
+          }
+        },
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 46}
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "时间范围",
+          "type": "interval",
+          "query": "1m,5m,10m,30m,1h,6h,12h,1d,7d,30d",
+          "current": {"text": "5m", "value": "5m"}
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "name": "部署事件",
+          "datasource": "-- Grafana --",
+          "type": "dashboard",
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "enable": true,
+          "hide": false
+        }
+      ]
+    }
+  }
+}

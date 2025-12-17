@@ -1,0 +1,1447 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "description": "企业级KYC认证服务",
+    "title": "KYC Service API",
+    "termsOfService": "http://swagger.io/terms/",
+    "contact": {
+      "name": "API Support",
+      "url": "http://www.swagger.io/support",
+      "email": "support@swagger.io"
+    },
+    "license": {
+      "name": "Apache 2.0",
+      "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+    },
+    "version": "1.0"
+  },
+  "host": "localhost:8080",
+  "basePath": "/api/v1",
+  "paths": {
+    "/auth/refresh": {
+      "post": {
+        "description": "Use the refresh token to obtain a new access token",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Auth",
+          "Public"
+        ],
+        "summary": "Refresh Access Token",
+        "parameters": [
+          {
+            "description": "Refresh token request",
+            "name": "request",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/api.RefreshTokenRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.SuccessResponse"
+            }
+          }
+        }
+      }
+    },
+    "/auth/token": {
+      "post": {
+        "description": "Use Client credentials to obtain access tokens",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Auth",
+          "Public"
+        ],
+        "summary": "Obtain access token",
+        "parameters": [
+          {
+            "description": "Token request",
+            "name": "request",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/api.TokenRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.SuccessResponse"
+            }
+          }
+        }
+      }
+    },
+    "/kyc/face/compare": {
+      "post": {
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "description": "Upload two images for face comparison",
+        "consumes": [
+          "multipart/form-data"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Public"
+        ],
+        "summary": "Face comparison",
+        "parameters": [
+          {
+            "type": "file",
+            "description": "Source image",
+            "name": "source_image",
+            "in": "formData",
+            "required": true
+          },
+          {
+            "type": "file",
+            "description": "Target image",
+            "name": "target_image",
+            "in": "formData",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.FaceCompareSuccessResponse"
+            }
+          }
+        }
+      }
+    },
+    "/kyc/face/detect": {
+      "post": {
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "description": "Upload an image for face detection",
+        "consumes": [
+          "multipart/form-data"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Public"
+        ],
+        "summary": "Face detection",
+        "parameters": [
+          {
+            "type": "file",
+            "description": "Face image",
+            "name": "picture",
+            "in": "formData",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.FaceDetectSuccessResponse"
+            }
+          }
+        }
+      }
+    },
+    "/kyc/face/search": {
+      "post": {
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "description": "Upload a face image to search similar faces",
+        "consumes": [
+          "multipart/form-data"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Public"
+        ],
+        "summary": "Face search",
+        "parameters": [
+          {
+            "type": "file",
+            "description": "Face image",
+            "name": "picture",
+            "in": "formData",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.FaceSearchSuccessResponse"
+            }
+          }
+        }
+      }
+    },
+    "/kyc/liveness/silent": {
+      "post": {
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "description": "Upload an image for silent liveness detection",
+        "consumes": [
+          "multipart/form-data"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Public"
+        ],
+        "summary": "Silent liveness",
+        "parameters": [
+          {
+            "type": "file",
+            "description": "Image",
+            "name": "picture",
+            "in": "formData",
+            "required": true
+          },
+          {
+            "enum": [
+              "zh",
+              "zh-CN",
+              "en",
+              "en-US"
+            ],
+            "type": "string",
+            "example": "zh-CN",
+            "description": "Language",
+            "name": "language",
+            "in": "formData"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.LivenessSilentSuccessResponse"
+            }
+          }
+        }
+      }
+    },
+    "/kyc/ocr": {
+      "post": {
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "description": "Upload ID card image for OCR recognition",
+        "consumes": [
+          "multipart/form-data"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Public",
+          "OCR"
+        ],
+        "summary": "OCR recognition",
+        "parameters": [
+          {
+            "type": "file",
+            "description": "ID card image",
+            "name": "picture",
+            "in": "formData",
+            "required": true
+          },
+          {
+            "enum": [
+              "thai",
+              "vietnamese",
+              "indonesian",
+              "chinese",
+              "english",
+              "tagalog",
+              "malay"
+            ],
+            "type": "string",
+            "example": "thai",
+            "description": "Language default:thai",
+            "name": "language",
+            "in": "formData"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/api.OCRSuccessResponse"
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "api.ClientListResponse": {
+      "type": "object",
+      "properties": {
+        "client_id": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "redirect_uri": {
+          "type": "string"
+        },
+        "scopes": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      }
+    },
+    "api.ClientRegistrationRequest": {
+      "type": "object",
+      "required": [
+        "name",
+        "redirect_uri",
+        "scopes"
+      ],
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "redirect_uri": {
+          "type": "string"
+        },
+        "scopes": {
+          "type": "string"
+        },
+        "token_ttl_seconds": {
+          "type": "integer"
+        }
+      }
+    },
+    "api.ClientRegistrationResponse": {
+      "type": "object",
+      "properties": {
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "redirect_uri": {
+          "type": "string"
+        },
+        "scopes": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      }
+    },
+    "api.ConsoleCreateAPIKeyRequest": {
+      "type": "object",
+      "required": [
+        "name",
+        "scopes"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 100,
+          "minLength": 1
+        },
+        "scopes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "api.ConsoleLoginRequest": {
+      "type": "object",
+      "required": [
+        "email",
+        "password"
+      ],
+      "properties": {
+        "email": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string",
+          "minLength": 6
+        }
+      }
+    },
+    "api.ConsoleRegisterRequest": {
+      "type": "object",
+      "required": [
+        "company",
+        "email",
+        "full_name",
+        "password"
+      ],
+      "properties": {
+        "avatar": {
+          "type": "string"
+        },
+        "company": {
+          "type": "string",
+          "minLength": 2
+        },
+        "email": {
+          "type": "string"
+        },
+        "full_name": {
+          "type": "string",
+          "minLength": 2
+        },
+        "password": {
+          "type": "string",
+          "minLength": 6
+        }
+      }
+    },
+    "api.ConsoleUpdateUserRequest": {
+      "type": "object",
+      "properties": {
+        "avatar": {
+          "type": "string"
+        },
+        "company": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "api.CreateAPIKeyRequest": {
+      "type": "object",
+      "required": [
+        "name",
+        "scopes"
+      ],
+      "properties": {
+        "ip_whitelist": {
+          "description": "IP白名单，CIDR格式",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "name": {
+          "type": "string"
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "api.ErrorCodeEntry": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "$ref": "#/definitions/api.ResponseCode"
+        },
+        "http_status": {
+          "type": "integer"
+        },
+        "message": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "api.ErrorCodesDoc": {
+      "type": "object",
+      "properties": {
+        "business_errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/api.ErrorCodeEntry"
+          }
+        },
+        "client_errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/api.ErrorCodeEntry"
+          }
+        },
+        "payment_errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/api.ErrorCodeEntry"
+          }
+        },
+        "server_errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/api.ErrorCodeEntry"
+          }
+        }
+      }
+    },
+    "api.ErrorResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "description": "response code",
+          "allOf": [
+            {
+              "$ref": "#/definitions/api.ResponseCode"
+            }
+          ]
+        },
+        "error": {
+          "description": "error detail",
+          "type": "string"
+        },
+        "errors": {
+          "description": "field errors",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/api.FieldError"
+          }
+        },
+        "message": {
+          "description": "response message",
+          "type": "string"
+        },
+        "method": {
+          "description": "request method",
+          "type": "string"
+        },
+        "path": {
+          "description": "request path",
+          "type": "string"
+        },
+        "request_id": {
+          "description": "request id",
+          "type": "string"
+        },
+        "timestamp": {
+          "description": "timestamp (ms)",
+          "type": "integer"
+        }
+      }
+    },
+    "api.FaceCompareDTO": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer"
+        },
+        "comparison_results": {
+          "type": "object",
+          "properties": {
+            "confidence": {
+              "type": "number"
+            },
+            "confidence_exist": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "detection_result": {
+              "type": "string"
+            },
+            "is_face_exist": {
+              "type": "integer"
+            },
+            "is_same_face": {
+              "type": "integer"
+            }
+          }
+        },
+        "filename": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "msg": {
+          "type": "string"
+        }
+      }
+    },
+    "api.FaceCompareSuccessResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "description": "response code",
+          "allOf": [
+            {
+              "$ref": "#/definitions/api.ResponseCode"
+            }
+          ]
+        },
+        "data": {
+          "$ref": "#/definitions/api.FaceCompareDTO"
+        },
+        "message": {
+          "description": "response message",
+          "type": "string"
+        },
+        "method": {
+          "description": "request method",
+          "type": "string"
+        },
+        "path": {
+          "description": "request path",
+          "type": "string"
+        },
+        "request_id": {
+          "description": "request id",
+          "type": "string"
+        },
+        "timestamp": {
+          "description": "timestamp (ms)",
+          "type": "integer"
+        }
+      }
+    },
+    "api.FaceDetectDTO": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer"
+        },
+        "detection_results": {
+          "type": "object",
+          "properties": {
+            "face_num": {
+              "type": "integer"
+            },
+            "faces_detected": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "confidence": {
+                    "type": "number"
+                  },
+                  "facial_area": {
+                    "type": "object",
+                    "properties": {
+                      "h": {
+                        "type": "integer"
+                      },
+                      "left_eye": {
+                        "type": "array",
+                        "items": {
+                          "type": "integer"
+                        }
+                      },
+                      "right_eye": {
+                        "type": "array",
+                        "items": {
+                          "type": "integer"
+                        }
+                      },
+                      "w": {
+                        "type": "integer"
+                      },
+                      "x": {
+                        "type": "integer"
+                      },
+                      "y": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "is_face_exist": {
+              "type": "integer"
+            }
+          }
+        },
+        "filename": {
+          "type": "string"
+        },
+        "msg": {
+          "type": "string"
+        }
+      }
+    },
+    "api.FaceDetectSuccessResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "description": "response code",
+          "allOf": [
+            {
+              "$ref": "#/definitions/api.ResponseCode"
+            }
+          ]
+        },
+        "data": {
+          "$ref": "#/definitions/api.FaceDetectDTO"
+        },
+        "message": {
+          "description": "response message",
+          "type": "string"
+        },
+        "method": {
+          "description": "request method",
+          "type": "string"
+        },
+        "path": {
+          "description": "request path",
+          "type": "string"
+        },
+        "request_id": {
+          "description": "request id",
+          "type": "string"
+        },
+        "timestamp": {
+          "description": "timestamp (ms)",
+          "type": "integer"
+        }
+      }
+    },
+    "api.FaceSearchDTO": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer"
+        },
+        "filename": {
+          "type": "string"
+        },
+        "msg": {
+          "type": "string"
+        },
+        "searching_results": {
+          "type": "object",
+          "properties": {
+            "has_similar_picture": {
+              "type": "integer"
+            },
+            "searched_similar_pictures": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/api.FaceSearchItem"
+              }
+            }
+          }
+        }
+      }
+    },
+    "api.FaceSearchItem": {
+      "type": "object",
+      "properties": {
+        "confidence": {
+          "type": "number"
+        },
+        "id": {
+          "type": "string"
+        }
+      }
+    },
+    "api.FaceSearchSuccessResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "description": "response code",
+          "allOf": [
+            {
+              "$ref": "#/definitions/api.ResponseCode"
+            }
+          ]
+        },
+        "data": {
+          "$ref": "#/definitions/api.FaceSearchDTO"
+        },
+        "message": {
+          "description": "response message",
+          "type": "string"
+        },
+        "method": {
+          "description": "request method",
+          "type": "string"
+        },
+        "path": {
+          "description": "request path",
+          "type": "string"
+        },
+        "request_id": {
+          "description": "request id",
+          "type": "string"
+        },
+        "timestamp": {
+          "description": "timestamp (ms)",
+          "type": "integer"
+        }
+      }
+    },
+    "api.FieldError": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "description": "field name",
+          "type": "string"
+        },
+        "message": {
+          "description": "error message",
+          "type": "string"
+        },
+        "value": {
+          "description": "field value",
+          "type": "string"
+        }
+      }
+    },
+    "api.GoogleTokenRequest": {
+      "type": "object",
+      "required": [
+        "id_token"
+      ],
+      "properties": {
+        "id_token": {
+          "type": "string"
+        }
+      }
+    },
+    "api.InviteMemberRequest": {
+      "type": "object",
+      "required": [
+        "email",
+        "role"
+      ],
+      "properties": {
+        "email": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        }
+      }
+    },
+    "api.LivenessSilentDTO": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer"
+        },
+        "filename": {
+          "type": "string"
+        },
+        "liveness_results": {
+          "type": "object",
+          "properties": {
+            "confidence": {
+              "type": "number"
+            },
+            "face_exist_confidence": {
+              "type": "number"
+            },
+            "is_face_exist": {
+              "type": "integer"
+            },
+            "is_liveness": {
+              "type": "integer"
+            }
+          }
+        },
+        "msg": {
+          "type": "string"
+        }
+      }
+    },
+    "api.LivenessSilentSuccessResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "description": "response code",
+          "allOf": [
+            {
+              "$ref": "#/definitions/api.ResponseCode"
+            }
+          ]
+        },
+        "data": {
+          "$ref": "#/definitions/api.LivenessSilentDTO"
+        },
+        "message": {
+          "description": "response message",
+          "type": "string"
+        },
+        "method": {
+          "description": "request method",
+          "type": "string"
+        },
+        "path": {
+          "description": "request path",
+          "type": "string"
+        },
+        "request_id": {
+          "description": "request id",
+          "type": "string"
+        },
+        "timestamp": {
+          "description": "timestamp (ms)",
+          "type": "integer"
+        }
+      }
+    },
+    "api.LivenessVideoDTO": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer"
+        },
+        "filename": {
+          "type": "string"
+        },
+        "liveness_results": {
+          "type": "object",
+          "properties": {
+            "confidence": {
+              "type": "number"
+            },
+            "face_exist_confidence": {
+              "type": "number"
+            },
+            "is_face_exist": {
+              "type": "integer"
+            },
+            "is_liveness": {
+              "type": "integer"
+            }
+          }
+        },
+        "msg": {
+          "type": "string"
+        }
+      }
+    },
+    "api.LivenessVideoSuccessResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "description": "response code",
+          "allOf": [
+            {
+              "$ref": "#/definitions/api.ResponseCode"
+            }
+          ]
+        },
+        "data": {
+          "$ref": "#/definitions/api.LivenessVideoDTO"
+        },
+        "message": {
+          "description": "response message",
+          "type": "string"
+        },
+        "method": {
+          "description": "request method",
+          "type": "string"
+        },
+        "path": {
+          "description": "request path",
+          "type": "string"
+        },
+        "request_id": {
+          "description": "request id",
+          "type": "string"
+        },
+        "timestamp": {
+          "description": "timestamp (ms)",
+          "type": "integer"
+        }
+      }
+    },
+    "api.LoginRequest": {
+      "type": "object",
+      "required": [
+        "email",
+        "password"
+      ],
+      "properties": {
+        "email": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string",
+          "minLength": 6
+        }
+      }
+    },
+    "api.OCRPublicResult": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer"
+        },
+        "filename": {
+          "type": "string"
+        },
+        "full_text": {
+          "type": "string"
+        },
+        "msg": {
+          "type": "string"
+        },
+        "parsing_results": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/api.OCRTextItem"
+          }
+        }
+      }
+    },
+    "api.OCRSuccessResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "description": "response code",
+          "allOf": [
+            {
+              "$ref": "#/definitions/api.ResponseCode"
+            }
+          ]
+        },
+        "data": {
+          "$ref": "#/definitions/api.OCRPublicResult"
+        },
+        "message": {
+          "description": "response message",
+          "type": "string"
+        },
+        "method": {
+          "description": "request method",
+          "type": "string"
+        },
+        "path": {
+          "description": "request path",
+          "type": "string"
+        },
+        "request_id": {
+          "description": "request id",
+          "type": "string"
+        },
+        "timestamp": {
+          "description": "timestamp (ms)",
+          "type": "integer"
+        }
+      }
+    },
+    "api.OCRTextItem": {
+      "type": "object",
+      "properties": {
+        "confidence": {
+          "type": "number"
+        },
+        "text": {
+          "type": "string"
+        }
+      }
+    },
+    "api.PasswordResetRequest": {
+      "type": "object",
+      "required": [
+        "email"
+      ],
+      "properties": {
+        "email": {
+          "type": "string"
+        }
+      }
+    },
+    "api.RefreshTokenRequest": {
+      "type": "object",
+      "required": [
+        "client_id",
+        "refresh_token"
+      ],
+      "properties": {
+        "client_id": {
+          "type": "string"
+        },
+        "refresh_token": {
+          "type": "string"
+        }
+      }
+    },
+    "api.RegisterRequest": {
+      "type": "object",
+      "required": [
+        "email",
+        "name",
+        "password"
+      ],
+      "properties": {
+        "avatar_url": {
+          "description": "可选头像URL",
+          "type": "string"
+        },
+        "company": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string",
+          "minLength": 6
+        }
+      }
+    },
+    "api.ResetPasswordConfirmRequest": {
+      "type": "object",
+      "required": [
+        "new_password",
+        "token"
+      ],
+      "properties": {
+        "new_password": {
+          "type": "string",
+          "minLength": 6
+        },
+        "token": {
+          "type": "string"
+        }
+      }
+    },
+    "api.ResponseCode": {
+      "type": "integer",
+      "enum": [
+        200,
+        1000,
+        1001,
+        1002,
+        1003,
+        1004,
+        1005,
+        1006,
+        1007,
+        2000,
+        2001,
+        2002,
+        2003,
+        2004,
+        2005,
+        2006,
+        2007,
+        40201,
+        5000,
+        5001,
+        5002,
+        5003,
+        5004
+      ],
+      "x-enum-comments": {
+        "CodeBadRequest": "invalid request parameters",
+        "CodeBusinessError": "generic business error",
+        "CodeConflict": "resource conflict",
+        "CodeDatabaseError": "database error",
+        "CodeEncryptionError": "encryption error",
+        "CodeFaceNotMatch": "face not matched",
+        "CodeFaceVerifyFailed": "face verification failed",
+        "CodeForbidden": "forbidden",
+        "CodeIDCardNotMatch": "id card information not matched",
+        "CodeInternalError": "internal server error",
+        "CodeInvalidParameter": "invalid parameter",
+        "CodeKYCFailed": "kyc verification failed",
+        "CodeLivenessFailed": "liveness detection failed",
+        "CodeMethodNotAllowed": "method not allowed",
+        "CodeMissingParameter": "missing parameter",
+        "CodeNotFound": "resource not found",
+        "CodeOCRFailed": "ocr recognition failed",
+        "CodePaymentRequired": "quota exceeded, please upgrade your plan",
+        "CodeServiceUnavailable": "service unavailable",
+        "CodeThirdPartyError": "third party service error",
+        "CodeTooManyRequests": "too many requests",
+        "CodeUnauthorized": "unauthorized"
+      },
+      "x-enum-descriptions": [
+        "",
+        "invalid request parameters",
+        "unauthorized",
+        "forbidden",
+        "resource not found",
+        "method not allowed",
+        "too many requests",
+        "invalid parameter",
+        "missing parameter",
+        "generic business error",
+        "ocr recognition failed",
+        "face verification failed",
+        "liveness detection failed",
+        "kyc verification failed",
+        "id card information not matched",
+        "face not matched",
+        "resource conflict",
+        "quota exceeded, please upgrade your plan",
+        "internal server error",
+        "database error",
+        "third party service error",
+        "service unavailable",
+        "encryption error"
+      ],
+      "x-enum-varnames": [
+        "CodeSuccess",
+        "CodeBadRequest",
+        "CodeUnauthorized",
+        "CodeForbidden",
+        "CodeNotFound",
+        "CodeMethodNotAllowed",
+        "CodeTooManyRequests",
+        "CodeInvalidParameter",
+        "CodeMissingParameter",
+        "CodeBusinessError",
+        "CodeOCRFailed",
+        "CodeFaceVerifyFailed",
+        "CodeLivenessFailed",
+        "CodeKYCFailed",
+        "CodeIDCardNotMatch",
+        "CodeFaceNotMatch",
+        "CodeConflict",
+        "CodePaymentRequired",
+        "CodeInternalError",
+        "CodeDatabaseError",
+        "CodeThirdPartyError",
+        "CodeServiceUnavailable",
+        "CodeEncryptionError"
+      ]
+    },
+    "api.SecurityGuide": {
+      "type": "object",
+      "properties": {
+        "api_key": {
+          "type": "object",
+          "properties": {
+            "curl": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "format": {
+              "type": "string"
+            },
+            "header": {
+              "type": "string"
+            },
+            "scopes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "auth_methods": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "oauth2": {
+          "type": "object",
+          "properties": {
+            "curl": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "grant_type": {
+              "type": "string"
+            },
+            "scopes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "token_url": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "api.SuccessResponse": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "description": "response code",
+          "allOf": [
+            {
+              "$ref": "#/definitions/api.ResponseCode"
+            }
+          ]
+        },
+        "data": {
+          "description": "response data"
+        },
+        "message": {
+          "description": "response message",
+          "type": "string"
+        },
+        "method": {
+          "description": "request method",
+          "type": "string"
+        },
+        "path": {
+          "description": "request path",
+          "type": "string"
+        },
+        "request_id": {
+          "description": "request id",
+          "type": "string"
+        },
+        "timestamp": {
+          "description": "timestamp (ms)",
+          "type": "integer"
+        }
+      }
+    },
+    "api.TokenRequest": {
+      "type": "object",
+      "required": [
+        "client_id",
+        "client_secret",
+        "grant_type"
+      ],
+      "properties": {
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret": {
+          "type": "string"
+        },
+        "grant_type": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        }
+      }
+    },
+    "api.UpdatePasswordRequest": {
+      "type": "object",
+      "required": [
+        "current_password",
+        "new_password"
+      ],
+      "properties": {
+        "current_password": {
+          "type": "string",
+          "minLength": 6
+        },
+        "new_password": {
+          "type": "string",
+          "minLength": 6
+        }
+      }
+    },
+    "api.UpdatePlanRequest": {
+      "type": "object",
+      "required": [
+        "plan_id"
+      ],
+      "properties": {
+        "plan_id": {
+          "type": "string",
+          "enum": [
+            "starter",
+            "growth",
+            "scale"
+          ]
+        }
+      }
+    },
+    "api.UpdateUserStatusRequest": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "active",
+            "suspended"
+          ]
+        }
+      }
+    }
+  },
+  "securityDefinitions": {
+    "ApiKeyAuth": {
+      "type": "apiKey",
+      "name": "Authorization",
+      "in": "header"
+    }
+  }
+}

@@ -1,0 +1,304 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "kyc-core-business-001",
+    "title": "KYC核心业务指标监控",
+    "tags": ["kyc", "business", "core", "production"],
+    "timezone": "Asia/Shanghai",
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "核心业务概览",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "KYC认证成功率",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(business_operations_total{operation=~\"kyc_.*\",status=\"success\"}[5m]) / rate(business_operations_total{operation=~\"kyc_.*\"}[5m]) * 100",
+            "legendFormat": "成功率 (%)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "decimals": 2,
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 85},
+                {"color": "green", "value": 95}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 1}
+      },
+      {
+        "id": 3,
+        "title": "总认证量 (QPS)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(business_operations_total{operation=~\"kyc_.*\"}[1m])",
+            "legendFormat": "认证QPS"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 10},
+                {"color": "red", "value": 50}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 1}
+      },
+      {
+        "id": 4,
+        "title": "OCR识别成功率",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(business_operations_total{operation=\"ocr\",status=\"success\"}[5m]) / rate(business_operations_total{operation=\"ocr\"}[5m]) * 100",
+            "legendFormat": "OCR成功率 (%)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "decimals": 2,
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 90},
+                {"color": "green", "value": 98}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 1}
+      },
+      {
+        "id": 5,
+        "title": "人脸识别成功率",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(business_operations_total{operation=\"face_verify\",status=\"success\"}[5m]) / rate(business_operations_total{operation=\"face_verify\"}[5m]) * 100",
+            "legendFormat": "人脸识别成功率 (%)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "decimals": 2,
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 85},
+                {"color": "green", "value": 95}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 1}
+      },
+      {
+        "id": 6,
+        "title": "业务成功率趋势",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(business_operations_total{operation=~\"kyc_.*\",status=\"success\"}[5m]) / rate(business_operations_total{operation=~\"kyc_.*\"}[5m]) * 100",
+            "legendFormat": "KYC成功率"
+          },
+          {
+            "expr": "rate(business_operations_total{operation=\"ocr\",status=\"success\"}[5m]) / rate(business_operations_total{operation=\"ocr\"}[5m]) * 100",
+            "legendFormat": "OCR成功率"
+          },
+          {
+            "expr": "rate(business_operations_total{operation=\"face_verify\",status=\"success\"}[5m]) / rate(business_operations_total{operation=\"face_verify\"}[5m]) * 100",
+            "legendFormat": "人脸识别成功率"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5}
+      },
+      {
+        "id": 7,
+        "title": "业务量趋势",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(business_operations_total{operation=~\"kyc_.*\"}[1m])",
+            "legendFormat": "KYC总量"
+          },
+          {
+            "expr": "rate(business_operations_total{operation=\"ocr\"}[1m])",
+            "legendFormat": "OCR量"
+          },
+          {
+            "expr": "rate(business_operations_total{operation=\"face_verify\"}[1m])",
+            "legendFormat": "人脸识别量"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps"
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5}
+      },
+      {
+        "id": 8,
+        "title": "业务操作性能分析",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 13}
+      },
+      {
+        "id": 9,
+        "title": "平均响应时间 (P95)",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(business_operation_duration_seconds_bucket{operation=~\"kyc_.*\"}[5m]))",
+            "legendFormat": "KYC P95"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(business_operation_duration_seconds_bucket{operation=\"ocr\"}[5m]))",
+            "legendFormat": "OCR P95"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(business_operation_duration_seconds_bucket{operation=\"face_verify\"}[5m]))",
+            "legendFormat": "人脸识别 P95"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s"
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 14}
+      },
+      {
+        "id": 10,
+        "title": "业务操作分布",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum by (operation) (rate(business_operations_total[5m]))",
+            "legendFormat": "{{operation}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps"
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 14}
+      },
+      {
+        "id": 11,
+        "title": "错误分析",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 22}
+      },
+      {
+        "id": 12,
+        "title": "错误率趋势",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(business_operations_total{status=\"failed\"}[5m]) / rate(business_operations_total[5m]) * 100",
+            "legendFormat": "总体错误率"
+          },
+          {
+            "expr": "rate(business_operations_total{operation=\"ocr\",status=\"failed\"}[5m]) / rate(business_operations_total{operation=\"ocr\"}[5m]) * 100",
+            "legendFormat": "OCR错误率"
+          },
+          {
+            "expr": "rate(business_operations_total{operation=\"face_verify\",status=\"failed\"}[5m]) / rate(business_operations_total{operation=\"face_verify\"}[5m]) * 100",
+            "legendFormat": "人脸识别错误率"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 23}
+      },
+      {
+        "id": 13,
+        "title": "错误类型分布",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "sum by (error_type, operation) (rate(business_operations_total{status=\"failed\"}[5m]))",
+            "format": "table"
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {},
+              "indexByName": {},
+              "renameByName": {
+                "error_type": "错误类型",
+                "operation": "业务操作",
+                "Value": "错误率"
+              }
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "custom": {
+              "displayMode": "color-background",
+              "thresholds": {
+                "steps": [
+                  {"color": "green", "value": 0},
+                  {"color": "yellow", "value": 0.1},
+                  {"color": "red", "value": 1}
+                ]
+              }
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 23}
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "time_range",
+          "type": "interval",
+          "query": "1m,5m,10m,30m,1h,6h,12h,1d,7d,30d",
+          "current": {"value": "5m"}
+        }
+      ]
+    }
+  }
+}
