@@ -1,0 +1,175 @@
+groups:
+  - name: bidirectional_auth_alerts
+    interval: 30s
+    rules:
+      # Kong网关绕过尝试告警
+      - alert: KongGatewayBypassAttempt
+        expr: increase(kyc_security_events_total{event_type="KONG_BYPASS_ATTEMPT"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          service: kyc-service
+          component: security
+        annotations:
+          summary: "检测到Kong网关绕过尝试"
+          description: "在过去5分钟内检测到{{ $value }}次Kong网关绕过尝试，客户端IP: {{ $labels.client_ip }}, 路径: {{ $labels.path }}"
+          runbook_url: "https://wiki.company.com/security/kong-bypass-attempt"
+
+      # 服务认证失败告警
+      - alert: ServiceAuthenticationFailure
+        expr: increase(kyc_service_auth_failures_total[5m]) > 5
+        for: 2m
+        labels:
+          severity: critical
+          service: kyc-service
+          component: authentication
+        annotations:
+          summary: "服务认证失败次数过多"
+          description: "服务认证失败次数超过阈值，过去5分钟内失败{{ $value }}次"
+          runbook_url: "https://wiki.company.com/security/service-auth-failure"
+
+      # 无效签名告警
+      - alert: InvalidSignatureDetected
+        expr: increase(kyc_invalid_signatures_total[5m]) > 3
+        for: 1m
+        labels:
+          severity: warning
+          service: kyc-service
+          component: security
+        annotations:
+          summary: "检测到无效签名"
+          description: "过去5分钟内检测到{{ $value }}次无效签名尝试"
+
+      # 时间戳过期告警
+      - alert: TimestampExpiredAttempts
+        expr: increase(kyc_timestamp_expired_total[5m]) > 3
+        for: 1m
+        labels:
+          severity: warning
+          service: kyc-service
+          component: security
+        annotations:
+          summary: "检测到时间戳过期尝试"
+          description: "过去5分钟内检测到{{ $value }}次时间戳过期尝试"
+
+      # 心跳检测失败告警
+      - alert: BidirectionalHeartbeatFailure
+        expr: kyc_heartbeat_healthy == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: kyc-service
+          component: heartbeat
+        annotations:
+          summary: "双向心跳检测失败"
+          description: "双向心跳检测失败，服务可能无法正常通信"
+          runbook_url: "https://wiki.company.com/operations/heartbeat-failure"
+
+      # 心跳延迟过高告警
+      - alert: HeartbeatLatencyHigh
+        expr: kyc_heartbeat_duration_seconds > 5
+        for: 3m
+        labels:
+          severity: warning
+          service: kyc-service
+          component: heartbeat
+        annotations:
+          summary: "心跳延迟过高"
+          description: "心跳延迟{{ $value }}秒，超过5秒阈值"
+
+      # 认证请求异常增长告警
+      - alert: AuthenticationRequestSpike
+        expr: rate(kyc_auth_requests_total[5m]) > 100
+        for: 2m
+        labels:
+          severity: warning
+          service: kyc-service
+          component: authentication
+        annotations:
+          summary: "认证请求异常增长"
+          description: "认证请求速率{{ $value }}次/秒，可能存在攻击行为"
+
+      # 限流触发告警
+      - alert: RateLimitTriggered
+        expr: increase(kyc_rate_limit_exceeded_total[5m]) > 10
+        for: 1m
+        labels:
+          severity: info
+          service: kyc-service
+          component: rate_limiting
+        annotations:
+          summary: "限流被触发"
+          description: "过去5分钟内限流被触发{{ $value }}次"
+
+      # 异常IP访问告警
+      - alert: SuspiciousIPAccess
+        expr: increase(kyc_suspicious_ip_access_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          service: kyc-service
+          component: security
+        annotations:
+          summary: "检测到可疑IP访问"
+          description: "检测到可疑IP {{ $labels.client_ip }} 访问，路径: {{ $labels.path }}"
+
+      # 证书即将过期告警
+      - alert: CertificateExpiringSoon
+        expr: kyc_certificate_expiry_days < 30
+        for: 1d
+        labels:
+          severity: warning
+          service: kyc-service
+          component: certificate
+        annotations:
+          summary: "证书即将过期"
+          description: "证书将在{{ $value }}天后过期，请及时更新"
+
+      # 证书已过期告警
+      - alert: CertificateExpired
+        expr: kyc_certificate_expiry_days < 0
+        for: 0m
+        labels:
+          severity: critical
+          service: kyc-service
+          component: certificate
+        annotations:
+          summary: "证书已过期"
+          description: "证书已过期{{ $value }}天，服务认证可能失败"
+
+      # 服务间通信失败告警
+      - alert: InterServiceCommunicationFailure
+        expr: increase(kyc_inter_service_communication_errors_total[5m]) > 5
+        for: 2m
+        labels:
+          severity: critical
+          service: kyc-service
+          component: communication
+        annotations:
+          summary: "服务间通信失败"
+          description: "服务间通信失败{{ $value }}次，可能影响业务功能"
+
+      # 安全事件总数告警
+      - alert: SecurityEventsHigh
+        expr: rate(kyc_security_events_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: kyc-service
+          component: security
+        annotations:
+          summary: "安全事件过多"
+          description: "安全事件发生速率{{ $value }}次/秒，请检查安全状况"
+
+      # 双向鉴权整体状态告警
+      - alert: BidirectionalAuthDegraded
+        expr: kyc_bidirectional_auth_healthy == 0
+        for: 10m
+        labels:
+          severity: critical
+          service: kyc-service
+          component: bidirectional_auth
+        annotations:
+          summary: "双向鉴权状态异常"
+          description: "双向鉴权系统状态异常，已持续10分钟"
+          runbook_url: "https://wiki.company.com/security/bidirectional-auth-degraded"

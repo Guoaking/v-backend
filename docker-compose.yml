@@ -1,0 +1,81 @@
+version: "3.8"
+
+services:
+  dev-backend:
+    image: ver/verilocale-backend:${DEV_TAG:-dev}
+    container_name: verilocale-backend-dev
+    restart: unless-stopped
+    ports:
+      - "${KYC_PORT:-8092}:${KYC_PORT:-8092}"
+    networks:
+      - shared-network
+    volumes:
+      - ./config.dev.yaml:/app/config.yaml:ro
+      - /opt/test:/opt/test:rw
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      KYC_PORT: 8092
+      KYC_GIN_MODE: debug
+      KYC_LOG_LEVEL: debug
+      KYC_DATABASE_HOST: database
+      KYC_DATABASE_PORT: 5432
+      KYC_DATABASE_USER: kong
+      KYC_DATABASE_PASSWORD: kongpassword
+      KYC_DATABASE_NAME: kong
+      KYC_REDIS_HOST: redis
+      KYC_REDIS_PORT: 6379
+      KYC_MONITORING_TRACING_JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+      KYC_SECURITY_JWT_SECRET: your-jwt-secret-key
+      KYC_SECURITY_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 --spider http://localhost:$KYC_PORT/metrics || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kyc-service:
+    image: ver/verilocale-backend:${PROD_TAG:-1.0.0}
+    container_name: verilocale-backend
+    restart: unless-stopped
+    ports:
+      - "${KYC_PORT:-8082}:${KYC_PORT:-8082}"
+    networks:
+      - shared-network
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - /opt/test:/opt/test:rw
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      KYC_PORT: 8082
+      KYC_GIN_MODE: release
+      KYC_LOG_LEVEL: info
+      KYC_DATABASE_HOST: database
+      KYC_DATABASE_PORT: 5432
+      KYC_DATABASE_USER: kong
+      KYC_DATABASE_PASSWORD: kongpassword
+      KYC_DATABASE_NAME: kong
+      KYC_REDIS_HOST: redis
+      KYC_REDIS_PORT: 6379
+      KYC_MONITORING_TRACING_JAEGER_ENDPOINT: http://jaeger:14268/api/traces
+      KYC_SECURITY_JWT_SECRET: your-jwt-secret-key
+      KYC_SECURITY_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 --spider http://localhost:$KYC_PORT/metrics || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  shared-network:
+    external: true
+    name: shared-network

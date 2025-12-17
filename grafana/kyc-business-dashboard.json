@@ -1,0 +1,292 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "KYC业务监控Dashboard",
+    "tags": ["kyc", "business", "monitoring"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "HTTP请求成功率",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{status=~\"2..\"}[5m]) / rate(http_requests_total[5m]) * 100",
+            "legendFormat": "成功率 (%)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 95},
+                {"color": "green", "value": 99}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "总请求QPS",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total[1m])",
+            "legendFormat": "QPS"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 100},
+                {"color": "red", "value": 500}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "KYC请求成功率",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(kyc_requests_total{status=\"success\"}[5m]) / rate(kyc_requests_total[5m]) * 100",
+            "legendFormat": "KYC成功率 (%)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 80},
+                {"color": "green", "value": 95}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0}
+      },
+      {
+        "id": 4,
+        "title": "KYC QPS",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(kyc_requests_total[1m])",
+            "legendFormat": "KYC QPS"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 50},
+                {"color": "red", "value": 200}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0}
+      },
+      {
+        "id": 5,
+        "title": "HTTP请求QPS趋势",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total[1m])",
+            "legendFormat": "总QPS"
+          },
+          {
+            "expr": "rate(http_requests_total{status=~\"2..\"}[1m])",
+            "legendFormat": "成功QPS"
+          },
+          {
+            "expr": "rate(http_requests_total{status=~\"4..\"}[1m])",
+            "legendFormat": "客户端错误QPS"
+          },
+          {
+            "expr": "rate(http_requests_total{status=~\"5..\"}[1m])",
+            "legendFormat": "服务器错误QPS"
+          }
+        ],
+        "yAxes": [
+          {"label": "QPS", "unit": "reqps"},
+          {"label": "", "unit": "short"}
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4}
+      },
+      {
+        "id": 6,
+        "title": "HTTP请求耗时P95",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "P95耗时 (秒)"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "P50耗时 (秒)"
+          }
+        ],
+        "yAxes": [
+          {"label": "耗时 (秒)", "unit": "s"},
+          {"label": "", "unit": "short"}
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4}
+      },
+      {
+        "id": 7,
+        "title": "KYC请求QPS趋势",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(kyc_requests_total[1m])",
+            "legendFormat": "总KYC QPS"
+          },
+          {
+            "expr": "rate(kyc_requests_total{status=\"success\"}[1m])",
+            "legendFormat": "成功KYC QPS"
+          },
+          {
+            "expr": "rate(kyc_requests_total{status=\"failed\"}[1m])",
+            "legendFormat": "失败KYC QPS"
+          }
+        ],
+        "yAxes": [
+          {"label": "QPS", "unit": "reqps"},
+          {"label": "", "unit": "short"}
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12}
+      },
+      {
+        "id": 8,
+        "title": "KYC处理耗时P95",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(kyc_duration_seconds_bucket[5m]))",
+            "legendFormat": "KYC P95耗时 (秒)"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(kyc_duration_seconds_bucket[5m]))",
+            "legendFormat": "KYC P50耗时 (秒)"
+          }
+        ],
+        "yAxes": [
+          {"label": "耗时 (秒)", "unit": "s"},
+          {"label": "", "unit": "short"}
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12}
+      },
+      {
+        "id": 9,
+        "title": "第三方服务调用QPS",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(third_party_requests_total[1m])",
+            "legendFormat": "总调用QPS"
+          },
+          {
+            "expr": "rate(third_party_requests_total{status=\"success\"}[1m])",
+            "legendFormat": "成功调用QPS"
+          },
+          {
+            "expr": "rate(third_party_requests_total{status=\"failed\"}[1m])",
+            "legendFormat": "失败调用QPS"
+          }
+        ],
+        "yAxes": [
+          {"label": "QPS", "unit": "reqps"},
+          {"label": "", "unit": "short"}
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20}
+      },
+      {
+        "id": 10,
+        "title": "第三方服务调用耗时P95",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(third_party_duration_seconds_bucket[5m]))",
+            "legendFormat": "第三方P95耗时 (秒)"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(third_party_duration_seconds_bucket[5m]))",
+            "legendFormat": "第三方P50耗时 (秒)"
+          }
+        ],
+        "yAxes": [
+          {"label": "耗时 (秒)", "unit": "s"},
+          {"label": "", "unit": "short"}
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20}
+      },
+      {
+        "id": 11,
+        "title": "错误统计",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(errors_total[1m])",
+            "legendFormat": "总错误率"
+          },
+          {
+            "expr": "rate(errors_total{type=\"kyc\"}[1m])",
+            "legendFormat": "KYC错误率"
+          },
+          {
+            "expr": "rate(errors_total{type=\"third_party\"}[1m])",
+            "legendFormat": "第三方服务错误率"
+          }
+        ],
+        "yAxes": [
+          {"label": "错误数/秒", "unit": "reqps"},
+          {"label": "", "unit": "short"}
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 28}
+      },
+      {
+        "id": 12,
+        "title": "按端点统计的请求成功率",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total[5m])",
+            "legendFormat": "{{method}} {{endpoint}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "displayMode": "color-background"
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 28}
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "5s",
+    "schemaVersion": 27,
+    "version": 1
+  }
+}

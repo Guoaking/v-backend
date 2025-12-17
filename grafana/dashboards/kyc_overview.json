@@ -1,0 +1,91 @@
+{
+  "title": "KYC Service Overview",
+  "timezone": "browser",
+  "panels": [
+    {
+      "type": "stat", "title": "OCR 通过率 (5m)",
+      "targets": [{ "expr": "sum(rate(business_operations_total{operation=\"ocr\",status=\"success\",org_id=~\"$org\"}[5m])) / sum(rate(business_operations_total{operation=\"ocr\",org_id=~\"$org\"}[5m]))" }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" }, "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 }
+    },
+    {
+      "type": "stat", "title": "人脸比对通过率 (5m)",
+      "targets": [{ "expr": "sum(rate(business_operations_total{operation=\"face\",status=\"success\",org_id=~\"$org\"}[5m])) / sum(rate(business_operations_total{operation=\"face\",org_id=~\"$org\"}[5m]))" }],
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 }
+    },
+    {
+      "type": "stat", "title": "静态活体通过率 (5m)",
+      "targets": [{ "expr": "sum(rate(dependency_calls_total{service=\"liveness_service\",method=\"silent\",status=\"success\",org_id=~\"$org\"}[5m])) / sum(rate(dependency_calls_total{service=\"liveness_service\",method=\"silent\",org_id=~\"$org\"}[5m]))" }],
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 }
+    },
+    {
+      "type": "stat", "title": "动态活体通过率 (5m)",
+      "targets": [{ "expr": "sum(rate(dependency_calls_total{service=\"liveness_service\",method=\"video\",status=\"success\",org_id=~\"$org\"}[5m])) / sum(rate(dependency_calls_total{service=\"liveness_service\",method=\"video\",org_id=~\"$org\"}[5m]))" }],
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 }
+    },
+    {
+      "type": "stat", "title": "eKYC 整体通过率 (5m)",
+      "targets": [{ "expr": "sum(rate(business_operations_total{operation=\"kyc\",status=\"success\",org_id=~\"$org\"}[5m])) / sum(rate(business_operations_total{operation=\"kyc\",org_id=~\"$org\"}[5m]))" }],
+      "gridPos": { "x": 0, "y": 4, "w": 6, "h": 4 }
+    },
+    {
+      "type": "bargauge", "title": "模型调用量 (5m)",
+      "targets": [
+        { "expr": "sum(rate(dependency_calls_total{service=\"ocr_service\",org_id=~\"$org\"}[5m]))", "legendFormat": "OCR" },
+        { "expr": "sum(rate(dependency_calls_total{service=\"face_service\",org_id=~\"$org\"}[5m]))", "legendFormat": "Face" },
+        { "expr": "sum(rate(dependency_calls_total{service=\"liveness_service\",org_id=~\"$org\"}[5m]))", "legendFormat": "Liveness" }
+      ],
+      "gridPos": { "x": 6, "y": 4, "w": 12, "h": 4 }
+    },
+    {
+      "type": "bargauge", "title": "第三方错误码分布 (5m)",
+      "targets": [
+        { "expr": "sum by (third_party_code) (rate(dependency_calls_total{status=\"failed\",org_id=~\"$org\"}[5m]))", "legendFormat": "{{third_party_code}}" }
+      ],
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 4 }
+    },
+    {
+      "type": "table", "title": "API Top Endpoints (5m)",
+      "targets": [{ "expr": "topk(10, sum by (http.endpoint)(rate(http_requests_total{org_id=~\"$org\"}[5m])))" }],
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 }
+    },
+    {
+      "type": "timeseries", "title": "QPS & 95th 延迟",
+      "targets": [
+        { "expr": "sum(rate(http_requests_total{org_id=~\"$org\"}[1m]))", "legendFormat": "QPS" },
+        { "expr": "histogram_quantile(0.95, sum by (le)(rate(http_request_duration_seconds_bucket{org_id=~\"$org\"}[5m])))", "legendFormat": "p95" }
+      ],
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 }
+    },
+    {
+      "type": "table", "title": "组织配额 (limit/used/remaining)",
+      "targets": [
+        { "expr": "sum by (org_id,service_type)(org_quota_limit{org_id=~\"$org\"})" },
+        { "expr": "sum by (org_id,service_type)(org_quota_used{org_id=~\"$org\"})" },
+        { "expr": "sum by (org_id,service_type)(org_quota_limit{org_id=~\"$org\"}) - sum by (org_id,service_type)(org_quota_used{org_id=~\"$org\"})", "legendFormat": "remaining" }
+      ],
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 6 }
+    },
+    {
+      "type": "bargauge", "title": "Top 组织使用榜 (累计)",
+      "targets": [
+        { "expr": "topk(10, sum by (org_id)(org_quota_used{org_id=~\"$org\"}))", "legendFormat": "{{org_id}}" }
+      ],
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 6 }
+    }
+  ],
+  "templating": { "list": [
+    {
+      "name": "org",
+      "type": "query",
+      "datasource": "Prometheus",
+      "refresh": 1,
+      "hide": 0,
+      "includeAll": true,
+      "allValue": ".*",
+      "query": "label_values(business_operations_total, org_id)",
+      "regex": "",
+      "current": {"text": "All", "value": ".*"}
+    }
+  ] },
+  "time": { "from": "now-6h", "to": "now" }
+}

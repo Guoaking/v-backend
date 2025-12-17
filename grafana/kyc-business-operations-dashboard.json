@@ -1,0 +1,343 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "kyc-business-operations-001",
+    "title": "业务运营分析仪表板",
+    "tags": ["business", "operations", "analytics", "kpi"],
+    "timezone": "Asia/Shanghai",
+    "refresh": "1m",
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "运营概览",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "日活用户 (DAU)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "count(count by (user_id) (business_operations_total{operation=~\"get_user_profile|admin_user_list|admin_org_list\"}[24h]))",
+            "legendFormat": "日活用户"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 10},
+                {"color": "green", "value": 50}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 1}
+      },
+      {
+        "id": 3,
+        "title": "总认证量 (今日)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(increase(business_operations_total{operation=~\"kyc_.*\"}[1d]))",
+            "legendFormat": "今日认证量"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 100},
+                {"color": "green", "value": 500}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 1}
+      },
+      {
+        "id": 4,
+        "title": "认证成功率 (今日)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(increase(business_operations_total{operation=~\"kyc_.*\",status=\"success\"}[1d])) / sum(increase(business_operations_total{operation=~\"kyc_.*\"}[1d])) * 100",
+            "legendFormat": "成功率 (%)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "decimals": 2,
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 85},
+                {"color": "green", "value": 95}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 1}
+      },
+      {
+        "id": 5,
+        "title": "平均处理时间",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(increase(business_operation_duration_seconds_bucket{operation=~\"kyc_.*\"}[1d])) by (le))",
+            "legendFormat": "P50 处理时间"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "decimals": 3,
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 2},
+                {"color": "red", "value": 5}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 1}
+      },
+      {
+        "id": 6,
+        "title": "用户活跃度趋势",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "count(count by (user_id) (business_operations_total{operation=~\"get_user_profile|admin_user_list|admin_org_list\"}[1h]))",
+            "legendFormat": "小时活跃用户"
+          },
+          {
+            "expr": "count(count by (user_id) (business_operations_total{operation=~\"get_user_profile|admin_user_list|admin_org_list\"}[24h]))",
+            "legendFormat": "日活用户"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "fillOpacity": 10,
+              "gradientMode": "none",
+              "pointSize": 5
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5}
+      },
+      {
+        "id": 7,
+        "title": "认证量趋势",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "sum(rate(business_operations_total{operation=~\"kyc_.*\"}[1m])) * 3600",
+            "legendFormat": "小时认证量"
+          },
+          {
+            "expr": "sum(rate(business_operations_total{operation=~\"kyc_.*\"}[5m])) * 300",
+            "legendFormat": "5分钟认证量"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqph",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "fillOpacity": 10,
+              "gradientMode": "none",
+              "pointSize": 5
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5}
+      },
+      {
+        "id": 8,
+        "title": "业务成功率分析",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 13}
+      },
+      {
+        "id": 9,
+        "title": "各业务成功率对比",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(business_operations_total{operation=\"ocr\",status=\"success\"}[5m]) / rate(business_operations_total{operation=\"ocr\"}[5m]) * 100",
+            "legendFormat": "OCR成功率"
+          },
+          {
+            "expr": "rate(business_operations_total{operation=\"face_verify\",status=\"success\"}[5m]) / rate(business_operations_total{operation=\"face_verify\"}[5m]) * 100",
+            "legendFormat": "人脸识别成功率"
+          },
+          {
+            "expr": "rate(business_operations_total{operation=~\"kyc_.*\",status=\"success\"}[5m]) / rate(business_operations_total{operation=~\"kyc_.*\"}[5m]) * 100",
+            "legendFormat": "整体KYC成功率"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "min": 0,
+            "max": 100,
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "fillOpacity": 10,
+              "gradientMode": "none",
+              "pointSize": 5
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 14}
+      },
+      {
+        "id": 10,
+        "title": "业务处理时间分布",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(business_operation_duration_seconds_bucket{operation=\"ocr\"}[5m])) by (le))",
+            "legendFormat": "OCR P50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(business_operation_duration_seconds_bucket{operation=\"ocr\"}[5m])) by (le))",
+            "legendFormat": "OCR P95"
+          },
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(business_operation_duration_seconds_bucket{operation=\"face_verify\"}[5m])) by (le))",
+            "legendFormat": "人脸识别 P50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(business_operation_duration_seconds_bucket{operation=\"face_verify\"}[5m])) by (le))",
+            "legendFormat": "人脸识别 P95"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "fillOpacity": 10,
+              "gradientMode": "none",
+              "pointSize": 5
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 14}
+      },
+      {
+        "id": 11,
+        "title": "用户行为分析",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 22}
+      },
+      {
+        "id": 12,
+        "title": "管理员操作分布",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum by (operation) (rate(business_operations_total{operation=~\"admin_.*\"}[5m]))",
+            "legendFormat": "{{operation}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "custom": {
+              "pieType": "pie"
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 23}
+      },
+      {
+        "id": 13,
+        "title": "业务错误分析",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "sum by (error_type, operation) (rate(business_operations_total{status=\"failed\"}[5m]))",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true
+              },
+              "renameByName": {
+                "error_type": "错误类型",
+                "operation": "业务操作",
+                "Value": "错误率 (req/s)"
+              }
+            }
+          },
+          {
+            "id": "sortBy",
+            "options": {
+              "fields": {},
+              "sort": [
+                {
+                  "field": "错误率 (req/s)",
+                  "desc": true
+                }
+              ]
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "custom": {
+              "displayMode": "color-background",
+              "thresholds": {
+                "steps": [
+                  {"color": "green", "value": 0},
+                  {"color": "yellow", "value": 0.1},
+                  {"color": "red", "value": 1}
+                ]
+              }
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 16, "x": 8, "y": 23}
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "time_range",
+          "type": "interval",
+          "query": "1m,5m,10m,30m,1h,6h,12h,1d,7d,30d",
+          "current": {"value": "1h"}
+        }
+      ]
+    }
+  }
+}

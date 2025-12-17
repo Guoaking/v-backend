@@ -1,0 +1,256 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kyc-service
+  namespace: kyc
+  labels:
+    app: kyc-service
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: kyc-service
+  template:
+    metadata:
+      labels:
+        app: kyc-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: kyc-service
+        image: kyc-service:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: KYC_DATABASE_HOST
+          value: postgres-service
+        - name: KYC_DATABASE_PORT
+          value: "5432"
+        - name: KYC_DATABASE_USER
+          valueFrom:
+            secretKeyRef:
+              name: kyc-secrets
+              key: db-user
+        - name: KYC_DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: kyc-secrets
+              key: db-password
+        - name: KYC_DATABASE_DBNAME
+          value: kyc_db
+        - name: KYC_REDIS_HOST
+          value: redis-service
+        - name: KYC_REDIS_PORT
+          value: "6379"
+        - name: KYC_SECURITY_JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: kyc-secrets
+              key: jwt-secret
+        - name: KYC_SECURITY_ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: kyc-secrets
+              key: encryption-key
+        - name: KYC_THIRD_PARTY_OCR_SERVICE_URL
+          value: "http://ocr-service:8080"
+        - name: KYC_THIRD_PARTY_FACE_SERVICE_URL
+          value: "http://face-service:8080"
+        - name: KYC_THIRD_PARTY_LIVENESS_SERVICE_URL
+          value: "http://liveness-service:8080"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: config
+          mountPath: /app/config.yaml
+          subPath: config.yaml
+          readOnly: true
+        - name: logs
+          mountPath: /app/logs
+      volumes:
+      - name: config
+        configMap:
+          name: kyc-config
+      - name: logs
+        emptyDir: {}
+      imagePullSecrets:
+      - name: regcred
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kyc-service
+  namespace: kyc
+  labels:
+    app: kyc-service
+spec:
+  selector:
+    app: kyc-service
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http
+  type: ClusterIP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kyc-config
+  namespace: kyc
+data:
+  config.yaml: |
+    port: 8080
+    gin_mode: release
+    log_level: info
+    
+    database:
+      host: postgres-service
+      port: 5432
+      user: kyc_user
+      password: kyc_password
+      dbname: kyc_db
+      sslmode: require
+      max_open_conns: 25
+      max_idle_conns: 5
+    
+    redis:
+      host: redis-service
+      port: 6379
+      password: ""
+      db: 0
+      pool_size: 10
+      min_idle_conns: 5
+      max_retries: 3
+      dial_timeout: 5s
+      read_timeout: 3s
+      write_timeout: 3s
+    
+    security:
+      jwt_secret: "your-secret-key-here-must-be-32-bytes-long"
+      jwt_expiration: 24h
+      encryption_key: "your-encryption-key-here-32-bytes"
+      rate_limit_per_second: 100
+      rate_limit_burst: 200
+    
+    third_party:
+      ocr_service:
+        url: "http://ocr-service:8080"
+        api_key: "ocr-api-key"
+        timeout: 30
+        retry_count: 3
+      
+      face_service:
+        url: "http://face-service:8080"
+        api_key: "face-api-key"
+        timeout: 30
+        retry_count: 3
+      
+      liveness_service:
+        url: "http://liveness-service:8080"
+        api_key: "liveness-api-key"
+        timeout: 60
+        retry_count: 3
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kyc-secrets
+  namespace: kyc
+type: Opaque
+data:
+  db-user: a3ljX3VzZXI=  # base64 encoded 'kyc_user'
+  db-password: a3ljX3Bhc3N3b3Jk  # base64 encoded 'kyc_password'
+  jwt-secret: eW91ci1zZWNyZXQta2V5LWhlcmUtbXVzdC1iZS0zMi1ieXRlcy1sb25n  # base64 encoded
+  encryption-key: eW91ci1lbmNyeXB0aW9uLWtleS1oZXJlLTMyLWJ5dGVz  # base64 encoded
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kyc-ingress
+  namespace: kyc
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+  - hosts:
+    - kyc.example.com
+    secretName: kyc-tls
+  rules:
+  - host: kyc.example.com
+    http:
+      paths:
+      - path: /(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: kong-proxy
+            port:
+              number: 8000
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: kyc-service-hpa
+  namespace: kyc
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: kyc-service
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60

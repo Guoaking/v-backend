@@ -1,0 +1,12 @@
+cert/
+cert/**
+*.pem
+.idea
+.github
+verilocale-web_*
+node_modules
+.env*
+*zip
+*tar.gz
+artifacts/
+main

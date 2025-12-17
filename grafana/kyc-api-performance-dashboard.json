@@ -1,0 +1,435 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "kyc-api-performance-001",
+    "title": "API性能监控仪表板",
+    "tags": ["api", "performance", "http", "latency"],
+    "timezone": "Asia/Shanghai",
+    "refresh": "15s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "API性能概览",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "总请求QPS",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(http_request_duration_p95_seconds_count[1m]))",
+            "legendFormat": "总QPS"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 100},
+                {"color": "red", "value": 500}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 1}
+      },
+      {
+        "id": 3,
+        "title": "平均响应时间 (P95)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_p95_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P95 响应时间"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "decimals": 3,
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 0.5},
+                {"color": "red", "value": 1}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 1}
+      },
+      {
+        "id": 4,
+        "title": "HTTP成功率",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(http_request_duration_p95_seconds_count{status_class=~\"2..\"}[5m])) / sum(rate(http_request_duration_p95_seconds_count[5m])) * 100",
+            "legendFormat": "成功率 (%)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "decimals": 2,
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 95},
+                {"color": "green", "value": 99}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 1}
+      },
+      {
+        "id": 5,
+        "title": "活跃端点数量",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "count(count by (endpoint) (http_request_duration_p95_seconds_count))",
+            "legendFormat": "活跃端点"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 1}
+      },
+      {
+        "id": 6,
+        "title": "QPS趋势",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "sum(rate(http_request_duration_p95_seconds_count[1m])) by (method)",
+            "legendFormat": "{{method}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "fillOpacity": 10,
+              "gradientMode": "none",
+              "pointSize": 5
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5}
+      },
+      {
+        "id": 7,
+        "title": "响应时间分布 (P50/P95/P99)",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_p95_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_p95_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_p95_seconds_bucket[5m])) by (le))",
+            "legendFormat": "P99"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "fillOpacity": 10,
+              "gradientMode": "none",
+              "pointSize": 5
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5}
+      },
+      {
+        "id": 8,
+        "title": "端点性能分析",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 13}
+      },
+      {
+        "id": 9,
+        "title": "最慢端点 (P95响应时间)",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_p95_seconds_bucket[5m])) by (endpoint))",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true
+              },
+              "renameByName": {
+                "endpoint": "端点",
+                "Value": "P95响应时间 (s)"
+              }
+            }
+          },
+          {
+            "id": "sortBy",
+            "options": {
+              "fields": {},
+              "sort": [
+                {
+                  "field": "P95响应时间 (s)",
+                  "desc": true
+                }
+              ]
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "custom": {
+              "displayMode": "color-background",
+              "thresholds": {
+                "steps": [
+                  {"color": "green", "value": 0},
+                  {"color": "yellow", "value": 0.5},
+                  {"color": "red", "value": 1}
+                ]
+              }
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 14}
+      },
+      {
+        "id": 10,
+        "title": "最高QPS端点",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "sum(rate(http_request_duration_p95_seconds_count[5m])) by (endpoint)",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true
+              },
+              "renameByName": {
+                "endpoint": "端点",
+                "Value": "QPS"
+              }
+            }
+          },
+          {
+            "id": "sortBy",
+            "options": {
+              "fields": {},
+              "sort": [
+                {
+                  "field": "QPS",
+                  "desc": true
+                }
+              ]
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "custom": {
+              "displayMode": "color-background",
+              "thresholds": {
+                "steps": [
+                  {"color": "green", "value": 0},
+                  {"color": "yellow", "value": 10},
+                  {"color": "red", "value": 50}
+                ]
+              }
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 14}
+      },
+      {
+        "id": 11,
+        "title": "错误分析",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 22}
+      },
+      {
+        "id": 12,
+        "title": "HTTP状态码分布",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum by (status_class) (rate(http_request_duration_p95_seconds_count[5m]))",
+            "legendFormat": "{{status_class}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "custom": {
+              "pieType": "pie"
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 23}
+      },
+      {
+        "id": 13,
+        "title": "错误率趋势",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "sum(rate(http_request_duration_p95_seconds_count{status_class=~\"4..|5..\"}[1m])) / sum(rate(http_request_duration_p95_seconds_count[1m])) * 100",
+            "legendFormat": "错误率 (%)"
+          },
+          {
+            "expr": "sum(rate(http_request_duration_p95_seconds_count{status_class=~\"5..\"}[1m])) / sum(rate(http_request_duration_p95_seconds_count[1m])) * 100",
+            "legendFormat": "5xx错误率 (%)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "custom": {
+              "drawStyle": "line",
+              "lineInterpolation": "linear",
+              "fillOpacity": 10,
+              "gradientMode": "none",
+              "pointSize": 5
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 23}
+      },
+      {
+        "id": 14,
+        "title": "高错误率端点",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "sum(rate(http_request_duration_p95_seconds_count{status_class=~\"4..|5..\"}[5m])) by (endpoint) / sum(rate(http_request_duration_p95_seconds_count[5m])) by (endpoint) * 100",
+            "format": "table",
+            "instant": true
+          }
+        ],
+        "transformations": [
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true
+              },
+              "renameByName": {
+                "endpoint": "端点",
+                "Value": "错误率 (%)"
+              }
+            }
+          },
+          {
+            "id": "filterByValue",
+            "options": {
+              "filters": [
+                {
+                  "config": {
+                    "id": "greater",
+                    "options": {
+                      "value": 1
+                    }
+                  },
+                  "fieldName": "错误率 (%)"
+                }
+              ]
+            }
+          },
+          {
+            "id": "sortBy",
+            "options": {
+              "fields": {},
+              "sort": [
+                {
+                  "field": "错误率 (%)",
+                  "desc": true
+                }
+              ]
+            }
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "custom": {
+              "displayMode": "color-background",
+              "thresholds": {
+                "steps": [
+                  {"color": "green", "value": 0},
+                  {"color": "yellow", "value": 1},
+                  {"color": "red", "value": 5}
+                ]
+              }
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 23}
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "endpoint",
+          "type": "query",
+          "query": "label_values(http_request_duration_p95_seconds_count, endpoint)",
+          "label": "API端点",
+          "includeAll": true,
+          "multi": true
+        },
+        {
+          "name": "method",
+          "type": "query",
+          "query": "label_values(http_request_duration_p95_seconds_count, method)",
+          "label": "HTTP方法",
+          "includeAll": true,
+          "multi": true
+        },
+        {
+          "name": "status_class",
+          "type": "query",
+          "query": "label_values(http_request_duration_p95_seconds_count, status_class)",
+          "label": "状态码类别",
+          "includeAll": true,
+          "multi": true
+        }
+      ]
+    }
+  }
+}

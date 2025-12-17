@@ -1,0 +1,284 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Kong API Gateway监控Dashboard",
+    "tags": ["kong", "api-gateway", "monitoring"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Kong请求成功率",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(kong_http_requests_total{code=~\"2..\"}[5m]) / rate(kong_http_requests_total[5m]) * 100",
+            "legendFormat": "成功率 (%)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 95},
+                {"color": "green", "value": 99}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Kong总QPS",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(kong_http_requests_total[1m])",
+            "legendFormat": "总QPS"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 1000},
+                {"color": "red", "value": 5000}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Kong响应时间P95",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(kong_latency_ms_bucket[5m])) / 1000",
+            "legendFormat": "P95响应时间 (秒)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 5}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0}
+      },
+      {
+        "id": 4,
+        "title": "Kong活跃连接数",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "kong_nginx_http_current_connections",
+            "legendFormat": "活跃连接数"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 1000},
+                {"color": "red", "value": 5000}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0}
+      },
+      {
+        "id": 5,
+        "title": "Kong请求QPS趋势",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(kong_http_requests_total[1m])",
+            "legendFormat": "总QPS"
+          },
+          {
+            "expr": "rate(kong_http_requests_total{code=~\"2..\"}[1m])",
+            "legendFormat": "成功QPS"
+          },
+          {
+            "expr": "rate(kong_http_requests_total{code=~\"4..\"}[1m])",
+            "legendFormat": "客户端错误QPS"
+          },
+          {
+            "expr": "rate(kong_http_requests_total{code=~\"5..\"}[1m])",
+            "legendFormat": "服务器错误QPS"
+          }
+        ],
+        "yAxes": [
+          {"label": "QPS", "unit": "reqps"},
+          {"label": "", "unit": "short"}
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4}
+      },
+      {
+        "id": 6,
+        "title": "Kong响应时间分布",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(kong_latency_ms_bucket[5m])) / 1000",
+            "legendFormat": "P50响应时间 (秒)"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(kong_latency_ms_bucket[5m])) / 1000",
+            "legendFormat": "P95响应时间 (秒)"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(kong_latency_ms_bucket[5m])) / 1000",
+            "legendFormat": "P99响应时间 (秒)"
+          }
+        ],
+        "yAxes": [
+          {"label": "响应时间 (秒)", "unit": "s"},
+          {"label": "", "unit": "short"}
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4}
+      },
+      {
+        "id": 7,
+        "title": "按服务统计的请求QPS",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(kong_http_requests_total[1m]) by (service)",
+            "legendFormat": "{{service}}"
+          }
+        ],
+        "yAxes": [
+          {"label": "QPS", "unit": "reqps"},
+          {"label": "", "unit": "short"}
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12}
+      },
+      {
+        "id": 8,
+        "title": "按服务统计的错误率",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(kong_http_requests_total{code=~\"4..\"}[1m]) by (service) / rate(kong_http_requests_total[1m]) by (service) * 100",
+            "legendFormat": "{{service}} 4xx错误率"
+          },
+          {
+            "expr": "rate(kong_http_requests_total{code=~\"5..\"}[1m]) by (service) / rate(kong_http_requests_total[1m]) by (service) * 100",
+            "legendFormat": "{{service}} 5xx错误率"
+          }
+        ],
+        "yAxes": [
+          {"label": "错误率 (%)", "unit": "percent"},
+          {"label": "", "unit": "short"}
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12}
+      },
+      {
+        "id": 9,
+        "title": "Kong连接数趋势",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "kong_nginx_http_current_connections{state=\"reading\"}",
+            "legendFormat": "Reading"
+          },
+          {
+            "expr": "kong_nginx_http_current_connections{state=\"writing\"}",
+            "legendFormat": "Writing"
+          },
+          {
+            "expr": "kong_nginx_http_current_connections{state=\"waiting\"}",
+            "legendFormat": "Waiting"
+          }
+        ],
+        "yAxes": [
+          {"label": "连接数", "unit": "short"},
+          {"label": "", "unit": "short"}
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20}
+      },
+      {
+        "id": 10,
+        "title": "Kong带宽使用",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(kong_bandwidth_total{direction=\"ingress\"}[1m])",
+            "legendFormat": "入口带宽 (bytes/sec)"
+          },
+          {
+            "expr": "rate(kong_bandwidth_total{direction=\"egress\"}[1m])",
+            "legendFormat": "出口带宽 (bytes/sec)"
+          }
+        ],
+        "yAxes": [
+          {"label": "带宽 (bytes/sec)", "unit": "Bps"},
+          {"label": "", "unit": "short"}
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20}
+      },
+      {
+        "id": 11,
+        "title": "Kong上游服务健康状态",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "kong_upstream_target_health",
+            "legendFormat": "{{upstream}} - {{target}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "displayMode": "color-background"
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 28}
+      },
+      {
+        "id": 12,
+        "title": "Kong限流统计",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(kong_rate_limiting_blocked_total[1m])",
+            "legendFormat": "被限流请求"
+          },
+          {
+            "expr": "rate(kong_rate_limiting_delayed_total[1m])",
+            "legendFormat": "被延迟请求"
+          }
+        ],
+        "yAxes": [
+          {"label": "请求数/秒", "unit": "reqps"},
+          {"label": "", "unit": "short"}
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 28}
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "5s",
+    "schemaVersion": 27,
+    "version": 1
+  }
+}

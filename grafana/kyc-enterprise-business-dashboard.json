@@ -1,0 +1,561 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "KYC服务 - 企业级业务监控",
+    "tags": ["kyc", "enterprise", "business", "otel"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "业务概览",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "业务成功率",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(business_operations_total{status=\"success\"}[5m]) / rate(business_operations_total[5m]) * 100",
+            "legendFormat": "整体成功率",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 95},
+                {"color": "green", "value": 99}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 1}
+      },
+      {
+        "id": 3,
+        "title": "业务操作总数",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(business_operations_total)",
+            "legendFormat": "总操作数",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 1}
+      },
+      {
+        "id": 4,
+        "title": "业务错误率",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(business_operations_total{status=\"failed\"}[5m]) / rate(business_operations_total[5m]) * 100",
+            "legendFormat": "错误率",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 1},
+                {"color": "red", "value": 5}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 1}
+      },
+      {
+        "id": 5,
+        "title": "平均业务处理时间",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.5, rate(business_operation_duration_seconds_bucket[5m]))",
+            "legendFormat": "P50",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s"
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 1}
+      },
+      {
+        "id": 6,
+        "title": "业务操作分布",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 5}
+      },
+      {
+        "id": 7,
+        "title": "各业务操作成功率",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(business_operations_total{status=\"success\"}[5m]) / rate(business_operations_total[5m]) * 100",
+            "legendFormat": "{{operation}} 成功率",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "custom": {
+              "drawStyle": "line",
+              "fillOpacity": 10
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 6}
+      },
+      {
+        "id": 8,
+        "title": "业务操作速率",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(business_operations_total[5m])",
+            "legendFormat": "{{operation}} - {{status}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "custom": {
+              "drawStyle": "line",
+              "fillOpacity": 10
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 6}
+      },
+      {
+        "id": 9,
+        "title": "HTTP性能指标",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 14}
+      },
+      {
+        "id": 10,
+        "title": "HTTP请求成功率",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{status_class!=\"5xx\"}[5m]) / rate(http_requests_total[5m]) * 100",
+            "legendFormat": "HTTP成功率",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "yellow", "value": 99},
+                {"color": "green", "value": 99.9}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 15}
+      },
+      {
+        "id": 11,
+        "title": "HTTP错误率(5xx)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{status_class=\"5xx\"}[5m]) / rate(http_requests_total[5m]) * 100",
+            "legendFormat": "服务器错误率",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 0.1},
+                {"color": "red", "value": 1}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 15}
+      },
+      {
+        "id": 12,
+        "title": "HTTP请求延迟P95",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) * 1000",
+            "legendFormat": "P95延迟",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ms",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 500},
+                {"color": "red", "value": 1000}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 15}
+      },
+      {
+        "id": 13,
+        "title": "HTTP请求延迟P99",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m])) * 1000",
+            "legendFormat": "P99延迟",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ms",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 1000},
+                {"color": "red", "value": 2000}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 15}
+      },
+      {
+        "id": 14,
+        "title": "安全与认证指标",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 19}
+      },
+      {
+        "id": 15,
+        "title": "认证失败次数",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(auth_failures_total)",
+            "legendFormat": "认证失败总数",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 10},
+                {"color": "red", "value": 50}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 20}
+      },
+      {
+        "id": 16,
+        "title": "权限拒绝次数",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(permission_denied_total)",
+            "legendFormat": "权限拒绝总数",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": 0},
+                {"color": "yellow", "value": 5},
+                {"color": "red", "value": 20}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 20}
+      },
+      {
+        "id": 17,
+        "title": "敏感数据访问次数",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(sensitive_data_access_total)",
+            "legendFormat": "敏感数据访问总数",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 20}
+      },
+      {
+        "id": 18,
+        "title": "Token验证次数",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(token_validation_total)",
+            "legendFormat": "Token验证总数",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        },
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 20}
+      },
+      {
+        "id": 19,
+        "title": "依赖服务指标",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 24}
+      },
+      {
+        "id": 20,
+        "title": "依赖服务成功率",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(dependency_calls_total{status=\"success\"}[5m]) / rate(dependency_calls_total[5m]) * 100",
+            "legendFormat": "{{service}} - {{method}}",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "custom": {
+              "drawStyle": "line",
+              "fillOpacity": 10
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 25}
+      },
+      {
+        "id": 21,
+        "title": "依赖服务延迟",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(dependency_call_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{service}} - {{method}} P95",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(dependency_call_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{service}} - {{method}} P99",
+            "refId": "B"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "custom": {
+              "drawStyle": "line",
+              "fillOpacity": 10
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 25}
+      },
+      {
+        "id": 22,
+        "title": "系统资源指标",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 33}
+      },
+      {
+        "id": 23,
+        "title": "CPU利用率",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "system_cpu_utilization_percent",
+            "legendFormat": "CPU利用率",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "custom": {
+              "drawStyle": "line",
+              "fillOpacity": 10
+            }
+          }
+        },
+        "gridPos": {"h": 6, "w": 8, "x": 0, "y": 34}
+      },
+      {
+        "id": 24,
+        "title": "内存利用率",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "system_memory_utilization_percent",
+            "legendFormat": "内存利用率",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "custom": {
+              "drawStyle": "line",
+              "fillOpacity": 10
+            }
+          }
+        },
+        "gridPos": {"h": 6, "w": 8, "x": 8, "y": 34}
+      },
+      {
+        "id": 25,
+        "title": "系统错误率",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "system_error_rate",
+            "legendFormat": "系统错误率",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percentunit",
+            "custom": {
+              "drawStyle": "line",
+              "fillOpacity": 10
+            }
+          }
+        },
+        "gridPos": {"h": 6, "w": 8, "x": 16, "y": 34}
+      },
+      {
+        "id": 26,
+        "title": "KYC核心业务指标",
+        "type": "row",
+        "gridPos": {"h": 1, "w": 24, "x": 0, "y": 40}
+      },
+      {
+        "id": 27,
+        "title": "KYC成功率趋势",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "business_kyc_success_rate * 100",
+            "legendFormat": "KYC成功率",
+            "refId": "A"
+          },
+          {
+            "expr": "business_ocr_success_rate * 100",
+            "legendFormat": "OCR成功率",
+            "refId": "B"
+          },
+          {
+            "expr": "business_face_verify_success_rate * 100",
+            "legendFormat": "人脸识别成功率",
+            "refId": "C"
+          },
+          {
+            "expr": "business_liveness_success_rate * 100",
+            "legendFormat": "活体检测成功率",
+            "refId": "D"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "custom": {
+              "drawStyle": "line",
+              "fillOpacity": 10
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 41}
+      },
+      {
+        "id": 28,
+        "title": "KYC处理时间分布",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(business_kyc_processing_time_seconds_bucket[5m]))",
+            "legendFormat": "P50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(business_kyc_processing_time_seconds_bucket[5m]))",
+            "legendFormat": "P95",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(business_kyc_processing_time_seconds_bucket[5m]))",
+            "legendFormat": "P99",
+            "refId": "C"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "custom": {
+              "drawStyle": "line",
+              "fillOpacity": 10
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 49}
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "30s",
+    "schemaVersion": 38,
+    "version": 1
+  },
+  "overwrite": true,
+  "folderId": 0
+}

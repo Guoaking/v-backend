@@ -1,0 +1,18 @@
+{
+  "target_url": "http://localhost:8082",
+  "qps": 100,
+  "duration": "5m",
+  "auth_type": "jwt",
+  "jwt_token": "",
+  "jwt_secret": "your-secret-key-here-must-be-32-bytes-long",
+  "oauth_token": "",
+  "oauth_config": {
+    "client_id": "test-client",
+    "client_secret": "test-secret",
+    "grant_type": "client_credentials",
+    "scope": "kyc:read kyc:write"
+  },
+  "error_rate": 0.1,
+  "metrics_port": 9091,
+  "concurrent_reqs": 10
+}

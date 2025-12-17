@@ -1,0 +1,228 @@
+version: "3.8"
+
+services:
+  database:
+    image: postgres:13
+    container_name: kong-database
+    restart: unless-stopped
+    networks:
+      - shared-network
+    environment:
+      POSTGRES_DB: kong
+      POSTGRES_USER: kong
+      POSTGRES_PASSWORD: kongpassword
+    ports:
+      - "5432:5432"
+    volumes:
+      # - kong-postgres-data:/var/lib/postgresql/data
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./script/db_init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "kong"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pg-backup:
+    image: prodrigestivill/postgres-backup-local
+    restart: always
+    user: postgres:postgres # 避免权限问题
+    volumes:
+      # 将备份文件保存到宿主机的 ./backups 目录
+      - ./backups:/backups
+    depends_on:
+      - database
+    environment:
+      - POSTGRES_HOST=database
+      - POSTGRES_DB=grafana
+      - POSTGRES_USER=kong
+      - POSTGRES_PASSWORD=kongpassword # 与 Postgres 容器密码一致
+      - SCHEDULE=@daily # 每天备份一次，也可以写 Crontab 表达式如 "0 3 * * *"
+      - BACKUP_KEEP_DAYS=7 # 只保留最近 7 天的备份
+      #- BACKUP_KEEP_WEEKS=4  # 保留最近 4 周
+      #- BACKUP_KEEP_MONTHS=6 # 保留最近 6 个月
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    container_name: kyc-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./data/redis_data:/data
+    networks:
+      - shared-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+    retries: 5
+
+  redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: redis-exporter
+    restart: unless-stopped
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+    ports:
+      - "9121:9121"
+    networks:
+      - shared-network
+    depends_on:
+      - redis
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: enterprise-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      # - grafana_data:/var/lib/grafana  # 插件持久化（ /var/lib/grafana/plugins ）、可能的附件/缓存等。
+      # - ./data/grafana:/var/lib/grafana  # 插件持久化（ /var/lib/grafana/plugins ）、可能的附件/缓存等。
+      - ./config/grafana/provisioning:/etc/grafana/provisioning # 存放 Grafana 的“预置配置”文件（YAML），用于在容器启动时自动创建数据源、仪表盘提供者等。
+      # - ./grafana/dashboards:/var/lib/grafana/dashboards   # 存放以文件方式预置的仪表盘 JSON；被上面的“仪表盘提供者”引用并在启动时加载
+      - ./config/grafana/:/etc/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_PLUGINS_PREINSTALL=grafana-piechart-panel
+      #- GF_SERVER_ROOT_URL=https://open.verilocale.com/grafana
+      #- GF_SERVER_SERVE_FROM_SUB_PATH=true
+      - GF_DATABASE_TYPE=postgres
+      - GF_DATABASE_HOST=database:5432
+      - GF_DATABASE_NAME=grafana
+      - GF_DATABASE_USER=kong
+      - GF_DATABASE_PASSWORD=kongpassword
+    user: "0:0"
+    networks:
+      - shared-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+      - database
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: enterprise-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./config/prometheus/alerts:/etc/prometheus/alerts
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/etc/prometheus/console_libraries"
+      - "--web.console.templates=/etc/prometheus/consoles"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.external-url=/prometheus/"
+      - "--web.enable-lifecycle"
+      - "--web.enable-admin-api"
+    networks:
+      - shared-network
+    restart: unless-stopped
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: postgres-exporter
+    restart: unless-stopped
+    environment:
+      - DATA_SOURCE_NAME=postgresql://kong:kongpassword@database:5432/kong?sslmode=disable
+    ports:
+      - "9187:9187"
+    networks:
+      - shared-network
+    depends_on:
+      - database
+
+  # Jaeger链路追踪
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    restart: unless-stopped
+    container_name: kyc-jaeger
+    ports:
+      - "16686:16686" # Jaeger UI
+      - "14268:14268" # Jaeger collector HTTP
+      - "14250:14250" # Jaeger collector gRPC
+      - "6831:6831/udp" # Jaeger agent compact
+      - "6832:6832/udp" # Jaeger agent binary
+      - "5778:5778" # Jaeger agent config
+      - "4317:4317" # OTLP gRPC receiver
+      - "4318:4318" # OTLP HTTP receiver
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+      - SPAN_STORAGE_TYPE=memory
+    networks:
+      - shared-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:16686/",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: enterprise-node-exporter
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.rootfs=/rootfs"
+      - "--path.sysfs=/host/sys"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+    networks:
+      - shared-network
+    restart: unless-stopped
+
+#  telegraf:
+#    image: telegraf:latest
+#    container_name: enterprise-telegraf
+#    volumes:
+#      - ./config/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+#    networks:
+#      - shared-network
+#    restart: unless-stopped
+#    depends_on:
+#      - prometheus
+
+#  alertmanager:
+#    image: prom/alertmanager:latest
+#    container_name: enterprise-alertmanager
+#    ports:
+#      - "9093:9093"
+#    volumes:
+#      - ./config/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+#      - alertmanager_data:/alertmanager
+#    command:
+#      - "--config.file=/etc/alertmanager/alertmanager.yml"
+#      - "--storage.path=/alertmanager"
+#      - "--web.external-url=http://localhost:9093"
+#    networks:
+#      - shared-network
+#    restart: unless-stopped
+
+volumes:
+  prometheus_data:
+  alertmanager_data:
+  # docker volume create kong-postgres-data
+  #kong-postgres-data: # { external: true, name: kong-postgres-data }
+  #redis_data:
+
+networks:
+  shared-network:
+    external: true
+    name: shared-network

@@ -1,0 +1,78 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: "enterprise-monitor"
+
+rule_files:
+  - "/etc/prometheus/alerts/*.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: "node-exporter"
+    static_configs:
+      - targets: ["node-exporter:9100"]
+
+  - job_name: "simulator"
+    static_configs:
+      - targets: ["simulator:8080"]
+    scrape_interval: 5s
+    metrics_path: /metrics
+
+  - job_name: "telegraf"
+    static_configs:
+      - targets: ["telegraf:9273"]
+
+  - job_name: "grafana"
+    static_configs:
+      - targets: ["grafana:3000"]
+
+  - job_name: "alertmanager"
+    static_configs:
+      - targets: ["alertmanager:9093"]
+
+  - job_name: "kong-gateway"
+    scrape_interval: 5s
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["kong-gateway:8001"]
+
+  # KYC服务监控配置 - 原有指标
+  - job_name: "kyc-service"
+    scrape_interval: 15s
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:8082"]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: "kyc-service"
+      - source_labels: [__address__]
+        target_label: service
+        replacement: "kyc-service"
+
+  # KYC服务OpenTelemetry指标 - 9090端口
+  - job_name: "kyc-service-otel"
+    scrape_interval: 15s
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:9090"]  # OTel Prometheus导出器端口
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: "kyc-service-otel"
+      - source_labels: [__address__]
+        target_label: service
+        replacement: "kyc-service"
+      - source_labels: [__address__]
+        target_label: metrics_source
+        replacement: "otel"
