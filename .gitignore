@@ -31,4 +31,5 @@ main
 verilocale-backend*
 cmd/kyc-loadtest/kyc-loadtest
 *.log*
+*.out
 .claude
