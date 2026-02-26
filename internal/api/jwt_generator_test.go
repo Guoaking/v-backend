@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -143,9 +141,17 @@ func TestJWTTokenGenerator_GenerateTokenHandler(t *testing.T) {
 			assert.Equal(t, tt.expectedStatus, w.Code)
 
 			if tt.expectedStatus == http.StatusOK {
-				// 解析响应
+				// 解析统一响应封装
+				var envelope SuccessResponse
+				err := json.Unmarshal(w.Body.Bytes(), &envelope)
+				require.NoError(t, err)
+				require.NotNil(t, envelope.Data)
+
+				// 将 data 反序列化为 JWTTokenResponse
+				dataBytes, err := json.Marshal(envelope.Data)
+				require.NoError(t, err)
 				var response JWTTokenResponse
-				err := json.Unmarshal(w.Body.Bytes(), &response)
+				err = json.Unmarshal(dataBytes, &response)
 				require.NoError(t, err)
 
 				// 验证响应结构
@@ -158,8 +164,12 @@ func TestJWTTokenGenerator_GenerateTokenHandler(t *testing.T) {
 
 				if tt.validateToken {
 					// 验证令牌
+					secret := tt.requestBody.Secret
+					if secret == "" {
+						secret = "test-secret-key-32-bytes-long"
+					}
 					token, err := jwt.Parse(response.AccessToken, func(token *jwt.Token) (interface{}, error) {
-						return []byte(tt.requestBody.Secret), nil
+						return []byte(secret), nil
 					})
 					require.NoError(t, err)
 					assert.True(t, token.Valid)
@@ -170,18 +180,29 @@ func TestJWTTokenGenerator_GenerateTokenHandler(t *testing.T) {
 					assert.Equal(t, tt.requestBody.Issuer, claims["iss"])
 					assert.Equal(t, tt.requestBody.Subject, claims["sub"])
 
-					// 验证自定义声明
+					// 验证自定义声明（JWT MapClaims 中数字默认会反序列化为 float64）
 					for k, v := range tt.requestBody.CustomClaims {
-						assert.Equal(t, v, claims[k])
+						got := claims[k]
+						switch vv := v.(type) {
+						case int:
+							assert.Equal(t, float64(vv), got)
+						case int64:
+							assert.Equal(t, float64(vv), got)
+						case float32:
+							assert.Equal(t, float64(vv), got)
+						default:
+							assert.Equal(t, v, got)
+						}
 					}
 				}
 			} else {
 				// 验证错误响应
-				var errorResp map[string]interface{}
+				var errorResp ErrorResponse
 				err := json.Unmarshal(w.Body.Bytes(), &errorResp)
 				require.NoError(t, err)
+				require.NotEmpty(t, errorResp.Error)
 
-				assert.Contains(t, errorResp["message"].(string), tt.expectedError)
+				assert.Contains(t, errorResp.Error, tt.expectedError)
 			}
 		})
 	}
@@ -316,11 +337,20 @@ func TestJWTTokenGenerator_validateParams(t *testing.T) {
 			expectedError: "主题(subject)不能为空",
 		},
 		{
-			name: "过期时间为0",
+			name: "过期时间为0(允许默认)",
 			params: TokenParams{
 				Issuer:     "test",
 				Subject:    "user",
 				Expiration: 0,
+			},
+			expectedError: "",
+		},
+		{
+			name: "过期时间为负数",
+			params: TokenParams{
+				Issuer:     "test",
+				Subject:    "user",
+				Expiration: -1 * time.Second,
 			},
 			expectedError: "过期时间(expiration)必须大于0",
 		},
@@ -357,49 +387,4 @@ func TestJWTTokenGenerator_validateParams(t *testing.T) {
 			}
 		})
 	}
-}
-
-func Test2(t *testing.T) {
-	fmt.Println("测试JWT生成器修复...")
-
-	// 创建JWT生成器
-	generator := NewJWTTokenGenerator("yYBD4KdaY8Y7YaWOYJvlvgl2fNfI8gzG", "kyc-service")
-
-	// 测试参数
-	params := TokenParams{
-		Issuer:     "my-app",
-		Subject:    "user123",
-		Audience:   []string{"api", "web"},
-		Expiration: 24 * time.Hour,
-		CustomClaims: map[string]interface{}{
-			"role":       "admin",
-			"department": "engineering",
-		},
-	}
-
-	// 生成token
-	ctx := context.Background()
-	tokenResponse, err := generator.GenerateToken(ctx, params)
-	if err != nil {
-		log.Fatalf("JWT生成失败: %v", err)
-	}
-
-	tokenResponse.AccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb25zdW1lcl9pZCI6InlZQkQ0S2RhWThZN1lhV09ZSnZsdmdsMmZOZkk4Z3pHIiwiZXhwIjoxNzYzMjkwNzI0LCJpYXQiOjE3NjMyODcxMjQsImlzcyI6InlZQkQ0S2RhWThZN1lhV09ZSnZsdmdsMmZOZkk4Z3pHIiwia2V5IjoieVlCRDRLZGFZOFk3WWFXT1lKdmx2Z2wyZk5mSThnekciLCJuYmYiOjE3NjMyODcxMjR9.Aooa97ZP_X6peTQnqvLugPo42Cqtha01kqWqBcS3wnk"
-	fmt.Printf("生成的JWT Token: %s\n", tokenResponse.AccessToken)
-	fmt.Printf("过期时间: %d秒\n", tokenResponse.ExpiresIn)
-	fmt.Printf("刷新令牌: %s\n", tokenResponse.RefreshToken)
-
-	// 验证token
-	claims, err := generator.ValidateToken(ctx, tokenResponse.AccessToken)
-	if err != nil {
-		log.Fatalf("JWT验证失败: %v", err)
-	}
-
-	fmt.Printf("验证成功！\n")
-	fmt.Printf("发行者: %s\n", claims.Issuer)
-	fmt.Printf("主题: %s\n", claims.Subject)
-	fmt.Printf("受众: %v\n", claims.Audience)
-	fmt.Printf("自定义声明: %v\n", claims.CustomClaims)
-
-	fmt.Println("\n测试完成！JWT生成器修复成功。")
 }

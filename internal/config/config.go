@@ -101,8 +101,12 @@ type ThirdPartyConfig struct {
 	} `mapstructure:"liveness_video"`
 }
 
-func Load() *Config {
-	viper.SetConfigName("config")
+func Load(configFile string) *Config {
+	if configFile == "" {
+		configFile = "config"
+	}
+
+	viper.SetConfigName(strings.TrimSuffix(configFile, ".yaml"))
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
 	viper.AddConfigPath("./config")
@@ -198,10 +202,10 @@ func setDefaults() {
 	viper.SetDefault("monitoring.alerting.enabled", false)
 	viper.SetDefault("monitoring.alerting.webhook_url", "")
 	viper.SetDefault("monitoring.alerting.slack_webhook", "")
-    viper.SetDefault("monitoring.alerting.email_smtp", "")
-    viper.SetDefault("monitoring.alerting.email_from", "")
-    viper.SetDefault("monitoring.alerting.email_user", "")
-    viper.SetDefault("monitoring.alerting.email_password", "")
-    viper.SetDefault("monitoring.alerting.email_port", 587)
-    viper.SetDefault("monitoring.alerting.email_tls", false)
+	viper.SetDefault("monitoring.alerting.email_smtp", "")
+	viper.SetDefault("monitoring.alerting.email_from", "")
+	viper.SetDefault("monitoring.alerting.email_user", "")
+	viper.SetDefault("monitoring.alerting.email_password", "")
+	viper.SetDefault("monitoring.alerting.email_port", 587)
+	viper.SetDefault("monitoring.alerting.email_tls", false)
 }

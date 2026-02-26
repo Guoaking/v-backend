@@ -141,23 +141,23 @@ func JWTAuth(service *service.KYCService) gin.HandlerFunc {
 		c.Set("user", claims)
 		c.Set("userID", user.ID)
 		c.Set("userEmail", user.Email)
-        c.Set("userRole", user.Role)
-        // 解析当前组织上下文：优先 CurrentOrgID，否则回退到用户OrgID
-        currentOrgID := user.CurrentOrgID
-        if currentOrgID == "" {
-            currentOrgID = user.OrgID
-        }
-        c.Set("orgID", currentOrgID)
-        // 从成员表解析组织角色
-        var member models.OrganizationMember
-        if currentOrgID != "" {
-            _ = service.DB.Where("organization_id = ? AND user_id = ? AND status = ?", currentOrgID, user.ID, "active").First(&member).Error
-        }
-        orgRole := member.Role
-        if orgRole == "" {
-            orgRole = user.OrgRole
-        }
-        c.Set("orgRole", orgRole)
+		c.Set("userRole", user.Role)
+		// 解析当前组织上下文：优先 CurrentOrgID，否则回退到用户OrgID
+		currentOrgID := user.CurrentOrgID
+		if currentOrgID == "" {
+			currentOrgID = user.OrgID
+		}
+		c.Set("orgID", currentOrgID)
+		// 从成员表解析组织角色
+		var member models.OrganizationMember
+		if currentOrgID != "" {
+			_ = service.DB.Where("organization_id = ? AND user_id = ? AND status = ?", currentOrgID, user.ID, "active").First(&member).Error
+		}
+		orgRole := member.Role
+		if orgRole == "" {
+			orgRole = user.OrgRole
+		}
+		c.Set("orgRole", orgRole)
 		c.Set("isPlatformAdmin", user.IsPlatformAdmin)
 		if user.CurrentOrgID != "" {
 			c.Set("currentOrgID", user.CurrentOrgID)
@@ -167,12 +167,12 @@ func JWTAuth(service *service.KYCService) gin.HandlerFunc {
 		var permIDs []string
 		type rp struct{ PermissionID string }
 		var rows []rp
-        if err := service.DB.Table("role_permissions").Select("permission_id").Where("role_id = ?", orgRole).Scan(&rows).Error; err == nil {
-            for _, r := range rows {
-                permIDs = append(permIDs, r.PermissionID)
-            }
-        }
-        c.Set("permissions", permIDs)
+		if err := service.DB.Table("role_permissions").Select("permission_id").Where("role_id = ?", orgRole).Scan(&rows).Error; err == nil {
+			for _, r := range rows {
+				permIDs = append(permIDs, r.PermissionID)
+			}
+		}
+		c.Set("permissions", permIDs)
 
 		c.Next()
 	}

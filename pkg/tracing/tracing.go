@@ -12,12 +12,12 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/jaeger"
 	"go.opentelemetry.io/otel/exporters/prometheus"
+	otelmetric "go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
-	otelmetric "go.opentelemetry.io/otel/metric"
 	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
@@ -102,7 +102,7 @@ func Init(cfg *config.Config) (func(), error) {
 			}
 		})
 
-		logger.GetLogger().Infof("OpenTelemetry指标已启用，Prometheus端点: %s:%d%s", 
+		logger.GetLogger().Infof("OpenTelemetry指标已启用，Prometheus端点: %s:%d%s",
 			"localhost", cfg.Monitoring.Metrics.Port, cfg.Monitoring.Metrics.Path)
 	}
 
@@ -134,7 +134,6 @@ func Init(cfg *config.Config) (func(), error) {
 
 	return cleanup, nil
 }
-
 
 // GetTracer 获取tracer
 func GetTracer() oteltrace.Tracer {

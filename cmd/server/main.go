@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"net/http"
 	"os"
@@ -158,8 +159,13 @@ func executeSecurityAuditMigration(db *gorm.DB) error {
 func main() {
 	ctx := context.Background()
 
+	// 解析命令行参数
+	var configFile string
+	flag.StringVar(&configFile, "config", "config", "配置文件路径 (不包含 .yaml 扩展名)")
+	flag.Parse()
+
 	// 加载配置
-	cfg := config.Load()
+	cfg := config.Load(configFile)
 
 	// 初始化日志
 	logger.Init(cfg.LogLevel)
@@ -509,11 +515,10 @@ func main() {
 	        ALTER TABLE oauth_clients ADD COLUMN IF NOT EXISTS ip_whitelist TEXT[] DEFAULT '{}'::text[];
 	        ALTER TABLE oauth_clients ADD COLUMN IF NOT EXISTS rate_limit_per_sec INTEGER DEFAULT 0;
 	        ALTER TABLE oauth_clients ADD COLUMN IF NOT EXISTS owner_id TEXT;
-	        DO $$ BEGIN
-	            IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_oauth_clients_ip_whitelist') THEN
-	                CREATE INDEX idx_oauth_clients_ip_whitelist ON oauth_clients USING GIN (ip_whitelist);
-	            END IF;
-	        END $$;
+	        
+	        IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_oauth_clients_ip_whitelist') THEN
+	            CREATE INDEX idx_oauth_clients_ip_whitelist ON oauth_clients USING GIN (ip_whitelist);
+	        END IF;
 	    END IF;
 	END $$;
 	`).Error; err != nil {

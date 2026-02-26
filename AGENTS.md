@@ -49,6 +49,15 @@ go test -cover ./...
 go test -coverprofile=coverage.out ./...
 go tool cover -html=coverage.out
 
+# Run CI quick test
+./scripts/test-quick.sh
+
+# Run CI full test
+./scripts/test-all.sh
+
+# Generate coverage report
+./scripts/test-coverage.sh
+
 # Test bidirectional authentication
 ./scripts/test-bidirectional-auth.sh
 
@@ -127,6 +136,101 @@ go test -v ./...
 - Include both success and error scenarios
 - Mock external dependencies appropriately
 - Test data should be isolated and reproducible
+
+## CI/CD & Automated Testing
+
+### Local CI Scripts
+项目配置了本地自动化测试脚本，确保代码质量：
+
+#### Quick Test（快速测试）
+```bash
+./scripts/test-quick.sh
+```
+- **触发时机**：开发过程中手动执行
+- **执行内容**：
+  - 代码格式检查（gofmt）
+  - 静态分析（go vet）
+  - 单元测试（go test）
+- **耗时**：约 10-30 秒
+- **用途**：快速验证代码基础质量
+
+#### Full Test（完整测试）
+```bash
+./scripts/test-all.sh
+```
+- **触发时机**：推送前自动执行
+- **执行内容**：
+  - 包含快速测试的所有内容
+  - 构建检查（go build）
+  - 安全检查（敏感信息泄露）
+- **耗时**：约 1-2 分钟
+- **用途**：全面验证代码质量和安全性
+
+#### Coverage Report（覆盖率报告）
+```bash
+./scripts/test-coverage.sh
+```
+- **执行内容**：
+  - 生成测试覆盖率数据
+  - 输出文本和 HTML 报告
+  - 计算总体覆盖率
+- **输出位置**：`coverage/` 目录
+- **用途**：分析测试覆盖情况
+
+### Git Hooks（自动化验证）
+
+#### Pre-commit Hook
+- **触发时机**：每次 `git commit` 时
+- **执行内容**：`./scripts/test-quick.sh`
+- **文件位置**：`.git/hooks/pre-commit`
+- **作用**：防止提交有基础问题的代码
+
+#### Pre-push Hook
+- **触发时机**：每次 `git push` 时
+- **执行内容**：`./scripts/test-all.sh`
+- **文件位置**：`.git/hooks/pre-push`
+- **作用**：防止推送有问题的代码到远程
+
+### Normal Development Workflow
+```bash
+# 1. 修改代码
+vim internal/api/some_handler.go
+
+# 2. 提交（自动运行快速测试）
+git add .
+git commit -m "feat: 添加新功能"
+# ✅ pre-commit hook 自动运行 test-quick.sh
+
+# 3. 推送（自动运行完整测试）
+git push origin main
+# ✅ pre-push hook 自动运行 test-all.sh
+```
+
+### Skip Verification（跳过验证）
+```bash
+# 跳过提交前验证（紧急情况）
+git commit --no-verify -m "紧急修复"
+
+# 跳过推送前验证（紧急情况）
+git push --no-verify origin main
+```
+
+### CI/CD Requirements
+- **测试覆盖率目标**：
+  - 整体覆盖率：> 70%
+  - 核心业务逻辑：> 90%
+  - 认证授权模块：100%
+- **代码质量标准**：
+  - 所有代码必须通过 gofmt 格式化
+  - 所有代码必须通过 go vet 静态分析
+  - 所有公共函数必须有测试用例
+- **安全检查**：
+  - 不得提交明文密码、密钥、token
+  - 不得有未处理的错误
+  - 不得有 SQL 注入风险
+
+### CI/CD Documentation
+详细配置说明请查看：`docs/CI_SETUP.md`
 
 ## Security
 

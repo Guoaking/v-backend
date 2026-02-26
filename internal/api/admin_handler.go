@@ -1,18 +1,18 @@
 package api
 
 import (
-    "encoding/json"
-    "fmt"
-    "time"
+	"encoding/json"
+	"fmt"
+	"time"
 
-    "kyc-service/internal/middleware"
-    "kyc-service/internal/models"
-    "kyc-service/internal/service"
-    "kyc-service/pkg/logger"
-    "kyc-service/pkg/metrics"
+	"kyc-service/internal/middleware"
+	"kyc-service/internal/models"
+	"kyc-service/internal/service"
+	"kyc-service/pkg/logger"
+	"kyc-service/pkg/metrics"
 
-    "github.com/gin-gonic/gin"
-    "golang.org/x/crypto/bcrypt"
+	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // AdminHandler 管理员处理器
@@ -129,11 +129,11 @@ func (h *AdminHandler) GetUserList(c *gin.Context) {
 	//}
 
 	var req AdminUserListRequest
-    if err := c.ShouldBindQuery(&req); err != nil {
-        metrics.RecordBusinessOperation(c.Request.Context(), "admin_user_list", false, time.Since(start), "invalid_request")
-        JSONError(c, CodeInvalidParameter, "参数验证失败")
-        return
-    }
+	if err := c.ShouldBindQuery(&req); err != nil {
+		metrics.RecordBusinessOperation(c.Request.Context(), "admin_user_list", false, time.Since(start), "invalid_request")
+		JSONError(c, CodeInvalidParameter, "参数验证失败")
+		return
+	}
 
 	// 设置默认值并计算分页参数
 	if req.Page < 1 {

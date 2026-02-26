@@ -107,40 +107,42 @@ func RequirePermission(perm string) gin.HandlerFunc {
 }
 
 func RequireAnyPermission(perms []string) gin.HandlerFunc {
-    return func(c *gin.Context) {
-        if c.GetBool("isPlatformAdmin") {
-            c.Next()
-            return
-        }
-        role := c.GetString("orgRole")
-        if role == "owner" || role == "admin" {
-            c.Next()
-            return
-        }
-        v, exists := c.Get("permissions")
-        if !exists {
-            forbiddenJSON(c, "Missing permissions in context")
-            c.Abort()
-            return
-        }
-        ps, _ := v.([]string)
-        allowed := false
-        for _, p := range ps {
-            for _, need := range perms {
-                if p == need || p == "*" {
-                    allowed = true
-                    break
-                }
-            }
-            if allowed { break }
-        }
-        if !allowed {
-            forbiddenJSON(c, "Permission denied")
-            c.Abort()
-            return
-        }
-        c.Next()
-    }
+	return func(c *gin.Context) {
+		if c.GetBool("isPlatformAdmin") {
+			c.Next()
+			return
+		}
+		role := c.GetString("orgRole")
+		if role == "owner" || role == "admin" {
+			c.Next()
+			return
+		}
+		v, exists := c.Get("permissions")
+		if !exists {
+			forbiddenJSON(c, "Missing permissions in context")
+			c.Abort()
+			return
+		}
+		ps, _ := v.([]string)
+		allowed := false
+		for _, p := range ps {
+			for _, need := range perms {
+				if p == need || p == "*" {
+					allowed = true
+					break
+				}
+			}
+			if allowed {
+				break
+			}
+		}
+		if !allowed {
+			forbiddenJSON(c, "Permission denied")
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
 }
 
 // RequirePlatformAdmin 仅平台管理员可访问

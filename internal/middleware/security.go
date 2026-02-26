@@ -25,7 +25,7 @@ func NewSecurityMiddleware(encryptionKey string) (*SecurityMiddleware, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &SecurityMiddleware{
 		encryptor: encryptor,
 	}, nil
@@ -37,10 +37,10 @@ func (s *SecurityMiddleware) DataMasking() gin.HandlerFunc {
 		// 生成请求ID用于追踪
 		requestID := uuid.New().String()
 		c.Set("request_id", requestID)
-		
+
 		// 继续处理请求
 		c.Next()
-		
+
 		// 响应脱敏处理
 		s.maskResponse(c)
 	}
@@ -50,34 +50,34 @@ func (s *SecurityMiddleware) DataMasking() gin.HandlerFunc {
 func (s *SecurityMiddleware) AuditLogging() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
-		
+
 		// 记录请求前的状态
 		requestID := c.GetString("request_id")
 		if requestID == "" {
 			requestID = uuid.New().String()
 			c.Set("request_id", requestID)
 		}
-		
+
 		// 获取用户信息
 		userID, _ := c.Get("user_id")
 		// clientID, _ := c.Get("client_id")  // 暂时不使用，避免编译错误
-		
+
 		// 脱敏处理请求参数
 		maskedParams := s.maskRequestParams(c)
-		
+
 		// 记录敏感数据访问
 		if isSensitiveEndpoint(c.Request.URL.Path) {
 			userIDStr := fmt.Sprintf("%v", userID)
 			RecordSensitiveDataAccess("audit_log", userIDStr, true, c.Request.URL.Path)
 		}
-		
+
 		// 继续处理
 		c.Next()
-		
+
 		// 记录审计日志
 		duration := time.Since(start)
 		statusCode := c.Writer.Status()
-		
+
 		auditLog := &models.AuditLog{
 			RequestID: requestID,
 			UserID:    fmt.Sprintf("%v", userID),
@@ -88,10 +88,10 @@ func (s *SecurityMiddleware) AuditLogging() gin.HandlerFunc {
 			Status:    fmt.Sprintf("%d", statusCode),
 			Message:   fmt.Sprintf("耗时: %v, 参数: %s", duration, maskedParams),
 		}
-		
+
 		// 记录业务操作
 		RecordBusinessOperation("audit_log", statusCode < 400, duration, "")
-		
+
 		// 异步保存审计日志
 		go func() {
 			if err := s.saveAuditLog(auditLog); err != nil {
@@ -110,7 +110,7 @@ func (s *SecurityMiddleware) PIIProtection() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		
+
 		c.Next()
 	}
 }
@@ -118,7 +118,7 @@ func (s *SecurityMiddleware) PIIProtection() gin.HandlerFunc {
 // maskRequestParams 脱敏请求参数
 func (s *SecurityMiddleware) maskRequestParams(c *gin.Context) string {
 	params := make(map[string]interface{})
-	
+
 	// 处理查询参数
 	for key, values := range c.Request.URL.Query() {
 		if s.isSensitiveField(key) {
@@ -127,7 +127,7 @@ func (s *SecurityMiddleware) maskRequestParams(c *gin.Context) string {
 			params[key] = values
 		}
 	}
-	
+
 	// 处理表单参数
 	if c.Request.Method == "POST" || c.Request.Method == "PUT" {
 		c.Request.ParseForm()
@@ -139,7 +139,7 @@ func (s *SecurityMiddleware) maskRequestParams(c *gin.Context) string {
 			}
 		}
 	}
-	
+
 	// 转换为JSON字符串
 	jsonData, _ := json.Marshal(params)
 	return string(jsonData)
@@ -171,7 +171,7 @@ func (s *SecurityMiddleware) isSensitiveField(field string) bool {
 		"bankcard", "bank_card", "creditcard", "credit_card",
 		"passport", "driverlicense", "driver_license",
 	}
-	
+
 	fieldLower := strings.ToLower(field)
 	for _, sensitive := range sensitiveFields {
 		if strings.Contains(fieldLower, sensitive) {
@@ -186,22 +186,22 @@ func (s *SecurityMiddleware) maskSensitiveValue(value string) string {
 	if value == "" {
 		return ""
 	}
-	
+
 	// 身份证号脱敏
 	if len(value) == 18 && s.isIDCard(value) {
 		return logger.DesensitizeIDCard(value)
 	}
-	
+
 	// 手机号脱敏
 	if len(value) == 11 && s.isPhoneNumber(value) {
 		return logger.DesensitizePhone(value)
 	}
-	
+
 	// 姓名脱敏
 	if len(value) >= 2 && s.isChineseName(value) {
 		return logger.DesensitizeName(value)
 	}
-	
+
 	// 邮箱脱敏
 	if strings.Contains(value, "@") {
 		parts := strings.Split(value, "@")
@@ -213,12 +213,12 @@ func (s *SecurityMiddleware) maskSensitiveValue(value string) string {
 			return "***@" + parts[1]
 		}
 	}
-	
+
 	// 通用脱敏：保留前2后2，中间用*代替
 	if len(value) > 4 {
 		return value[:2] + "***" + value[len(value)-2:]
 	}
-	
+
 	return "***"
 }
 
@@ -227,14 +227,14 @@ func (s *SecurityMiddleware) isIDCard(value string) bool {
 	if len(value) != 18 {
 		return false
 	}
-	
+
 	// 检查前17位是否为数字
 	for i := 0; i < 17; i++ {
 		if value[i] < '0' || value[i] > '9' {
 			return false
 		}
 	}
-	
+
 	// 检查最后一位（可以是数字或X）
 	lastChar := value[17]
 	return (lastChar >= '0' && lastChar <= '9') || lastChar == 'X' || lastChar == 'x'
@@ -245,14 +245,14 @@ func (s *SecurityMiddleware) isPhoneNumber(value string) bool {
 	if len(value) != 11 {
 		return false
 	}
-	
+
 	// 检查是否都是数字
 	for i := 0; i < 11; i++ {
 		if value[i] < '0' || value[i] > '9' {
 			return false
 		}
 	}
-	
+
 	// 检查是否为有效的手机号段（简化检查）
 	return value[0] == '1' && (value[1] >= '3' && value[1] <= '9')
 }
@@ -274,18 +274,18 @@ func (s *SecurityMiddleware) isChineseName(value string) bool {
 func (s *SecurityMiddleware) checkSensitiveData(c *gin.Context) error {
 	// 检查请求体中是否包含明文敏感信息
 	// 这里可以实现更复杂的检测逻辑
-	
+
 	// 检查身份证号
 	body, _ := c.GetRawData()
 	if s.containsPlainIDCard(string(body)) {
 		return fmt.Errorf("请求包含明文身份证号")
 	}
-	
+
 	// 检查银行卡号
 	if s.containsPlainBankCard(string(body)) {
 		return fmt.Errorf("请求包含明文银行卡号")
 	}
-	
+
 	return nil
 }
 
@@ -296,7 +296,7 @@ func (s *SecurityMiddleware) containsPlainIDCard(text string) bool {
 	if len(text) < 18 {
 		return false
 	}
-	
+
 	// 查找连续的18位数字或17位数字+X
 	for i := 0; i <= len(text)-18; i++ {
 		segment := text[i : i+18]
@@ -304,7 +304,7 @@ func (s *SecurityMiddleware) containsPlainIDCard(text string) bool {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -315,14 +315,14 @@ func (s *SecurityMiddleware) containsPlainBankCard(text string) bool {
 	if len(text) < 16 {
 		return false
 	}
-	
+
 	// 查找连续的16-19位数字
 	for i := 0; i <= len(text)-16; i++ {
 		end := i + 16
 		if end > len(text) {
 			end = len(text)
 		}
-		
+
 		segment := text[i:end]
 		if len(segment) >= 16 && len(segment) <= 19 {
 			allDigits := true
@@ -337,7 +337,7 @@ func (s *SecurityMiddleware) containsPlainBankCard(text string) bool {
 			}
 		}
 	}
-	
+
 	return false
 }
 
@@ -345,7 +345,7 @@ func (s *SecurityMiddleware) containsPlainBankCard(text string) bool {
 func (s *SecurityMiddleware) saveAuditLog(log *models.AuditLog) error {
 	// 这里应该实现审计日志的保存逻辑
 	// 可以保存到数据库、消息队列或专门的审计系统
-	
+
 	logger.GetLogger().WithFields(map[string]interface{}{
 		"request_id": log.RequestID,
 		"user_id":    log.UserID,
@@ -355,7 +355,7 @@ func (s *SecurityMiddleware) saveAuditLog(log *models.AuditLog) error {
 		"status":     log.Status,
 		"message":    log.Message,
 	}).Info("审计日志")
-	
+
 	return nil
 }
 

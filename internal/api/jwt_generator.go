@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"time"
 
 	"kyc-service/pkg/logger"
@@ -25,14 +24,14 @@ type TokenGenerator interface {
 
 // TokenParams JWT生成参数
 type TokenParams struct {
-	Issuer     string                 `json:"issuer" binding:"required"`
-	Subject    string                 `json:"subject" binding:"required"`
-	Audience   []string               `json:"audience"`
-	Expiration time.Duration          `json:"expiration"`
-	NotBefore  time.Time              `json:"not_before"`
+	Issuer       string                 `json:"issuer"`
+	Subject      string                 `json:"subject"`
+	Audience     []string               `json:"audience"`
+	Expiration   time.Duration          `json:"expiration"`
+	NotBefore    time.Time              `json:"not_before"`
 	CustomClaims map[string]interface{} `json:"custom_claims"`
-	Algorithm  string                 `json:"algorithm"`
-	Secret     string                 `json:"secret"`
+	Algorithm    string                 `json:"algorithm"`
+	Secret       string                 `json:"secret"`
 }
 
 // JWTTokenResponse JWT令牌响应
@@ -47,13 +46,13 @@ type JWTTokenResponse struct {
 
 // TokenClaims JWT声明
 type TokenClaims struct {
-	Issuer    string    `json:"iss"`
-	Subject   string    `json:"sub"`
-	Audience  []string  `json:"aud"`
-	ExpiresAt time.Time `json:"exp"`
-	NotBefore time.Time `json:"nbf"`
-	IssuedAt  time.Time `json:"iat"`
-	JWTID     string    `json:"jti"`
+	Issuer       string                 `json:"iss"`
+	Subject      string                 `json:"sub"`
+	Audience     []string               `json:"aud"`
+	ExpiresAt    time.Time              `json:"exp"`
+	NotBefore    time.Time              `json:"nbf"`
+	IssuedAt     time.Time              `json:"iat"`
+	JWTID        string                 `json:"jti"`
 	CustomClaims map[string]interface{} `json:"custom,omitempty"`
 }
 
@@ -77,7 +76,7 @@ func NewJWTTokenGenerator(defaultSecret, issuer string) *JWTTokenGenerator {
 func (g *JWTTokenGenerator) GenerateTokenHandler(c *gin.Context) {
 	ctx := c.Request.Context()
 	requestID := c.GetString("request_id")
-	
+
 	// 创建span用于链路追踪
 	tracer := otel.Tracer("jwt-generator")
 	ctx, span := tracer.Start(ctx, "GenerateToken", trace.WithAttributes(
@@ -85,7 +84,7 @@ func (g *JWTTokenGenerator) GenerateTokenHandler(c *gin.Context) {
 		attribute.String("operation", "jwt_generation"),
 	))
 	defer span.End()
-	
+
 	// 记录请求开始
 	logger.GetLogger().WithFields(map[string]interface{}{
 		"request_id": requestID,
@@ -93,63 +92,63 @@ func (g *JWTTokenGenerator) GenerateTokenHandler(c *gin.Context) {
 		"client_ip":  c.ClientIP(),
 		"user_agent": c.Request.UserAgent(),
 	}).Info("JWT令牌生成请求开始")
-	
+
 	// 记录指标
 	startTime := time.Now()
 	metrics.RecordAuthRequest("jwt_generation", true)
-	
+
 	var params TokenParams
 	if err := c.ShouldBindJSON(&params); err != nil {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.type", "validation_error"))
-		
+
 		metrics.RecordAuthRequest("jwt_generation", false)
 		logger.GetLogger().WithError(err).WithField("request_id", requestID).Warn("JWT参数验证失败")
-		
-		JSONError(c, http.StatusBadRequest, "参数验证失败")
+
+		JSONError(c, CodeInvalidParameter, "参数验证失败")
 		return
 	}
-	
+
 	// 验证参数
 	if err := g.validateParams(&params); err != nil {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.type", "validation_error"))
-		
+
 		metrics.RecordAuthRequest("jwt_generation", false)
 		logger.GetLogger().WithError(err).WithField("request_id", requestID).Warn("JWT参数验证失败")
-		
-		JSONError(c, http.StatusBadRequest, err.Error())
+
+		JSONError(c, CodeInvalidParameter, err.Error())
 		return
 	}
-	
+
 	// 生成令牌
 	tokenResponse, err := g.GenerateToken(ctx, params)
 	if err != nil {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("error.type", "generation_error"))
-		
+
 		metrics.RecordAuthRequest("jwt_generation", false)
 		logger.GetLogger().WithError(err).WithField("request_id", requestID).Error("JWT令牌生成失败")
-		
-		JSONError(c, http.StatusInternalServerError, "令牌生成失败")
+
+		JSONError(c, CodeInternalError, "令牌生成失败")
 		return
 	}
-	
+
 	// 记录成功指标
 	duration := time.Since(startTime)
 	metrics.RecordHTTPRequest(ctx, "POST", "/api/v1/token/generate", "200", duration)
-	
+
 	// 记录成功日志
 	logger.GetLogger().WithFields(map[string]interface{}{
-		"request_id":    requestID,
-		"operation":     "jwt_generation",
-		"issuer":        params.Issuer,
-		"subject":       params.Subject,
-		"algorithm":     params.Algorithm,
-		"expires_in":    tokenResponse.ExpiresIn,
-		"duration_ms":   duration.Milliseconds(),
+		"request_id":  requestID,
+		"operation":   "jwt_generation",
+		"issuer":      params.Issuer,
+		"subject":     params.Subject,
+		"algorithm":   params.Algorithm,
+		"expires_in":  tokenResponse.ExpiresIn,
+		"duration_ms": duration.Milliseconds(),
 	}).Info("JWT令牌生成成功")
-	
+
 	// 设置span属性
 	span.SetAttributes(
 		attribute.String("jwt.issuer", params.Issuer),
@@ -158,7 +157,7 @@ func (g *JWTTokenGenerator) GenerateTokenHandler(c *gin.Context) {
 		attribute.Int64("jwt.expires_in", int64(tokenResponse.ExpiresIn)),
 		attribute.String("jwt.token_id", tokenResponse.AccessToken[:20]+"..."),
 	)
-	
+
 	JSONSuccess(c, tokenResponse)
 }
 
@@ -170,10 +169,10 @@ func (g *JWTTokenGenerator) GenerateToken(ctx context.Context, params TokenParam
 		attribute.String("jwt.subject", params.Subject),
 	))
 	defer span.End()
-	
+
 	// 获取当前时间
 	now := time.Now()
-	
+
 	// 设置默认参数
 	if params.Algorithm == "" {
 		params.Algorithm = g.defaultAlg
@@ -188,10 +187,10 @@ func (g *JWTTokenGenerator) GenerateToken(ctx context.Context, params TokenParam
 	if params.NotBefore.IsZero() {
 		params.NotBefore = now
 	}
-	
+
 	// 生成JWT ID
 	jwtID := fmt.Sprintf("jwt_%s_%d", params.Issuer, now.Unix())
-	
+
 	// 创建自定义声明映射
 	customClaims := make(jwt.MapClaims)
 	for k, v := range params.CustomClaims {
@@ -204,10 +203,10 @@ func (g *JWTTokenGenerator) GenerateToken(ctx context.Context, params TokenParam
 	customClaims["nbf"] = params.NotBefore.Unix()
 	customClaims["iat"] = now.Unix()
 	customClaims["jti"] = jwtID
-	
+
 	// 创建令牌
 	token := jwt.NewWithClaims(jwt.GetSigningMethod(params.Algorithm), customClaims)
-	
+
 	// 签名令牌
 	tokenString, err := token.SignedString([]byte(params.Secret))
 	if err != nil {
@@ -215,13 +214,13 @@ func (g *JWTTokenGenerator) GenerateToken(ctx context.Context, params TokenParam
 		logger.GetLogger().WithError(err).Error("JWT签名失败")
 		return nil, fmt.Errorf("JWT签名失败: %w", err)
 	}
-	
+
 	// 生成刷新令牌
 	refreshToken := fmt.Sprintf("refresh_%s_%d", jwtID, time.Now().UnixNano())
-	
+
 	// 记录指标
 	metrics.RecordJWTGeneration(params.Issuer, params.Algorithm, true)
-	
+
 	return &JWTTokenResponse{
 		AccessToken:  tokenString,
 		TokenType:    "Bearer",
@@ -237,7 +236,7 @@ func (g *JWTTokenGenerator) ValidateToken(ctx context.Context, tokenString strin
 	tracer := otel.Tracer("jwt-generator")
 	_, span := tracer.Start(ctx, "ValidateToken")
 	defer span.End()
-	
+
 	// 解析令牌
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		// 验证签名方法
@@ -246,20 +245,20 @@ func (g *JWTTokenGenerator) ValidateToken(ctx context.Context, tokenString strin
 		}
 		return []byte(g.defaultSecret), nil
 	})
-	
+
 	if err != nil {
 		span.RecordError(err)
 		metrics.RecordJWTValidation(false)
 		return nil, fmt.Errorf("令牌验证失败: %w", err)
 	}
-	
+
 	// 验证令牌有效性
 	if !token.Valid {
 		span.SetAttributes(attribute.String("validation.result", "invalid"))
 		metrics.RecordJWTValidation(false)
 		return nil, fmt.Errorf("令牌无效")
 	}
-	
+
 	// 提取声明
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
@@ -267,12 +266,12 @@ func (g *JWTTokenGenerator) ValidateToken(ctx context.Context, tokenString strin
 		metrics.RecordJWTValidation(false)
 		return nil, fmt.Errorf("无法提取令牌声明")
 	}
-	
+
 	// 构建响应
 	tokenClaims := &TokenClaims{
 		CustomClaims: make(map[string]interface{}),
 	}
-	
+
 	// 提取标准声明
 	if iss, ok := claims["iss"].(string); ok {
 		tokenClaims.Issuer = iss
@@ -299,18 +298,18 @@ func (g *JWTTokenGenerator) ValidateToken(ctx context.Context, tokenString strin
 	if jti, ok := claims["jti"].(string); ok {
 		tokenClaims.JWTID = jti
 	}
-	
+
 	// 提取自定义声明
 	for k, v := range claims {
 		if k != "iss" && k != "sub" && k != "aud" && k != "exp" && k != "nbf" && k != "iat" && k != "jti" {
 			tokenClaims.CustomClaims[k] = v
 		}
 	}
-	
+
 	// 记录指标
 	metrics.RecordJWTValidation(true)
 	span.SetAttributes(attribute.String("validation.result", "success"))
-	
+
 	return tokenClaims, nil
 }
 
@@ -319,17 +318,17 @@ func (g *JWTTokenGenerator) RefreshToken(ctx context.Context, refreshToken strin
 	tracer := otel.Tracer("jwt-generator")
 	_, span := tracer.Start(ctx, "RefreshToken")
 	defer span.End()
-	
+
 	// 验证刷新令牌格式
 	if len(refreshToken) < 10 {
 		return nil, fmt.Errorf("无效的刷新令牌格式")
 	}
-	
+
 	// 这里应该验证刷新令牌的有效性
 	// 实际实现中需要查询数据库或缓存验证
-	
+
 	span.SetAttributes(attribute.String("refresh_token_id", refreshToken[:20]))
-	
+
 	// 生成新的访问令牌
 	params := TokenParams{
 		Issuer:     "system",
@@ -338,7 +337,7 @@ func (g *JWTTokenGenerator) RefreshToken(ctx context.Context, refreshToken strin
 		Algorithm:  g.defaultAlg,
 		Secret:     g.defaultSecret,
 	}
-	
+
 	return g.GenerateToken(ctx, params)
 }
 
@@ -350,10 +349,11 @@ func (g *JWTTokenGenerator) validateParams(params *TokenParams) error {
 	if params.Subject == "" {
 		return fmt.Errorf("主题(subject)不能为空")
 	}
-	if params.Expiration <= 0 {
+	// Expiration 为 0 时允许使用默认值（由 GenerateToken 内部补齐）
+	if params.Expiration < 0 {
 		return fmt.Errorf("过期时间(expiration)必须大于0")
 	}
-	if params.Expiration > 8760*time.Hour { // 1年
+	if params.Expiration > 0 && params.Expiration > 8760*time.Hour { // 1年
 		return fmt.Errorf("过期时间不能超过1年")
 	}
 	if params.Algorithm != "" && params.Algorithm != "HS256" && params.Algorithm != "HS384" && params.Algorithm != "HS512" {

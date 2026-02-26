@@ -1,23 +1,23 @@
 package middleware
 
 import (
-    "encoding/json"
-    "strings"
-    "time"
+	"encoding/json"
+	"strings"
+	"time"
 
-    "github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin"
 )
 
 func RequireKeyScope(required string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-        var scopes []string
-        raw := c.GetString("scopes")
-        if raw != "" {
-            // 兼容两种格式：JSON数组字符串 或 空格分隔字符串
-            if err := json.Unmarshal([]byte(raw), &scopes); err != nil {
-                scopes = strings.Fields(strings.TrimSpace(raw))
-            }
-        }
+		var scopes []string
+		raw := c.GetString("scopes")
+		if raw != "" {
+			// 兼容两种格式：JSON数组字符串 或 空格分隔字符串
+			if err := json.Unmarshal([]byte(raw), &scopes); err != nil {
+				scopes = strings.Fields(strings.TrimSpace(raw))
+			}
+		}
 		has := false
 		for _, s := range scopes {
 			if s == required {

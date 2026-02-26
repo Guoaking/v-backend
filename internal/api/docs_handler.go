@@ -60,10 +60,10 @@ type ErrorCodeEntry struct {
 }
 
 type ErrorCodesDoc struct {
-    Client []ErrorCodeEntry `json:"client_errors"`
-    Business []ErrorCodeEntry `json:"business_errors"`
-    Payment []ErrorCodeEntry `json:"payment_errors"`
-    Server []ErrorCodeEntry `json:"server_errors"`
+	Client   []ErrorCodeEntry `json:"client_errors"`
+	Business []ErrorCodeEntry `json:"business_errors"`
+	Payment  []ErrorCodeEntry `json:"payment_errors"`
+	Server   []ErrorCodeEntry `json:"server_errors"`
 }
 
 // ErrorCodesDoc

@@ -1,52 +1,52 @@
 package api
 
 import (
-    "kyc-service/internal/models"
-    "kyc-service/internal/service"
-    "kyc-service/pkg/crypto"
-    "kyc-service/pkg/logger"
-    "kyc-service/pkg/utils"
-    "strings"
-    "time"
+	"kyc-service/internal/models"
+	"kyc-service/internal/service"
+	"kyc-service/pkg/crypto"
+	"kyc-service/pkg/logger"
+	"kyc-service/pkg/utils"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
 // APIKeyHandler API密钥管理处理器
 type APIKeyHandler struct {
-    service *service.KYCService
+	service *service.KYCService
 }
 
 // NewAPIKeyHandler 创建API密钥管理处理器
 func NewAPIKeyHandler(svc *service.KYCService) *APIKeyHandler {
-    return &APIKeyHandler{service: svc}
+	return &APIKeyHandler{service: svc}
 }
 
 // ApproveAPIKey 审批激活API密钥
 func (h *APIKeyHandler) ApproveAPIKey(c *gin.Context) {
-    orgID := c.GetString("orgID")
-    keyID := c.Param("id")
-    if orgID == "" || keyID == "" {
-        JSONError(c, CodeInvalidParameter, "参数错误")
-        return
-    }
-    key, err := h.service.GetAPIKeyByID(keyID)
-    if err != nil || key.OrgID != orgID {
-        JSONError(c, CodeNotFound, "API密钥不存在")
-        return
-    }
-    // 简单策略校验（可扩展为组织策略模板校验）
-    if key.Status == "revoked" {
-        JSONError(c, CodeForbidden, "已撤销的密钥不可激活")
-        return
-    }
-    key.Status = "active"
-    if err := h.service.UpdateAPIKey(key); err != nil {
-        JSONError(c, CodeDatabaseError, "审批失败")
-        return
-    }
-    h.recordAuditLog(c, c.GetString("userID"), "approve_api_key", "success", "API key approved")
-    JSONSuccess(c, gin.H{"approved": keyID})
+	orgID := c.GetString("orgID")
+	keyID := c.Param("id")
+	if orgID == "" || keyID == "" {
+		JSONError(c, CodeInvalidParameter, "参数错误")
+		return
+	}
+	key, err := h.service.GetAPIKeyByID(keyID)
+	if err != nil || key.OrgID != orgID {
+		JSONError(c, CodeNotFound, "API密钥不存在")
+		return
+	}
+	// 简单策略校验（可扩展为组织策略模板校验）
+	if key.Status == "revoked" {
+		JSONError(c, CodeForbidden, "已撤销的密钥不可激活")
+		return
+	}
+	key.Status = "active"
+	if err := h.service.UpdateAPIKey(key); err != nil {
+		JSONError(c, CodeDatabaseError, "审批失败")
+		return
+	}
+	h.recordAuditLog(c, c.GetString("userID"), "approve_api_key", "success", "API key approved")
+	JSONSuccess(c, gin.H{"approved": keyID})
 }
 
 // CreateAPIKeyRequest 创建API密钥请求
@@ -123,11 +123,11 @@ func (h *APIKeyHandler) CreateAPIKey(c *gin.Context) {
 		return
 	}
 
-    var req CreateAPIKeyRequest
-    if err := c.ShouldBindJSON(&req); err != nil {
-        JSONError(c, CodeInvalidParameter, "Invalid request format")
-        return
-    }
+	var req CreateAPIKeyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		JSONError(c, CodeInvalidParameter, "Invalid request format")
+		return
+	}
 
 	// 生成API密钥
 	apiKey := utils.GenerateAPIKey()
@@ -147,25 +147,25 @@ func (h *APIKeyHandler) CreateAPIKey(c *gin.Context) {
 		}
 	}
 
-    orgID := c.GetString("orgID")
-    // 策略校验
-    policy := h.service.GetOrgPolicy(orgID)
-    if !h.service.ValidateScopesSubset(policy.AllowedScopes, req.Scopes) {
-        JSONError(c, CodeForbidden, "Scopes not allowed by organization policy")
-        return
-    }
+	orgID := c.GetString("orgID")
+	// 策略校验
+	policy := h.service.GetOrgPolicy(orgID)
+	if !h.service.ValidateScopesSubset(policy.AllowedScopes, req.Scopes) {
+		JSONError(c, CodeForbidden, "Scopes not allowed by organization policy")
+		return
+	}
 
-    key := &models.APIKey{
-        ID:          apiKey,
-        UserID:      userID.(string),
-        OrgID:       orgID,
-        Name:        req.Name,
-        SecretHash:  secretHash,
-        Prefix:      prefix,
-        Scopes:      utils.ToJSONString(req.Scopes),
-        Status:      map[bool]string{true: "pending", false: "active"}[policy.RequireApproval],
-        IPWhitelist: req.IPWhitelist,
-    }
+	key := &models.APIKey{
+		ID:          apiKey,
+		UserID:      userID.(string),
+		OrgID:       orgID,
+		Name:        req.Name,
+		SecretHash:  secretHash,
+		Prefix:      prefix,
+		Scopes:      utils.ToJSONString(req.Scopes),
+		Status:      map[bool]string{true: "pending", false: "active"}[policy.RequireApproval],
+		IPWhitelist: req.IPWhitelist,
+	}
 
 	if err := h.service.CreateAPIKey(key); err != nil {
 		logger.GetLogger().WithError(err).Error("Failed to create API key")
@@ -173,8 +173,8 @@ func (h *APIKeyHandler) CreateAPIKey(c *gin.Context) {
 		return
 	}
 
-    // 记录审计日志
-    h.recordAuditLog(c, userID.(string), "create_api_key", "success", "API key created")
+	// 记录审计日志
+	h.recordAuditLog(c, userID.(string), "create_api_key", "success", "API key created")
 
 	JSONSuccess(c, APIKeyResponse{
 		ID:          key.ID,
@@ -214,18 +214,18 @@ func (h *APIKeyHandler) DeleteAPIKey(c *gin.Context) {
 		return
 	}
 
-    // 更新密钥状态为已撤销
-    key.Status = "revoked"
-    if err := h.service.UpdateAPIKey(key); err != nil {
-        logger.GetLogger().WithError(err).Error("Failed to revoke API key")
-        JSONError(c, CodeDatabaseError, "Failed to revoke API key")
-        return
-    }
+	// 更新密钥状态为已撤销
+	key.Status = "revoked"
+	if err := h.service.UpdateAPIKey(key); err != nil {
+		logger.GetLogger().WithError(err).Error("Failed to revoke API key")
+		JSONError(c, CodeDatabaseError, "Failed to revoke API key")
+		return
+	}
 
-    // 加入黑名单缓存，撤销即时生效
-    if h.service.Redis != nil {
-        _ = h.service.Redis.Set(c.Request.Context(), "apikey:blacklist:"+key.ID, "1", 24*3600*time.Second).Err()
-    }
+	// 加入黑名单缓存，撤销即时生效
+	if h.service.Redis != nil {
+		_ = h.service.Redis.Set(c.Request.Context(), "apikey:blacklist:"+key.ID, "1", 24*3600*time.Second).Err()
+	}
 
 	// 记录审计日志
 	h.recordAuditLog(c, userID.(string), "revoke_api_key", "success", "API key revoked")

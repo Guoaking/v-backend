@@ -14,6 +14,9 @@ import (
 )
 
 var (
+	// 是否已完成 OTel 指标初始化（未初始化时 Record* 应该安全 no-op）
+	otelMetricsInitialized bool
+
 	// HTTP指标
 	httpRequestDuration metric.Float64Histogram
 	httpRequestsTotal   metric.Int64Counter
@@ -298,11 +301,16 @@ func InitOTelMetrics() error {
 
 	// 启用 Go runtime 指标导出
 	_ = runtimeotel.Start(runtimeotel.WithMinimumReadMemStatsInterval(10 * time.Second))
+	otelMetricsInitialized = true
 	return nil
 }
 
 // RecordHTTPRequest 记录HTTP请求指标
 func RecordHTTPRequest(ctx context.Context, method, endpoint, status string, duration time.Duration) {
+	if !otelMetricsInitialized {
+		return
+	}
+
 	orgID := ""
 	if v := ctx.Value("org_id"); v != nil {
 		if s, ok := v.(string); ok {
@@ -342,6 +350,10 @@ func RecordHTTPRequest(ctx context.Context, method, endpoint, status string, dur
 
 // RecordBusinessOperation 记录业务操作指标
 func RecordBusinessOperation(ctx context.Context, operation string, success bool, duration time.Duration, errorType string) {
+	if !otelMetricsInitialized {
+		return
+	}
+
 	status := "success"
 	if !success {
 		status = "failed"
@@ -376,6 +388,10 @@ func RecordBusinessOperation(ctx context.Context, operation string, success bool
 
 // RecordAuthFailure 记录认证失败
 func RecordAuthFailure(ctx context.Context, authType, reason, clientIP string) {
+	if !otelMetricsInitialized {
+		return
+	}
+
 	attrs := []attribute.KeyValue{
 		attribute.String("auth_type", authType),
 		attribute.String("reason", reason),
@@ -387,6 +403,10 @@ func RecordAuthFailure(ctx context.Context, authType, reason, clientIP string) {
 
 // RecordPermissionDenied 记录权限拒绝
 func RecordPermissionDenied(ctx context.Context, resource, action, userID, reason string) {
+	if !otelMetricsInitialized {
+		return
+	}
+
 	attrs := []attribute.KeyValue{
 		attribute.String("resource", resource),
 		attribute.String("action", action),

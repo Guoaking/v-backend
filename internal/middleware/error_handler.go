@@ -19,7 +19,7 @@ func ErrorHandler() gin.HandlerFunc {
 		if len(c.Errors) > 0 {
 			// 获取最后一个错误
 			err := c.Errors.Last()
-			
+
 			logger.GetLogger().WithFields(map[string]interface{}{
 				"error":      err.Error(),
 				"status":     c.Writer.Status(),
@@ -32,13 +32,13 @@ func ErrorHandler() gin.HandlerFunc {
 			if !c.Writer.Written() {
 				// 使用通用的JSON响应，避免循环导入
 				c.JSON(-1, gin.H{
-					"code":      getErrorCode(c.Writer.Status()),
-					"message":   getErrorMessage(c.Writer.Status()),
-					"error":     err.Error(),
-					"timestamp": time.Now().UnixMilli(),
+					"code":       getErrorCode(c.Writer.Status()),
+					"message":    getErrorMessage(c.Writer.Status()),
+					"error":      err.Error(),
+					"timestamp":  time.Now().UnixMilli(),
 					"request_id": c.GetString("request_id"),
-					"path":      c.Request.URL.Path,
-					"method":    c.Request.Method,
+					"path":       c.Request.URL.Path,
+					"method":     c.Request.Method,
 				})
 			}
 		}
@@ -50,7 +50,7 @@ func Recovery() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
 			if err := recover(); err != nil {
-                stack := string(debug.Stack())
+				stack := string(debug.Stack())
 				logger.GetLogger().WithFields(map[string]interface{}{
 					"error":      err,
 					"path":       c.Request.URL.Path,
@@ -61,13 +61,13 @@ func Recovery() gin.HandlerFunc {
 
 				// 返回统一的错误响应
 				c.JSON(500, gin.H{
-					"code":      5000,
-					"message":   "系统内部错误",
-					"error":     "系统内部错误，请联系管理员",
-					"timestamp": time.Now().UnixMilli(),
+					"code":       5000,
+					"message":    "系统内部错误",
+					"error":      "系统内部错误，请联系管理员",
+					"timestamp":  time.Now().UnixMilli(),
 					"request_id": c.GetString("request_id"),
-					"path":      c.Request.URL.Path,
-					"method":    c.Request.Method,
+					"path":       c.Request.URL.Path,
+					"method":     c.Request.Method,
 				})
 				c.Abort()
 			}

@@ -55,7 +55,7 @@ func Logger() gin.HandlerFunc {
 
 		}
 
-		fmt.Sprintf("%s - [%s] \"%s %s %s %d %s \"%s\" %s\" trace_id=%s span_id=%s request_id=%s\n",
+		return fmt.Sprintf("%s - [%s] \"%s %s %s %d %s \"%s\" %s\" trace_id=%s span_id=%s request_id=%s\n",
 			param.ClientIP,
 			param.TimeStamp.Format(time.RFC3339),
 			param.Method,
@@ -69,7 +69,6 @@ func Logger() gin.HandlerFunc {
 			spanID,
 			requestID,
 		)
-		return ""
 	})
 }
 

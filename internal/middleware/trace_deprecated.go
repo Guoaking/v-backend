@@ -55,7 +55,7 @@ func Trace() gin.HandlerFunc {
 			"method":     c.Request.Method,
 			"path":       c.Request.URL.Path,
 			"client_ip":  c.ClientIP(),
-        }).Info("请求开始")
+		}).Info("请求开始")
 
 		// 继续处理请求
 		c.Next()
@@ -87,7 +87,7 @@ func Trace() gin.HandlerFunc {
 func TraceWithDuration() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
-		
+
 		// 开始span
 		ctx, span := tracing.StartSpan(c.Request.Context(), fmt.Sprintf("%s %s", c.Request.Method, c.FullPath()))
 		defer span.End()
