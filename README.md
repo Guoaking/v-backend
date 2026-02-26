@@ -2,14 +2,21 @@
 
 这是一个基于Go语言的企业级KYC（Know Your Customer）认证服务，集成了OCR识别、人脸识别、活体检测等功能，通过Kong API Gateway提供统一的API访问入口。
 
+## 知识库
+
+- 后端业务实现知识库（AI First 版）：`docs/AI_FIRST_BACKEND_KB.md`
+
 ## 功能特性
 
 ### 🔐 安全特性
 - **OAuth 2.0认证**: 基于JWT的访问令牌机制
+- **双向认证**: Kong与服务之间的HMAC签名验证
+- **mTLS支持**: 证书双向认证
 - **数据加密**: 敏感数据AES-256加密存储
 - **数据脱敏**: 身份证号、手机号、姓名等敏感信息脱敏处理
 - **审计日志**: 完整的操作审计追踪
 - **PII保护**: 个人身份信息保护机制
+- **IP白名单**: API Key级别的IP访问控制
 
 ### 🚀 性能优化
 - **限流控制**: 基于Redis的分布式限流
@@ -20,7 +27,7 @@
 ### 📊 监控告警
 - **Prometheus指标**: 全面的业务和技术指标
 - **Grafana仪表板**: 可视化监控面板
-- **链路追踪**: 分布式链路追踪支持
+- **OpenTelemetry**: 统一的可观测性支持
 - **告警机制**: 多维度告警规则配置
 
 ### 🔧 技术架构
@@ -28,34 +35,45 @@
 - **微服务**: Go语言高并发服务
 - **数据库**: PostgreSQL关系型数据库
 - **缓存**: Redis分布式缓存
-- **容器化**: Docker + Kubernetes部署
+- **容器化**: Docker部署支持
 
 ## 快速开始
 
 ### 1. 环境要求
 - Go 1.21+
-- Docker & Docker Compose
+- Docker
 - PostgreSQL 15+
 - Redis 7+
-- Kong 3.4+
 
 ### 2. 本地开发
+
 ```bash
 # 克隆项目
 git clone <repository-url>
-cd kyc-service
+cd v-backend
 
 # 安装依赖
 go mod download
 
-# 启动基础设施
-docker-compose up -d postgres redis kong prometheus grafana
+# 启动基础设施（PostgreSQL + Redis）
+docker network create kyc-network 2>/dev/null || true
+
+docker run -d --name database --network kyc-network -p 5432:5432 \
+  -e POSTGRES_USER=kong -e POSTGRES_PASSWORD=kongpassword -e POSTGRES_DB=kong \
+  postgres:15-alpine
+
+docker run -d --name redis --network kyc-network -p 6379:6379 \
+  redis:7
+
+# 构建服务
+go build -o kyc-service ./cmd/server/main.go
 
 # 运行服务
-go run cmd/server/main.go
+./kyc-service -config config.local
 ```
 
 ### 3. Docker部署
+
 ```bash
 # 构建镜像
 docker build -t kyc-service:latest .
@@ -64,25 +82,58 @@ docker build -t kyc-service:latest .
 docker-compose up -d
 ```
 
-### 4. Kubernetes部署
+## 配置说明
+
+### 配置文件
+服务支持通过配置文件和环境变量进行配置，优先级：环境变量 > 配置文件 > 默认值
+
 ```bash
-# 创建命名空间
-kubectl create namespace kyc
+# 使用指定配置文件启动
+./kyc-service -config config.local
 
-# 部署服务
-kubectl apply -f k8s-deployment.yaml
-
-# 检查状态
-kubectl get pods -n kyc
+# 使用环境变量覆盖配置
+KYC_PORT=8082 ./kyc-service -config config.local
 ```
 
+### 主要配置项
+
+| 配置项 | 说明 | 默认值 |
+|---------|------|---------|
+| port | 服务监听端口 | 8082 |
+| gin_mode | Gin运行模式 | debug |
+| log_level | 日志级别 | info |
+| database.host | 数据库地址 | localhost |
+| database.port | 数据库端口 | 5432 |
+| redis.host | Redis地址 | localhost |
+| redis.port | Redis端口 | 6379 |
+| security.jwt_secret | JWT密钥 | - |
+| security.encryption_key | 加密密钥 | - |
+
 ## API文档
+
+### 健康检查
+
+```http
+GET /health
+```
+
+响应示例：
+```json
+{
+  "kong_verified": true,
+  "service": "kyc-service",
+  "status": "healthy",
+  "timestamp": "2026-02-26T18:31:46+08:00",
+  "version": "1.0.0"
+}
+```
 
 ### 认证接口
 
 #### 获取访问令牌
+
 ```http
-POST /api/v1/auth/token
+POST /api/v1/oauth/token
 Content-Type: application/json
 
 {
@@ -94,8 +145,9 @@ Content-Type: application/json
 ```
 
 #### 刷新令牌
+
 ```http
-POST /api/v1/auth/refresh
+POST /api/v1/oauth/refresh
 Content-Type: application/json
 
 {
@@ -107,71 +159,71 @@ Content-Type: application/json
 ### KYC接口
 
 #### OCR识别
+
 ```http
 POST /api/v1/kyc/ocr
 Authorization: Bearer <token>
-Idempotency-Key: <unique-key>
 Content-Type: multipart/form-data
 
 image: <身份证图片文件>
-language: auto
 ```
 
 #### 人脸识别
+
 ```http
-POST /api/v1/kyc/face/verify
+POST /api/v1/kyc/face/search
 Authorization: Bearer <token>
-Idempotency-Key: <unique-key>
 Content-Type: multipart/form-data
 
-image1: <第一张图片>
-image2: <第二张图片>
+image: <人脸图片文件>
 ```
 
-#### 活体检测（WebSocket）
-```javascript
-const ws = new WebSocket('ws://localhost:8000/api/v1/kyc/liveness/ws');
-ws.send(JSON.stringify({action: 'blink'}));
+#### 活体检测
+
+```http
+POST /api/v1/kyc/liveness/silent
+Authorization: Bearer <token>
+Content-Type: multipart/form-data
+
+image: <活体检测图片>
 ```
 
 #### 完整KYC流程
+
 ```http
 POST /api/v1/kyc/verify
 Authorization: Bearer <token>
-Idempotency-Key: <unique-key>
-Content-Type: multipart/form-data
+Content-Type: application/json
 
-idcard_image: <身份证图片>
-face_image: <人脸图片>
-name: <姓名>
-idcard: <身份证号>
-phone: <手机号>
+{
+  "id_card_image": "base64_encoded_image",
+  "face_image": "base64_encoded_image",
+  "name": "张三",
+  "id_card": "110101199001011234",
+  "phone": "13800138000"
+}
 ```
 
 #### 查询KYC状态
+
 ```http
 GET /api/v1/kyc/status/{request_id}
 Authorization: Bearer <token>
 ```
 
-## 监控和告警
+## 监控和指标
 
 ### Prometheus指标
+
 - `http_requests_total`: HTTP请求总数
 - `http_request_duration_seconds`: HTTP请求耗时
 - `kyc_requests_total`: KYC请求总数
 - `kyc_duration_seconds`: KYC处理耗时
-- `third_party_requests_total`: 第三方服务调用总数
-- `third_party_duration_seconds`: 第三方服务调用耗时
 
-### Grafana仪表板
-访问 `http://localhost:3000` 查看监控仪表板，默认用户名/密码：admin/admin
+### 访问监控
 
-### 告警规则
-- 错误率超过10%
-- 响应时间P95超过1000ms
-- CPU使用率超过85%
-- 内存使用率超过80%
+- **Prometheus**: http://localhost:9090/metrics
+- **健康检查**: http://localhost:8082/health
 
 ## 安全配置
 
@@ -194,47 +246,12 @@ Authorization: Bearer <token>
 - 响应状态
 - 处理时间
 
-## 性能优化
-
-### 限流策略
-- 全局：每秒1000请求，突发2000
-- KYC服务：每秒100请求，突发200
-- 基于IP的限流
-
-### 缓存策略
-- Redis缓存热点数据
-- 数据库查询缓存
-- 第三方服务调用缓存
-
-### 连接池
-- 数据库连接池：最大25连接
-- Redis连接池：最大10连接
-
-## 部署架构
-
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Client App    │───▶│   Kong Gateway  │───▶│  KYC Service    │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                              │                        │
-                              ▼                        ▼
-                       ┌─────────────────┐    ┌─────────────────┐
-                       │  Rate Limiting  │    │   PostgreSQL    │
-                       │   Auth & CORS   │    │   Database      │
-                       └─────────────────┘    └─────────────────┘
-                                                       │
-                                                       ▼
-                                               ┌─────────────────┐
-                                               │     Redis       │
-                                               │     Cache       │
-                                               └─────────────────┘
-```
-
 ## 开发指南
 
 ### 项目结构
+
 ```
-kyc-service/
+v-backend/
 ├── cmd/
 │   └── server/         # 应用入口
 ├── internal/
@@ -244,31 +261,46 @@ kyc-service/
 │   ├── models/        # 数据模型
 │   ├── monitoring/    # 监控组件
 │   ├── service/       # 业务逻辑
-│   └── storage/       # 数据存储
+│   ├── storage/       # 数据存储
+│   └── tasks/         # 后台任务
 ├── pkg/
 │   ├── crypto/        # 加密工具
 │   ├── logger/        # 日志工具
 │   ├── metrics/       # 指标工具
 │   └── utils/         # 通用工具
+├── scripts/        # 脚本和工具
+├── docs/           # 文档
 ├── config.yaml        # 配置文件
-├── docker-compose.yml # Docker编排
-├── k8s-deployment.yaml # K8s部署
+├── config.local.yaml  # 本地配置文件
 └── go.mod            # Go模块
 ```
 
-### 环境变量
+### 本地CI测试
+
+项目配置了本地自动化测试脚本：
+
 ```bash
-KYC_PORT=8080
-KYC_GIN_MODE=release
-KYC_LOG_LEVEL=info
-KYC_DATABASE_HOST=localhost
-KYC_DATABASE_PORT=5432
-KYC_DATABASE_USER=kyc_user
-KYC_DATABASE_PASSWORD=password
-KYC_REDIS_HOST=localhost
-KYC_REDIS_PORT=6379
-KYC_SECURITY_JWT_SECRET=your-secret-key
-KYC_SECURITY_ENCRYPTION_KEY=your-encryption-key
+# 快速测试（格式检查、静态分析、单元测试）
+./scripts/test-quick.sh
+
+# 完整测试（包含构建检查、安全检查）
+./scripts/test-all.sh
+
+# 生成覆盖率报告
+./scripts/test-coverage.sh
+```
+
+### Git Hooks
+
+项目配置了Git hooks自动执行测试：
+
+- **pre-commit**: 运行 `test-quick.sh`
+- **pre-push**: 运行 `test-all.sh`
+
+跳过验证：
+```bash
+git commit --no-verify -m "紧急修复"
+git push --no-verify origin main
 ```
 
 ## 贡献指南
@@ -289,9 +321,11 @@ KYC_SECURITY_ENCRYPTION_KEY=your-encryption-key
 
 ## 更新日志
 
-### v1.0.0 (2024-01-15)
-- ✨ 初始版本发布
-- 🔧 基础KYC功能实现
-- 📊 监控和告警系统
-- 🔐 安全特性完整实现
-- 🚀 Docker和K8s部署支持
+### v1.0.0 (2026-02-26)
+- ✨ 完整的服务功能实现
+- 🔧 配置系统优化，支持命令行参数指定配置文件
+- 📊 OpenTelemetry监控集成
+- 🔐 安全特性完整实现（OAuth 2.0、双向认证、mTLS）
+- 🚀 性能优化（限流、缓存、连接池）
+- 🧪 本地CI测试脚本和Git hooks配置
+- 🐳 Docker部署支持

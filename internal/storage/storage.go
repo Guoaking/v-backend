@@ -96,34 +96,8 @@ func InitRedis(cfg config.RedisConfig) (*redis.Client, error) {
 
 // autoMigrate 自动迁移数据库表（逐模型执行，便于定位错误）
 func autoMigrate(db *gorm.DB) error {
-	// 先手动创建 kyc_requests，避免某些环境下对信息模式查询报错
-	if err := db.Exec(`
-        CREATE TABLE IF NOT EXISTS kyc_requests (
-            id VARCHAR(255) PRIMARY KEY,
-            user_id VARCHAR(255),
-            request_type VARCHAR(50),
-            status VARCHAR(50),
-            id_card_hash VARCHAR(255),
-            id_card TEXT,
-            name TEXT,
-            phone TEXT,
-            face_image TEXT,
-            id_card_image TEXT,
-            liveness_data TEXT,
-            result TEXT,
-            error_message TEXT,
-            ip_address VARCHAR(45),
-            user_agent TEXT,
-            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-            deleted_at TIMESTAMPTZ
-        );
-        CREATE INDEX IF NOT EXISTS idx_kyc_user ON kyc_requests(user_id);
-        CREATE INDEX IF NOT EXISTS idx_kyc_id_card_hash ON kyc_requests(id_card_hash);
-    `).Error; err != nil {
-		logger.GetLogger().Errorf("手动创建 kyc_requests 失败: %v", err)
-		return err
-	}
+	// 移除手动创建 kyc_requests 表的代码，避免与 GORM AutoMigrate 冲突
+	// 直接让 GORM 自动管理表结构
 
 	modelsToMigrate := []interface{}{
 		&models.AuditLog{},
@@ -146,6 +120,7 @@ func autoMigrate(db *gorm.DB) error {
 		&models.FaceImageRef{},
 		&models.ImageAsset{},
 		&models.VideoAsset{},
+		&models.KYCRequest{}, // 确保 KYCRequest 模型被包含在自动迁移中
 	}
 
 	for _, m := range modelsToMigrate {

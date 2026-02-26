@@ -272,7 +272,7 @@ func (c *BidirectionalAuthMetricsCollector) Start() {
 func (c *BidirectionalAuthMetricsCollector) collectMetrics() {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ticker.C:
@@ -287,10 +287,10 @@ func (c *BidirectionalAuthMetricsCollector) collectMetrics() {
 func (c *BidirectionalAuthMetricsCollector) updateMetrics() {
 	// 这里可以添加具体的指标更新逻辑
 	// 例如检查证书过期时间、服务健康状态等
-	
+
 	// 模拟证书过期时间（实际应该从证书文件中读取）
 	UpdateCertificateExpiry(30.0) // 30天后过期
-	
+
 	// 模拟双向鉴权健康状态（实际应该根据实际状态设置）
 	UpdateBidirectionalAuthHealth(true)
 }

@@ -1,25 +1,25 @@
 package api
 
 import (
-    "context"
-    "crypto/rand"
-    "encoding/base64"
-    "encoding/json"
-    "fmt"
-    "strings"
-    "time"
+	"context"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"strings"
+	"time"
 
-    "kyc-service/internal/middleware"
-    "kyc-service/internal/models"
-    "kyc-service/internal/service"
-    "kyc-service/pkg/crypto"
-    "kyc-service/pkg/logger"
-    "kyc-service/pkg/metrics"
-    "kyc-service/pkg/utils"
+	"kyc-service/internal/middleware"
+	"kyc-service/internal/models"
+	"kyc-service/internal/service"
+	"kyc-service/pkg/crypto"
+	"kyc-service/pkg/logger"
+	"kyc-service/pkg/metrics"
+	"kyc-service/pkg/utils"
 
-    "github.com/gin-gonic/gin"
-    "github.com/golang-jwt/jwt/v5"
-    "gorm.io/gorm"
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
+	"gorm.io/gorm"
 )
 
 // ConsoleHandler 控制台处理器
@@ -49,11 +49,11 @@ type ConsoleAPIKeyResponse struct {
 	Status    string     `json:"status"`
 	LastUsed  *time.Time `json:"last_used_at,omitempty"`
 	LastIP    string     `json:"last_ip,omitempty"`
-    CreatedBy struct {
-        UserID string `json:"user_id"`
-        Name   string `json:"name"`
-        Avatar string `json:"avatar"`
-    } `json:"created_by,omitempty"`
+	CreatedBy struct {
+		UserID string `json:"user_id"`
+		Name   string `json:"name"`
+		Avatar string `json:"avatar"`
+	} `json:"created_by,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	Stats     *struct {
 		TotalRequests24h int        `json:"total_requests_24h"`
@@ -104,11 +104,11 @@ func (h *ConsoleHandler) GetCurrentUser(c *gin.Context) {
 
 	// 从JWT获取用户信息
 	userClaims, exists := c.Get("user")
-    if !exists {
-        metrics.RecordBusinessOperation(c.Request.Context(), "get_user_profile", false, time.Since(start), "unauthorized")
-        JSONError(c, CodeUnauthorized, "未授权访问")
-        return
-    }
+	if !exists {
+		metrics.RecordBusinessOperation(c.Request.Context(), "get_user_profile", false, time.Since(start), "unauthorized")
+		JSONError(c, CodeUnauthorized, "未授权访问")
+		return
+	}
 
 	claims := userClaims.(jwt.MapClaims)
 	userID := claims["user_id"].(string)
@@ -116,16 +116,16 @@ func (h *ConsoleHandler) GetCurrentUser(c *gin.Context) {
 	// 查询用户信息
 	var user models.User
 	if err := h.service.DB.Preload("Organization").First(&user, "id = ?", userID).Error; err != nil {
-        if err == gorm.ErrRecordNotFound {
-            metrics.RecordBusinessOperation(c.Request.Context(), "get_user_profile", false, time.Since(start), "user_not_found")
-            JSONError(c, CodeNotFound, "用户不存在")
-            return
-        }
-        logger.GetLogger().WithError(err).Error("查询用户失败")
-        metrics.RecordBusinessOperation(c.Request.Context(), "get_user_profile", false, time.Since(start), "database_error")
-        JSONError(c, CodeDatabaseError, "系统错误")
-        return
-    }
+		if err == gorm.ErrRecordNotFound {
+			metrics.RecordBusinessOperation(c.Request.Context(), "get_user_profile", false, time.Since(start), "user_not_found")
+			JSONError(c, CodeNotFound, "用户不存在")
+			return
+		}
+		logger.GetLogger().WithError(err).Error("查询用户失败")
+		metrics.RecordBusinessOperation(c.Request.Context(), "get_user_profile", false, time.Since(start), "database_error")
+		JSONError(c, CodeDatabaseError, "系统错误")
+		return
+	}
 
 	currentOrg := user.OrgID
 	if user.CurrentOrgID != "" {
@@ -140,16 +140,16 @@ func (h *ConsoleHandler) GetCurrentUser(c *gin.Context) {
 	// 查询组织信息
 	var org models.Organization
 	if err := h.service.DB.First(&org, "id = ?", user.OrgID).Error; err != nil {
-        if err == gorm.ErrRecordNotFound {
-            metrics.RecordBusinessOperation(c.Request.Context(), "get_org_info", false, time.Since(start), "org_not_found")
-            JSONError(c, CodeNotFound, "组织不存在")
-            return
-        }
-        logger.GetLogger().WithError(err).Error("查询组织失败")
-        metrics.RecordBusinessOperation(c.Request.Context(), "get_org_info", false, time.Since(start), "database_error")
-        JSONError(c, CodeDatabaseError, "系统错误")
-        return
-    }
+		if err == gorm.ErrRecordNotFound {
+			metrics.RecordBusinessOperation(c.Request.Context(), "get_org_info", false, time.Since(start), "org_not_found")
+			JSONError(c, CodeNotFound, "组织不存在")
+			return
+		}
+		logger.GetLogger().WithError(err).Error("查询组织失败")
+		metrics.RecordBusinessOperation(c.Request.Context(), "get_org_info", false, time.Since(start), "database_error")
+		JSONError(c, CodeDatabaseError, "系统错误")
+		return
+	}
 
 	var apiKeys []models.APIKey
 	if err := h.service.DB.Where("user_id = ? AND status = ?", userID, "active").Order("created_at DESC").Find(&apiKeys).Error; err != nil {
@@ -193,7 +193,7 @@ func (h *ConsoleHandler) GetCurrentUser(c *gin.Context) {
 	}
 
 	// 记录业务操作成功
-    metrics.RecordBusinessOperation(c.Request.Context(), "get_user_profile", true, time.Since(start), "")
+	metrics.RecordBusinessOperation(c.Request.Context(), "get_user_profile", true, time.Since(start), "")
 
 	JSONSuccess(c, response)
 }

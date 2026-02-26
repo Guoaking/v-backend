@@ -20,15 +20,15 @@ import (
 
 func (s *KYCService) IngestImage(ctx context.Context, orgID string, file *multipart.FileHeader) (*models.ImageAsset, error) {
 	f, err := file.Open()
-    if err != nil {
-        return nil, fmt.Errorf("open file failed: %w", err)
-    }
+	if err != nil {
+		return nil, fmt.Errorf("open file failed: %w", err)
+	}
 	defer f.Close()
 	h := sha256.New()
 	size, err := io.Copy(h, f)
-    if err != nil {
-        return nil, fmt.Errorf("read file failed: %w", err)
-    }
+	if err != nil {
+		return nil, fmt.Errorf("read file failed: %w", err)
+	}
 	sum := hex.EncodeToString(h.Sum(nil))
 	var exist models.ImageAsset
 	if err := s.DB.Where("organization_id = ? AND hash = ?", orgID, sum).First(&exist).Error; err == nil {
@@ -69,24 +69,24 @@ func (s *KYCService) IngestImage(ctx context.Context, orgID string, file *multip
 	}
 	ingestRoot := s.Config.Storage.IngestDir
 	safe := sum + filepath.Ext(file.Filename)
-    if strings.Contains(safe, "..") {
-        return nil, fmt.Errorf("invalid filename")
-    }
+	if strings.Contains(safe, "..") {
+		return nil, fmt.Errorf("invalid filename")
+	}
 	absPath := filepath.Join(ingestRoot, safe)
 	if err := os.MkdirAll(ingestRoot, 0755); err != nil {
 		return nil, err
 	}
 	out, err := os.Create(absPath)
-    if err != nil {
-        return nil, fmt.Errorf("create file failed: %w", err)
-    }
+	if err != nil {
+		return nil, fmt.Errorf("create file failed: %w", err)
+	}
 	defer out.Close()
 	if _, err := io.Copy(out, f); err != nil {
 		return nil, err
 	}
-    if ct == "" || !strings.HasPrefix(ct, "image/") {
-        return nil, fmt.Errorf("unsupported file type: %v", ct)
-    }
+	if ct == "" || !strings.HasPrefix(ct, "image/") {
+		return nil, fmt.Errorf("unsupported file type: %v", ct)
+	}
 	asset := &models.ImageAsset{ID: utils.GenerateID(), OrganizationID: orgID, Hash: sum, FilePath: absPath, SafeFilename: safe, ContentType: ct, SizeBytes: size, CreatedAt: time.Now()}
 	if err := s.DB.Create(asset).Error; err != nil {
 		return nil, err
@@ -97,15 +97,15 @@ func (s *KYCService) IngestImage(ctx context.Context, orgID string, file *multip
 
 func (s *KYCService) IngestVideo(ctx context.Context, orgID string, file *multipart.FileHeader) (*models.VideoAsset, error) {
 	f, err := file.Open()
-    if err != nil {
-        return nil, fmt.Errorf("open file failed: %w", err)
-    }
+	if err != nil {
+		return nil, fmt.Errorf("open file failed: %w", err)
+	}
 	defer f.Close()
 	h := sha256.New()
 	size, err := io.Copy(h, f)
-    if err != nil {
-        return nil, fmt.Errorf("read file failed: %w", err)
-    }
+	if err != nil {
+		return nil, fmt.Errorf("read file failed: %w", err)
+	}
 	sum := hex.EncodeToString(h.Sum(nil))
 	var exist models.VideoAsset
 	if err := s.DB.Where("organization_id = ? AND hash = ?", orgID, sum).First(&exist).Error; err == nil {
@@ -148,9 +148,9 @@ func (s *KYCService) IngestVideo(ctx context.Context, orgID string, file *multip
 	}
 	ingestRoot := s.Config.Storage.IngestDir
 	safe := sum + filepath.Ext(file.Filename)
-    if strings.Contains(safe, "..") {
-        return nil, fmt.Errorf("invalid filename")
-    }
+	if strings.Contains(safe, "..") {
+		return nil, fmt.Errorf("invalid filename")
+	}
 	absPath := filepath.Join(ingestRoot, safe)
 	if err := os.MkdirAll(ingestRoot, 0755); err != nil {
 		return nil, err
@@ -164,9 +164,9 @@ func (s *KYCService) IngestVideo(ctx context.Context, orgID string, file *multip
 		return nil, err
 	}
 	ct := vct
-    if ct == "" || !strings.HasPrefix(ct, "video/") {
-        return nil, fmt.Errorf("unsupported file type: %v, %v", ct, file.Filename)
-    }
+	if ct == "" || !strings.HasPrefix(ct, "video/") {
+		return nil, fmt.Errorf("unsupported file type: %v, %v", ct, file.Filename)
+	}
 
 	asset := &models.VideoAsset{ID: utils.GenerateID(), OrganizationID: orgID, Hash: sum, FilePath: absPath, SafeFilename: safe, ContentType: ct, SizeBytes: size, CreatedAt: time.Now()}
 	if err := s.DB.Create(asset).Error; err != nil {

@@ -1,25 +1,25 @@
 package api
 
 import (
-    "encoding/json"
-    "fmt"
-    "io"
-    "net/http"
-    "strings"
-    "time"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+	"time"
 
-    "kyc-service/internal/middleware"
-    "kyc-service/internal/models"
-    "kyc-service/internal/service"
-    "kyc-service/pkg/crypto"
-    "kyc-service/pkg/logger"
-    "kyc-service/pkg/metrics"
-    "kyc-service/pkg/utils"
+	"kyc-service/internal/middleware"
+	"kyc-service/internal/models"
+	"kyc-service/internal/service"
+	"kyc-service/pkg/crypto"
+	"kyc-service/pkg/logger"
+	"kyc-service/pkg/metrics"
+	"kyc-service/pkg/utils"
 
-    "github.com/gin-gonic/gin"
-    "github.com/golang-jwt/jwt/v5"
-    "golang.org/x/crypto/bcrypt"
-    "gorm.io/gorm"
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 // GoogleOAuthHandler Google OAuth处理器
@@ -63,7 +63,7 @@ func (h *GoogleOAuthHandler) GoogleLogin(c *gin.Context) {
 
 	var req GoogleTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-    metrics.RecordBusinessOperation(c.Request.Context(), "google_oauth", false, time.Since(start), "invalid_request")
+		metrics.RecordBusinessOperation(c.Request.Context(), "google_oauth", false, time.Since(start), "invalid_request")
 		JSONError(c, CodeInvalidParameter, "参数验证失败")
 		return
 	}
@@ -72,14 +72,14 @@ func (h *GoogleOAuthHandler) GoogleLogin(c *gin.Context) {
 	googleUser, err := h.verifyGoogleToken(req.IDToken)
 	if err != nil {
 		logger.GetLogger().WithError(err).Error("Google Token验证失败")
-    metrics.RecordBusinessOperation(c.Request.Context(), "google_oauth", false, time.Since(start), "token_verification_failed")
+		metrics.RecordBusinessOperation(c.Request.Context(), "google_oauth", false, time.Since(start), "token_verification_failed")
 		JSONError(c, CodeUnauthorized, "Google Token验证失败")
 		return
 	}
 
 	// 检查邮箱是否已验证
 	if !googleUser.EmailVerified {
-    metrics.RecordBusinessOperation(c.Request.Context(), "google_oauth", false, time.Since(start), "email_not_verified")
+		metrics.RecordBusinessOperation(c.Request.Context(), "google_oauth", false, time.Since(start), "email_not_verified")
 		JSONError(c, CodeUnauthorized, "Google邮箱未验证")
 		return
 	}
@@ -93,31 +93,31 @@ func (h *GoogleOAuthHandler) GoogleLogin(c *gin.Context) {
 		user, err = h.createUserFromGoogle(googleUser)
 		if err != nil {
 			logger.GetLogger().WithError(err).Error("Google用户注册失败")
-            metrics.RecordBusinessOperation(c.Request.Context(), "google_oauth", false, time.Since(start), "registration_failed")
+			metrics.RecordBusinessOperation(c.Request.Context(), "google_oauth", false, time.Since(start), "registration_failed")
 			JSONError(c, CodeInternalError, "用户注册失败")
 			return
 		}
-        metrics.RecordBusinessOperation(c.Request.Context(), "google_oauth", true, time.Since(start), "user_registered")
+		metrics.RecordBusinessOperation(c.Request.Context(), "google_oauth", true, time.Since(start), "user_registered")
 	} else if err != nil {
 		logger.GetLogger().WithError(err).Error("查询用户失败")
-        metrics.RecordBusinessOperation(c.Request.Context(), "google_oauth", false, time.Since(start), "database_error")
+		metrics.RecordBusinessOperation(c.Request.Context(), "google_oauth", false, time.Since(start), "database_error")
 		JSONError(c, CodeDatabaseError, "系统错误")
 		return
 	} else {
 		// 用户存在，检查状态
 		if user.Status != "active" {
-            metrics.RecordBusinessOperation(c.Request.Context(), "google_oauth", false, time.Since(start), "user_inactive")
+			metrics.RecordBusinessOperation(c.Request.Context(), "google_oauth", false, time.Since(start), "user_inactive")
 			JSONError(c, CodeUnauthorized, "用户账户已禁用")
 			return
 		}
-        metrics.RecordBusinessOperation(c.Request.Context(), "google_oauth", true, time.Since(start), "user_login")
+		metrics.RecordBusinessOperation(c.Request.Context(), "google_oauth", true, time.Since(start), "user_login")
 	}
 
 	// 获取组织信息
 	var org models.Organization
 	if err := h.service.DB.First(&org, "id = ?", user.OrgID).Error; err != nil {
 		logger.GetLogger().WithError(err).Error("查询组织失败")
-        metrics.RecordBusinessOperation(c.Request.Context(), "google_oauth", false, time.Since(start), "org_not_found")
+		metrics.RecordBusinessOperation(c.Request.Context(), "google_oauth", false, time.Since(start), "org_not_found")
 		JSONError(c, CodeInternalError, "组织信息错误")
 		return
 	}
@@ -126,7 +126,7 @@ func (h *GoogleOAuthHandler) GoogleLogin(c *gin.Context) {
 	accessToken, err := h.generateUserJWT(&user, &org)
 	if err != nil {
 		logger.GetLogger().WithError(err).Error("生成JWT失败")
-        metrics.RecordBusinessOperation(c.Request.Context(), "google_oauth", false, time.Since(start), "jwt_generation_failed")
+		metrics.RecordBusinessOperation(c.Request.Context(), "google_oauth", false, time.Since(start), "jwt_generation_failed")
 		JSONError(c, CodeInternalError, "令牌生成失败")
 		return
 	}

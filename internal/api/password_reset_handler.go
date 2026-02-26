@@ -1,20 +1,20 @@
 package api
 
 import (
-    "crypto/rand"
-    "encoding/hex"
-    "fmt"
-    "time"
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
+	"time"
 
-    "kyc-service/internal/middleware"
-    "kyc-service/internal/models"
-    "kyc-service/internal/service"
-    "kyc-service/pkg/logger"
-    "kyc-service/pkg/metrics"
-    "kyc-service/pkg/utils"
+	"kyc-service/internal/middleware"
+	"kyc-service/internal/models"
+	"kyc-service/internal/service"
+	"kyc-service/pkg/logger"
+	"kyc-service/pkg/metrics"
+	"kyc-service/pkg/utils"
 
-    "github.com/gin-gonic/gin"
-    "gorm.io/gorm"
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // PasswordResetHandler 密码重置处理器
@@ -52,7 +52,7 @@ func (h *PasswordResetHandler) RequestPasswordReset(c *gin.Context) {
 
 	var req PasswordResetRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-    metrics.RecordBusinessOperation(c.Request.Context(), "password_reset_request", false, time.Since(start), "invalid_request")
+		metrics.RecordBusinessOperation(c.Request.Context(), "password_reset_request", false, time.Since(start), "invalid_request")
 		JSONError(c, CodeInvalidParameter, "参数验证失败")
 		return
 	}
@@ -62,7 +62,7 @@ func (h *PasswordResetHandler) RequestPasswordReset(c *gin.Context) {
 	if err := h.service.DB.Where("email = ?", req.Email).First(&user).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			// 用户不存在，但仍然返回成功，避免泄露用户信息
-            metrics.RecordBusinessOperation(c.Request.Context(), "password_reset_request", true, time.Since(start), "user_not_found_but_hidden")
+			metrics.RecordBusinessOperation(c.Request.Context(), "password_reset_request", true, time.Since(start), "user_not_found_but_hidden")
 			JSONSuccess(c, PasswordResetResponse{
 				Success: true,
 				Message: "如果邮箱存在，重置链接已发送",
@@ -70,7 +70,7 @@ func (h *PasswordResetHandler) RequestPasswordReset(c *gin.Context) {
 			return
 		}
 		logger.GetLogger().WithError(err).Error("查询用户失败")
-        metrics.RecordBusinessOperation(c.Request.Context(), "password_reset_request", false, time.Since(start), "database_error")
+		metrics.RecordBusinessOperation(c.Request.Context(), "password_reset_request", false, time.Since(start), "database_error")
 		JSONError(c, CodeDatabaseError, "系统错误")
 		return
 	}
@@ -79,7 +79,7 @@ func (h *PasswordResetHandler) RequestPasswordReset(c *gin.Context) {
 	token, err := h.generateResetToken()
 	if err != nil {
 		logger.GetLogger().WithError(err).Error("生成重置令牌失败")
-        metrics.RecordBusinessOperation(c.Request.Context(), "password_reset_request", false, time.Since(start), "token_generation_failed")
+		metrics.RecordBusinessOperation(c.Request.Context(), "password_reset_request", false, time.Since(start), "token_generation_failed")
 		JSONError(c, CodeInternalError, "令牌生成失败")
 		return
 	}
@@ -95,7 +95,7 @@ func (h *PasswordResetHandler) RequestPasswordReset(c *gin.Context) {
 
 	if err := h.service.DB.Create(&resetRecord).Error; err != nil {
 		logger.GetLogger().WithError(err).Error("创建密码重置记录失败")
-        metrics.RecordBusinessOperation(c.Request.Context(), "password_reset_request", false, time.Since(start), "database_error")
+		metrics.RecordBusinessOperation(c.Request.Context(), "password_reset_request", false, time.Since(start), "database_error")
 		JSONError(c, CodeDatabaseError, "系统错误")
 		return
 	}
@@ -119,7 +119,7 @@ func (h *PasswordResetHandler) RequestPasswordReset(c *gin.Context) {
 	}
 
 	// 记录业务操作成功
-    metrics.RecordBusinessOperation(c.Request.Context(), "password_reset_request", true, time.Since(start), "")
+	metrics.RecordBusinessOperation(c.Request.Context(), "password_reset_request", true, time.Since(start), "")
 
 	JSONSuccess(c, PasswordResetResponse{
 		Success: true,
@@ -151,22 +151,22 @@ func (h *PasswordResetHandler) ConfirmPasswordReset(c *gin.Context) {
 
 	var req ResetPasswordConfirmRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-    metrics.RecordBusinessOperation(c.Request.Context(), "password_reset_confirm", false, time.Since(start), "invalid_request")
+		metrics.RecordBusinessOperation(c.Request.Context(), "password_reset_confirm", false, time.Since(start), "invalid_request")
 		JSONError(c, CodeInvalidParameter, "参数验证失败")
 		return
 	}
 
 	// 查找有效的重置令牌
 	var resetRecord models.PasswordReset
-	if err := h.service.DB.Where("token = ? AND status = ? AND expires_at > ?", 
+	if err := h.service.DB.Where("token = ? AND status = ? AND expires_at > ?",
 		req.Token, "pending", time.Now()).First(&resetRecord).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-            metrics.RecordBusinessOperation(c.Request.Context(), "password_reset_confirm", false, time.Since(start), "invalid_or_expired_token")
+			metrics.RecordBusinessOperation(c.Request.Context(), "password_reset_confirm", false, time.Since(start), "invalid_or_expired_token")
 			JSONError(c, CodeInvalidParameter, "令牌无效或已过期")
 			return
 		}
 		logger.GetLogger().WithError(err).Error("查询重置记录失败")
-        metrics.RecordBusinessOperation(c.Request.Context(), "password_reset_confirm", false, time.Since(start), "database_error")
+		metrics.RecordBusinessOperation(c.Request.Context(), "password_reset_confirm", false, time.Since(start), "database_error")
 		JSONError(c, CodeDatabaseError, "系统错误")
 		return
 	}
@@ -175,7 +175,7 @@ func (h *PasswordResetHandler) ConfirmPasswordReset(c *gin.Context) {
 	if err := h.service.DB.Model(&models.User{}).Where("id = ?", resetRecord.UserID).
 		Update("password", req.NewPassword).Error; err != nil {
 		logger.GetLogger().WithError(err).Error("更新密码失败")
-        metrics.RecordBusinessOperation(c.Request.Context(), "password_reset_confirm", false, time.Since(start), "database_error")
+		metrics.RecordBusinessOperation(c.Request.Context(), "password_reset_confirm", false, time.Since(start), "database_error")
 		JSONError(c, CodeDatabaseError, "密码更新失败")
 		return
 	}
