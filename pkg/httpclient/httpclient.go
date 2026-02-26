@@ -173,7 +173,7 @@ func (c *Client) PostMultipart(ctx context.Context, url string, data map[string]
 		now5 := time.Now()
 		resp, err = c.client.Do(req)
 
-		fmt.Printf("output: %v, %v, %v\n", "end5", time.Since(now5), c.config.RetryInterval)
+		fmt.Printf("output: %v, %v, %v\n", "三方耗时:", time.Since(now5), c.config.RetryInterval)
 
 		if err == nil && resp.StatusCode < http.StatusInternalServerError {
 			break

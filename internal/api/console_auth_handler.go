@@ -43,23 +43,31 @@ type ConsoleLoginRequest struct {
 type ConsoleLoginResponse struct {
 	AccessToken string              `json:"access_token"`
 	User        *ConsoleUserProfile `json:"user"`
-	//Permissions []string            `json:"permissions"`
+	//Orgs        []OrganizationLite  `json:"orgs,omitempty"`
 }
 
 // ConsoleUserProfile 用户档案
 type ConsoleUserProfile struct {
-	ID           string              `json:"id"`
-	Email        string              `json:"email"`
-	FullName     string              `json:"full_name"`
-	AvatarURL    string              `json:"avatar,omitempty"`
-	Company      string              `json:"company,omitempty"`
-	Role         string              `json:"role"`
-	OrgRole      string              `json:"org_role"`
-	OrgID        string              `json:"org_id"`
-	PlanID       string              `json:"plan_id"`
-	Status       string              `json:"status"`
-	Organization models.Organization `json:"organization,omitempty"`
-	Permissions  []string            `json:"permissions,omitempty"`
+	AccessToken     string              `json:"access_token,omitempty"`
+	ID              string              `json:"id"`
+	Email           string              `json:"email"`
+	FullName        string              `json:"full_name"`
+	AvatarURL       string              `json:"avatar,omitempty"`
+	Company         string              `json:"company,omitempty"`
+	Role            string              `json:"role"`
+	OrgRole         string              `json:"org_role"`
+	OrgID           string              `json:"org_id"`
+	LastActiveOrgID string              `json:"last_active_org_id"`
+	PlanID          string              `json:"plan_id"`
+	Status          string              `json:"status"`
+	Organization    models.Organization `json:"organization,omitempty"`
+	Orgs            []OrganizationLite  `json:"orgs,omitempty"`
+	Permissions     []string            `json:"permissions,omitempty"`
+}
+
+type OrganizationLite struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 // ConsoleRegisterRequest 注册请求
@@ -93,7 +101,7 @@ func (h *ConsoleAuthHandler) Login(c *gin.Context) { // ignore_security_alert
 
 	var req ConsoleLoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-    metrics.RecordBusinessOperation(c.Request.Context(), "console_login", false, time.Since(start), "invalid_request")
+		metrics.RecordBusinessOperation(c.Request.Context(), "console_login", false, time.Since(start), "invalid_request")
 		JSONError(c, CodeInvalidParameter, "参数验证失败")
 		return
 	}
@@ -114,12 +122,12 @@ func (h *ConsoleAuthHandler) Login(c *gin.Context) { // ignore_security_alert
 			auditLog.Status = "failed"
 			auditLog.Message = "User not found or inactive"
 			h.recordAuditLog(auditLog)
-            metrics.RecordBusinessOperation(c.Request.Context(), "console_login", false, time.Since(start), "user_not_found")
+			metrics.RecordBusinessOperation(c.Request.Context(), "console_login", false, time.Since(start), "user_not_found")
 			JSONError(c, CodeUnauthorized, "邮箱或密码错误")
 			return
 		}
 		logger.GetLogger().WithError(err).Error("查询用户失败")
-        metrics.RecordBusinessOperation(c.Request.Context(), "console_login", false, time.Since(start), "database_error")
+		metrics.RecordBusinessOperation(c.Request.Context(), "console_login", false, time.Since(start), "database_error")
 		JSONError(c, CodeDatabaseError, "系统错误")
 		return
 	}
@@ -130,28 +138,12 @@ func (h *ConsoleAuthHandler) Login(c *gin.Context) { // ignore_security_alert
 		auditLog.Status = "failed"
 		auditLog.Message = "Invalid password"
 		h.recordAuditLog(auditLog)
-    metrics.RecordBusinessOperation(c.Request.Context(), "console_login", false, time.Since(start), "invalid_password")
+		metrics.RecordBusinessOperation(c.Request.Context(), "console_login", false, time.Since(start), "invalid_password")
 		JSONError(c, CodeUnauthorized, "邮箱或密码错误")
 		return
 	}
 
-	// 获取组织信息
-	var org models.Organization
-	if err := h.service.DB.First(&org, "id = ?", user.OrgID).Error; err != nil {
-		logger.GetLogger().WithError(err).Error("查询组织失败")
-        metrics.RecordBusinessOperation(c.Request.Context(), "console_login", false, time.Since(start), "org_not_found")
-		JSONError(c, CodeInternalError, "组织信息错误")
-		return
-	}
-
-	// 生成JWT令牌
-	accessToken, err := h.generateUserJWT(&user, &org)
-	if err != nil {
-		logger.GetLogger().WithError(err).Error("生成JWT失败")
-        metrics.RecordBusinessOperation(c.Request.Context(), "console_login", false, time.Since(start), "jwt_generation_failed")
-		JSONError(c, CodeInternalError, "令牌生成失败")
-		return
-	}
+	// 延后到解析组织上下文与角色后再生成Token
 
 	// 更新最后登录时间
 	now := time.Now()
@@ -172,7 +164,7 @@ func (h *ConsoleAuthHandler) Login(c *gin.Context) { // ignore_security_alert
 	h.recordAuditLog(auditLog)
 
 	// 记录业务操作成功
-    metrics.RecordBusinessOperation(c.Request.Context(), "console_login", true, time.Since(start), "")
+	metrics.RecordBusinessOperation(c.Request.Context(), "console_login", true, time.Since(start), "")
 
 	roleToUse := user.OrgRole
 	orgIDToUse := user.CurrentOrgID
@@ -191,22 +183,66 @@ func (h *ConsoleAuthHandler) Login(c *gin.Context) { // ignore_security_alert
 		}
 	}
 
-	// 返回用户信息
-	userProfile := &ConsoleUserProfile{
-		ID:           user.ID,
-		Email:        user.Email,
-		FullName:     user.Name,
-		AvatarURL:    user.AvatarURL,
-		Company:      org.Name,
-		Role:         user.Role,
-		OrgRole:      roleToUse,
-		OrgID:        orgIDToUse,
-		PlanID:       org.PlanID,
-		Status:       user.Status,
-		Organization: org,
-		Permissions:  permIDs,
+	// 获取组织信息（以选定的 orgID 为准）
+	var org models.Organization
+	if err := h.service.DB.First(&org, "id = ?", orgIDToUse).Error; err != nil {
+		logger.GetLogger().WithError(err).Error("查询组织失败")
+		metrics.RecordBusinessOperation(c.Request.Context(), "console_login", false, time.Since(start), "org_not_found")
+		JSONError(c, CodeInternalError, "组织信息错误")
+		return
+	}
+	// 临时设置用户上下文用于生成Token
+	user.CurrentOrgID = orgIDToUse
+	user.OrgRole = roleToUse
+	user.OrgID = orgIDToUse
+	// 生成JWT令牌（绑定当前选定组织）
+	accessToken, err := h.generateUserJWT(&user, &org)
+	if err != nil {
+		logger.GetLogger().WithError(err).Error("生成JWT失败")
+		metrics.RecordBusinessOperation(c.Request.Context(), "console_login", false, time.Since(start), "jwt_generation_failed")
+		JSONError(c, CodeInternalError, "令牌生成失败")
+		return
 	}
 
+	// 返回用户信息
+	// 更新活跃组织
+	user.LastActiveOrgID = orgIDToUse
+	_ = h.service.DB.Model(&models.User{}).Where("id = ?", user.ID).Update("last_active_org_id", orgIDToUse).Error
+
+	var orgsOut []OrganizationLite
+	var memberships []models.OrganizationMember
+	_ = h.service.DB.Where("user_id = ?", user.ID).Find(&memberships).Error
+	if len(memberships) > 1 {
+		var orgs []models.Organization
+		var ids []string
+		for _, m := range memberships {
+			ids = append(ids, m.OrganizationID)
+		}
+		_ = h.service.DB.Where("id IN ?", ids).Find(&orgs).Error
+		for _, o := range orgs {
+			orgsOut = append(orgsOut, OrganizationLite{ID: o.ID, Name: o.Name})
+		}
+	}
+
+	userProfile := &ConsoleUserProfile{
+		AccessToken:     accessToken,
+		ID:              user.ID,
+		Email:           user.Email,
+		FullName:        user.Name,
+		AvatarURL:       user.AvatarURL,
+		Company:         org.Name,
+		Role:            user.Role,
+		OrgRole:         roleToUse,
+		OrgID:           orgIDToUse,
+		LastActiveOrgID: user.LastActiveOrgID,
+		PlanID:          org.PlanID,
+		Status:          user.Status,
+		Organization:    org,
+		Orgs:            orgsOut,
+		Permissions:     permIDs,
+	}
+
+	//JSONSuccess(c, userProfile)
 	JSONSuccess(c, ConsoleLoginResponse{AccessToken: accessToken, User: userProfile})
 }
 
@@ -242,16 +278,17 @@ func (h *ConsoleAuthHandler) Me(c *gin.Context) {
 		}
 	}
 	resp := &ConsoleUserProfile{
-		ID:          user.ID,
-		Email:       user.Email,
-		FullName:    user.Name,
-		AvatarURL:   user.AvatarURL,
-		Role:        user.Role,
-		OrgRole:     roleToUse,
-		OrgID:       orgIDToUse,
-		PlanID:      org.PlanID,
-		Status:      user.Status,
-		Permissions: permIDs,
+		ID:              user.ID,
+		Email:           user.Email,
+		FullName:        user.Name,
+		AvatarURL:       user.AvatarURL,
+		Role:            user.Role,
+		OrgRole:         roleToUse,
+		OrgID:           orgIDToUse,
+		LastActiveOrgID: user.LastActiveOrgID,
+		PlanID:          org.PlanID,
+		Status:          user.Status,
+		Permissions:     permIDs,
 	}
 	JSONSuccess(c, resp)
 }

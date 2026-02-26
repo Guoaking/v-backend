@@ -969,3 +969,70 @@ func (h *AdminHandler) UpdateGlobalConfig(c *gin.Context) {
 	}
 	JSONSuccess(c, gin.H{"daily_registration_cap": req.DailyRegistrationCap})
 }
+
+// CreatePermissionRequest 创建权限请求
+type CreatePermissionRequest struct {
+	ID          string `json:"id" binding:"required"`
+	Name        string `json:"name" binding:"required"`
+	Category    string `json:"category" binding:"required"`
+	Description string `json:"description"`
+}
+
+// CreatePermission 管理员创建新权限定义
+func (h *AdminHandler) CreatePermission(c *gin.Context) {
+	var req CreatePermissionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		JSONError(c, CodeInvalidParameter, "参数验证失败")
+		return
+	}
+
+	perm := models.Permission{
+		ID:          req.ID,
+		Name:        req.Name,
+		Category:    req.Category,
+		Description: req.Description,
+		CreatedAt:   time.Now(),
+	}
+
+	if err := h.service.DB.Create(&perm).Error; err != nil {
+		logger.GetLogger().WithError(err).Error("创建权限失败")
+		JSONError(c, CodeDatabaseError, "创建失败，可能ID已存在")
+		return
+	}
+
+	// 审计日志
+	h.recordAuditLog(c, c.GetString("userID"), "admin.create_permission", "success", fmt.Sprintf("Created permission: %s", req.ID))
+	JSONSuccess(c, perm)
+}
+
+// DeletePermission 管理员删除权限定义
+func (h *AdminHandler) DeletePermission(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		JSONError(c, CodeInvalidParameter, "缺少权限ID")
+		return
+	}
+
+	// 开启事务
+	tx := h.service.DB.Begin()
+
+	// 1. 删除 role_permissions 中的关联
+	if err := tx.Exec("DELETE FROM role_permissions WHERE permission_id = ?", id).Error; err != nil {
+		tx.Rollback()
+		JSONError(c, CodeDatabaseError, "清理角色关联失败")
+		return
+	}
+
+	// 2. 删除 permissions 表中的记录
+	if err := tx.Delete(&models.Permission{}, "id = ?", id).Error; err != nil {
+		tx.Rollback()
+		JSONError(c, CodeDatabaseError, "删除权限失败")
+		return
+	}
+
+	tx.Commit()
+
+	// 审计日志
+	h.recordAuditLog(c, c.GetString("userID"), "admin.delete_permission", "success", fmt.Sprintf("Deleted permission: %s", id))
+	JSONSuccess(c, gin.H{"deleted": id})
+}

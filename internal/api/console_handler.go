@@ -49,11 +49,11 @@ type ConsoleAPIKeyResponse struct {
 	Status    string     `json:"status"`
 	LastUsed  *time.Time `json:"last_used_at,omitempty"`
 	LastIP    string     `json:"last_ip,omitempty"`
-	CreatedBy struct {
-		UserID string `json:"userId"`
-		Name   string `json:"name"`
-		Avatar string `json:"avatar"`
-	} `json:"createdBy,omitempty"`
+    CreatedBy struct {
+        UserID string `json:"user_id"`
+        Name   string `json:"name"`
+        Avatar string `json:"avatar"`
+    } `json:"created_by,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	Stats     *struct {
 		TotalRequests24h int        `json:"total_requests_24h"`

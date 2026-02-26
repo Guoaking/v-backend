@@ -87,10 +87,8 @@ func (h *MetaHandler) UpdateRole(c *gin.Context) {
 		JSONError(c, CodeInvalidParameter, "参数验证失败")
 		return
 	}
-	if role.IsSystem && len(req.Permissions) > 0 {
-		JSONError(c, CodeForbidden, "系统角色不可修改权限")
-		return
-	}
+	// 系统角色：允许新增权限，但禁止移除已有权限
+	// 非系统角色：允许完整覆盖权限集合
 	updates := map[string]interface{}{}
 	if req.Name != "" {
 		updates["name"] = req.Name
@@ -104,19 +102,54 @@ func (h *MetaHandler) UpdateRole(c *gin.Context) {
 			return
 		}
 	}
-	if !role.IsSystem && req.Permissions != nil {
-		tx := h.service.DB.Begin()
-		if err := tx.Where("role_id = ?", id).Delete(&models.RolePermission{}).Error; err != nil {
-			tx.Rollback()
-			JSONError(c, CodeDatabaseError, "更新失败")
-			return
-		}
-		for _, pid := range req.Permissions {
-			_ = tx.Create(&models.RolePermission{RoleID: id, PermissionID: pid}).Error
-		}
-		if err := tx.Commit().Error; err != nil {
-			JSONError(c, CodeDatabaseError, "更新失败")
-			return
+	if req.Permissions != nil {
+		if role.IsSystem {
+			var rows []struct{ PermissionID string }
+			_ = h.service.DB.Table("role_permissions").Select("permission_id").Where("role_id = ?", id).Scan(&rows).Error
+			cur := map[string]struct{}{}
+			for _, r := range rows {
+				cur[r.PermissionID] = struct{}{}
+			}
+			reqSet := map[string]struct{}{}
+			for _, p := range req.Permissions {
+				reqSet[p] = struct{}{}
+			}
+			// 检查是否尝试移除已有权限
+			for p := range cur {
+				if _, ok := reqSet[p]; !ok {
+					JSONError(c, CodeForbidden, "系统角色不可移除权限")
+					return
+				}
+			}
+			// 仅新增缺失权限
+			tx := h.service.DB.Begin()
+			for _, p := range req.Permissions {
+				if _, ok := cur[p]; !ok {
+					if err := tx.Create(&models.RolePermission{RoleID: id, PermissionID: p}).Error; err != nil {
+						tx.Rollback()
+						JSONError(c, CodeDatabaseError, "更新失败")
+						return
+					}
+				}
+			}
+			if err := tx.Commit().Error; err != nil {
+				JSONError(c, CodeDatabaseError, "更新失败")
+				return
+			}
+		} else {
+			tx := h.service.DB.Begin()
+			if err := tx.Where("role_id = ?", id).Delete(&models.RolePermission{}).Error; err != nil {
+				tx.Rollback()
+				JSONError(c, CodeDatabaseError, "更新失败")
+				return
+			}
+			for _, pid := range req.Permissions {
+				_ = tx.Create(&models.RolePermission{RoleID: id, PermissionID: pid}).Error
+			}
+			if err := tx.Commit().Error; err != nil {
+				JSONError(c, CodeDatabaseError, "更新失败")
+				return
+			}
 		}
 	}
 	JSONSuccess(c, role)

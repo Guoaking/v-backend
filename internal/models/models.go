@@ -58,7 +58,8 @@ type User struct {
 	Role            string         `json:"role"` // user, admin
 	OrgID           string         `json:"org_id"`
 	OrgRole         string         `json:"org_role"` // owner, admin, developer, viewer
-	CurrentOrgID    string         `json:"currentOrgId"`
+    CurrentOrgID    string         `json:"currentOrgId"`
+    LastActiveOrgID string         `json:"last_active_org_id"`
 	Status          string         `json:"status"` // active, suspended
 	LastLoginAt     *time.Time     `json:"last_login_at"`
 	CreatedAt       time.Time      `json:"created_at"`
@@ -70,17 +71,20 @@ type User struct {
 
 // OAuthClient OAuth客户端
 type OAuthClient struct {
-    ID          string    `gorm:"primaryKey" json:"id"`
-    Secret      string    `json:"-"`
-    Name        string    `json:"name"`
-    Description string    `json:"description"`
-    RedirectURI string    `json:"redirect_uri"`
-    Scopes      string    `json:"scopes"`
-    Status      string    `json:"status"`
-    OrgID       string    `json:"org_id"`
-    TokenTTLSeconds int   `json:"token_ttl_seconds"`
-    CreatedAt   time.Time `json:"created_at"`
-    UpdatedAt   time.Time `json:"updated_at"`
+    ID              string         `gorm:"primaryKey" json:"id"`
+    Secret          string         `json:"-"`
+    Name            string         `json:"name"`
+    Description     string         `json:"description"`
+    RedirectURI     string         `json:"redirect_uri"`
+    Scopes          string         `json:"scopes"`
+    Status          string         `json:"status"`
+    OrgID           string         `json:"org_id"`
+    OwnerID         string         `json:"owner_id"`
+    TokenTTLSeconds int            `json:"token_ttl_seconds"`
+    IPWhitelist     pq.StringArray `gorm:"type:text[]" json:"ip_whitelist"`
+    RateLimitPerSec int            `json:"rate_limit_per_sec"`
+    CreatedAt       time.Time      `json:"created_at"`
+    UpdatedAt       time.Time      `json:"updated_at"`
 }
 
 // Organization 组织/租户表
@@ -134,14 +138,15 @@ type APIKey struct {
 
 // UsageLog 用量日志表
 type UsageLog struct {
-	ID         string    `gorm:"primaryKey" json:"id"`
-	OrgID      string    `gorm:"index" json:"org_id"`
-	APIKeyID   string    `gorm:"index" json:"api_key_id"`
-	UserID     string    `gorm:"index" json:"user_id"`
-	Endpoint   string    `json:"endpoint"`
-	StatusCode int       `json:"status_code"`
-	RequestID  string    `json:"request_id"`
-	CreatedAt  time.Time `json:"created_at"`
+    ID         string    `gorm:"primaryKey" json:"id"`
+    OrgID      string    `gorm:"index" json:"org_id"`
+    APIKeyID   string    `gorm:"index" json:"api_key_id"`
+    UserID     string    `gorm:"index" json:"user_id"`
+    OAuthClientID *string   `gorm:"index" json:"oauth_client_id,omitempty"`
+    Endpoint   string    `json:"endpoint"`
+    StatusCode int       `json:"status_code"`
+    RequestID  string    `json:"request_id"`
+    CreatedAt  time.Time `json:"created_at"`
 }
 
 // OAuthToken OAuth令牌
@@ -182,10 +187,11 @@ type OrganizationInvitation struct {
 
 // Permission 原子权限定义
 type Permission struct {
-	ID          string `gorm:"primaryKey" json:"id"`
-	Category    string `json:"category"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
+	ID          string    `gorm:"primaryKey" json:"id"`
+	Category    string    `json:"category"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 // Role 角色定义
