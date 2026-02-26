@@ -21,18 +21,18 @@ type BidirectionalAuth struct {
 	// 服务签名密钥
 	ServiceSecretKey string
 	// 服务名称
-	ServiceName      string
+	ServiceName string
 	// 令牌过期时间
-	TokenExpiration  time.Duration
+	TokenExpiration time.Duration
 }
 
 // NewBidirectionalAuth 创建双向鉴权中间件
 func NewBidirectionalAuth(kongSecret, serviceSecret, serviceName string) *BidirectionalAuth {
 	return &BidirectionalAuth{
 		KongSharedSecret: kongSecret,
-		ServiceSecretKey:   serviceSecret,
-		ServiceName:        serviceName,
-		TokenExpiration:    24 * time.Hour,
+		ServiceSecretKey: serviceSecret,
+		ServiceName:      serviceName,
+		TokenExpiration:  24 * time.Hour,
 	}
 }
 
@@ -114,7 +114,7 @@ func (b *BidirectionalAuth) ServiceAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 生成服务签名
 		serviceToken := b.generateServiceToken(c.Request.URL.Path, c.Request.Method)
-		
+
 		// 设置服务认证头
 		c.Header("X-Service-Signature", serviceToken.Signature)
 		c.Header("X-Service-Timestamp", serviceToken.Timestamp)
@@ -187,23 +187,23 @@ func NewBidirectionalHealthCheck(auth *BidirectionalAuth) *BidirectionalHealthCh
 // HealthCheckHandler 健康检查处理器
 func (h *BidirectionalHealthCheck) HealthCheckHandler(c *gin.Context) {
 	// 验证请求是否来自Kong网关
-	kongVerified := c.GetBool("kong_verified")
-	if !kongVerified {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"status":  "error",
-			"message": "健康检查请求必须通过Kong网关",
-			"code":    "HEALTH_CHECK_UNAUTHORIZED",
-		})
-		return
-	}
+	//kongVerified := c.GetBool("kong_verified")
+	//if !kongVerified {
+	//	c.JSON(http.StatusUnauthorized, gin.H{
+	//		"status":  "error",
+	//		"message": "健康检查请求必须通过Kong网关",
+	//		"code":    "HEALTH_CHECK_UNAUTHORIZED",
+	//	})
+	//	return
+	//}
 
 	// 返回服务状态
 	healthInfo := gin.H{
-		"status":       "healthy",
-		"service":      h.auth.ServiceName,
-		"timestamp":    time.Now().Format(time.RFC3339),
+		"status":        "healthy",
+		"service":       h.auth.ServiceName,
+		"timestamp":     time.Now().Format(time.RFC3339),
 		"kong_verified": true,
-		"version":      "1.0.0",
+		"version":       "1.0.0",
 	}
 
 	// 生成服务响应签名
@@ -263,12 +263,12 @@ func (b *BidirectionalAuth) BypassDetectionMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 检查是否缺少Kong认证头（可能的绕过尝试）
 		kongSignature := c.GetHeader("X-Kong-Signature")
-		
+
 		// 检查是否直接访问服务（绕过Kong）
 		if kongSignature == "" && c.Request.Header.Get("X-Forwarded-By") != "Kong" {
 			logger.GetLogger().WithFields(map[string]interface{}{
-				"ip":   c.ClientIP(),
-				"path": c.Request.URL.Path,
+				"ip":         c.ClientIP(),
+				"path":       c.Request.URL.Path,
 				"user_agent": c.Request.UserAgent(),
 			}).Warn("检测到可能的Kong网关绕过尝试")
 
@@ -296,13 +296,12 @@ func RecordSecurityEvent(eventType, clientIP, path, details string) {
 		"details":    details,
 		"timestamp":  time.Now().Format(time.RFC3339),
 	}).Warn("安全事件记录")
-	
+
 	// 记录到Prometheus指标
 	metrics.RecordSecurityEvent(eventType, clientIP, path)
-	
+
 	// 记录可疑IP访问
 	if eventType == "KONG_BYPASS_ATTEMPT" || eventType == "SUSPICIOUS_IP_ACCESS" {
 		metrics.RecordSuspiciousIPAccess(clientIP, path, details)
 	}
 }
-

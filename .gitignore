@@ -27,7 +27,8 @@ artifacts*
 .github
 kyc-service
 main
-server
+./server
 verilocale-backend*
 cmd/kyc-loadtest/kyc-loadtest
 *.log*
+.claude

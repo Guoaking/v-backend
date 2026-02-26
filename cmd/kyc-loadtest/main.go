@@ -151,8 +151,10 @@ func runLoadTest(cmd *cobra.Command, args []string) {
 		JWTSecret:  jwtSecret,
 		OAuthToken: token,
 		OAuthConfig: OAuthConfig{
-			ClientID:     "fb049a77-9d8c-41ff-bf56-202f1a269740",
-			ClientSecret: "bfc4de25-fb35-4784-bf7f-b913286fa157",
+			//ClientID:     "fb049a77-9d8c-41ff-bf56-202f1a269740",
+			ClientID: "23a7dcff-c0e5-4cda-941f-7d7808d30631",
+			//ClientSecret: "bfc4de25-fb35-4784-bf7f-b913286fa157",
+			ClientSecret: "85436943-36e8-4bde-bccd-357314bcc206",
 			GrantType:    "client_credentials",
 			//Scope:        "ocr:read liveness:read face:read",
 		},

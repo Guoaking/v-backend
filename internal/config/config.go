@@ -198,6 +198,10 @@ func setDefaults() {
 	viper.SetDefault("monitoring.alerting.enabled", false)
 	viper.SetDefault("monitoring.alerting.webhook_url", "")
 	viper.SetDefault("monitoring.alerting.slack_webhook", "")
-	viper.SetDefault("monitoring.alerting.email_smtp", "")
-	viper.SetDefault("monitoring.alerting.email_from", "")
+    viper.SetDefault("monitoring.alerting.email_smtp", "")
+    viper.SetDefault("monitoring.alerting.email_from", "")
+    viper.SetDefault("monitoring.alerting.email_user", "")
+    viper.SetDefault("monitoring.alerting.email_password", "")
+    viper.SetDefault("monitoring.alerting.email_port", 587)
+    viper.SetDefault("monitoring.alerting.email_tls", false)
 }

@@ -21,8 +21,16 @@ definitions:
     properties:
       description:
         type: string
+      ip_whitelist:
+        items:
+          type: string
+        type: array
       name:
         type: string
+      owner_id:
+        type: string
+      rate_limit_per_sec:
+        type: integer
       redirect_uri:
         type: string
       scopes:
@@ -31,7 +39,6 @@ definitions:
         type: integer
     required:
     - name
-    - redirect_uri
     - scopes
     type: object
   api.ClientRegistrationResponse:
@@ -45,6 +52,8 @@ definitions:
       description:
         type: string
       name:
+        type: string
+      owner_id:
         type: string
       redirect_uri:
         type: string
@@ -432,17 +441,6 @@ definitions:
         description: timestamp (ms)
         type: integer
     type: object
-  api.LoginRequest:
-    properties:
-      email:
-        type: string
-      password:
-        minLength: 6
-        type: string
-    required:
-    - email
-    - password
-    type: object
   api.OCRPublicResult:
     properties:
       code:
@@ -499,25 +497,6 @@ definitions:
     required:
     - client_id
     - refresh_token
-    type: object
-  api.RegisterRequest:
-    properties:
-      avatar_url:
-        description: 可选头像URL
-        type: string
-      company:
-        type: string
-      email:
-        type: string
-      name:
-        type: string
-      password:
-        minLength: 6
-        type: string
-    required:
-    - email
-    - name
-    - password
     type: object
   api.ResetPasswordConfirmRequest:
     properties:
@@ -681,6 +660,13 @@ definitions:
       timestamp:
         description: timestamp (ms)
         type: integer
+    type: object
+  api.SwitchOrgRequest:
+    properties:
+      org_id:
+        type: string
+    required:
+    - org_id
     type: object
   api.TokenRequest:
     properties:
@@ -971,14 +957,14 @@ paths:
     post:
       consumes:
       - application/json
-      description: 用户使用邮箱和密码登录
+      description: 用户使用邮箱和密码登录控制台
       parameters:
-      - description: 登录信息
+      - description: 登录请求
         in: body
-        name: login
+        name: request
         required: true
         schema:
-          $ref: '#/definitions/api.LoginRequest'
+          $ref: '#/definitions/api.ConsoleLoginRequest'
       produces:
       - application/json
       responses:
@@ -996,45 +982,7 @@ paths:
             $ref: '#/definitions/api.ErrorResponse'
       summary: 用户登录
       tags:
-      - Auth
-  /api/v1/auth/logout:
-    post:
-      consumes:
-      - application/json
-      description: 用户登出系统
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/api.SuccessResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/api.ErrorResponse'
-      summary: 用户登出
-      tags:
-      - Auth
-  /api/v1/auth/me:
-    get:
-      consumes:
-      - application/json
-      description: 获取当前登录用户的信息
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/api.SuccessResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/api.ErrorResponse'
-      summary: 获取当前用户信息
-      tags:
-      - Auth
+      - Console Auth
   /api/v1/auth/password-reset/confirm:
     post:
       consumes:
@@ -1091,14 +1039,14 @@ paths:
     post:
       consumes:
       - application/json
-      description: 用户注册新账户
+      description: 新用户注册并创建组织
       parameters:
-      - description: 注册信息
+      - description: 注册请求
         in: body
-        name: register
+        name: request
         required: true
         schema:
-          $ref: '#/definitions/api.RegisterRequest'
+          $ref: '#/definitions/api.ConsoleRegisterRequest'
       produces:
       - application/json
       responses:
@@ -1116,7 +1064,7 @@ paths:
             $ref: '#/definitions/api.ErrorResponse'
       summary: 用户注册
       tags:
-      - Auth
+      - Console Auth
   /api/v1/console/users/me/password:
     put:
       consumes:
@@ -1339,6 +1287,40 @@ paths:
           schema:
             $ref: '#/definitions/api.ErrorResponse'
       summary: 更新组织套餐
+      tags:
+      - Organization
+  /api/v1/orgs/switch:
+    post:
+      consumes:
+      - application/json
+      description: 登录用户在多组织间切换当前组织上下文
+      parameters:
+      - description: 切换组织请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.SwitchOrgRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: 切换当前组织
       tags:
       - Organization
   /api/v1/users/me:

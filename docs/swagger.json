@@ -356,7 +356,7 @@
         },
         "/api/v1/auth/login": {
             "post": {
-                "description": "用户使用邮箱和密码登录",
+                "description": "用户使用邮箱和密码登录控制台",
                 "consumes": [
                     "application/json"
                 ],
@@ -364,17 +364,17 @@
                     "application/json"
                 ],
                 "tags": [
-                    "Auth"
+                    "Console Auth"
                 ],
                 "summary": "用户登录",
                 "parameters": [
                     {
-                        "description": "登录信息",
-                        "name": "login",
+                        "description": "登录请求",
+                        "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/api.LoginRequest"
+                            "$ref": "#/definitions/api.ConsoleLoginRequest"
                         }
                     }
                 ],
@@ -389,64 +389,6 @@
                         "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/api.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/api.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/auth/logout": {
-            "post": {
-                "description": "用户登出系统",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Auth"
-                ],
-                "summary": "用户登出",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/api.SuccessResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/api.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/auth/me": {
-            "get": {
-                "description": "获取当前登录用户的信息",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Auth"
-                ],
-                "summary": "获取当前用户信息",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/api.SuccessResponse"
                         }
                     },
                     "401": {
@@ -540,7 +482,7 @@
         },
         "/api/v1/auth/register": {
             "post": {
-                "description": "用户注册新账户",
+                "description": "新用户注册并创建组织",
                 "consumes": [
                     "application/json"
                 ],
@@ -548,17 +490,17 @@
                     "application/json"
                 ],
                 "tags": [
-                    "Auth"
+                    "Console Auth"
                 ],
                 "summary": "用户注册",
                 "parameters": [
                     {
-                        "description": "注册信息",
-                        "name": "register",
+                        "description": "注册请求",
+                        "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/api.RegisterRequest"
+                            "$ref": "#/definitions/api.ConsoleRegisterRequest"
                         }
                     }
                 ],
@@ -894,6 +836,58 @@
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/api.UpdatePlanRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/api.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/orgs/switch": {
+            "post": {
+                "description": "登录用户在多组织间切换当前组织上下文",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Organization"
+                ],
+                "summary": "切换当前组织",
+                "parameters": [
+                    {
+                        "description": "切换组织请求",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.SwitchOrgRequest"
                         }
                     }
                 ],
@@ -1666,15 +1660,26 @@
             "type": "object",
             "required": [
                 "name",
-                "redirect_uri",
                 "scopes"
             ],
             "properties": {
                 "description": {
                     "type": "string"
                 },
+                "ip_whitelist": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "name": {
                     "type": "string"
+                },
+                "owner_id": {
+                    "type": "string"
+                },
+                "rate_limit_per_sec": {
+                    "type": "integer"
                 },
                 "redirect_uri": {
                     "type": "string"
@@ -1703,6 +1708,9 @@
                     "type": "string"
                 },
                 "name": {
+                    "type": "string"
+                },
+                "owner_id": {
                     "type": "string"
                 },
                 "redirect_uri": {
@@ -2292,22 +2300,6 @@
                 }
             }
         },
-        "api.LoginRequest": {
-            "type": "object",
-            "required": [
-                "email",
-                "password"
-            ],
-            "properties": {
-                "email": {
-                    "type": "string"
-                },
-                "password": {
-                    "type": "string",
-                    "minLength": 6
-                }
-            }
-        },
         "api.OCRPublicResult": {
             "type": "object",
             "properties": {
@@ -2393,33 +2385,6 @@
                 },
                 "refresh_token": {
                     "type": "string"
-                }
-            }
-        },
-        "api.RegisterRequest": {
-            "type": "object",
-            "required": [
-                "email",
-                "name",
-                "password"
-            ],
-            "properties": {
-                "avatar_url": {
-                    "description": "可选头像URL",
-                    "type": "string"
-                },
-                "company": {
-                    "type": "string"
-                },
-                "email": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "password": {
-                    "type": "string",
-                    "minLength": 6
                 }
             }
         },
@@ -2623,6 +2588,17 @@
                 "timestamp": {
                     "description": "timestamp (ms)",
                     "type": "integer"
+                }
+            }
+        },
+        "api.SwitchOrgRequest": {
+            "type": "object",
+            "required": [
+                "org_id"
+            ],
+            "properties": {
+                "org_id": {
+                    "type": "string"
                 }
             }
         },

@@ -75,6 +75,16 @@ monitoring:
     subsystem: "service"
     push_interval: "30s"
     histogram_buckets: [0.1, 0.5, 1, 2, 5, 10]
+  alerting:
+    # https://qiye.163.com/help/client-profile.html
+#    email_smtp: smtp.qq.com
+    email_smtp: imaphz.qiye.163.com
+    email_from: ericlee@verilocale.com
+    email_user: ericlee@verilocale.com
+#    email_password: jqfsfgmymvwdbahi
+    email_password: 8#7s%r#YDPUB@YkX
+    email_port: 465
+    email_tls: true
   
   tracing:
     enabled: true

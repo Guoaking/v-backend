@@ -1,19 +1,20 @@
 package service
 
 import (
-    "context"
-    "fmt"
-    "mime/multipart"
-    "net/http"
-    "time"
+	"context"
+	"encoding/json"
+	"fmt"
+	"mime/multipart"
+	"net/http"
+	"time"
 
-    "kyc-service/internal/config"
-    "kyc-service/internal/models"
-    "kyc-service/pkg/crypto"
-    "kyc-service/pkg/httpclient"
-    "kyc-service/pkg/logger"
-    "kyc-service/pkg/metrics"
-    "kyc-service/pkg/tracing"
+	"kyc-service/internal/config"
+	"kyc-service/internal/models"
+	"kyc-service/pkg/crypto"
+	"kyc-service/pkg/httpclient"
+	"kyc-service/pkg/logger"
+	"kyc-service/pkg/metrics"
+	"kyc-service/pkg/tracing"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
@@ -36,6 +37,62 @@ type KYCService struct {
 	livenessSuccessRate   metric.Float64Gauge
 	kycSuccessRate        metric.Float64Gauge
 	kycProcessingTime     metric.Float64Histogram
+}
+
+type OrgPolicy struct {
+	AllowedScopes   []string
+	RequireApproval bool
+	MaxTokenTTLSec  int
+	IPWhitelist     []string
+	MaxRatePerSec   int
+}
+
+func (s *KYCService) GetOrgPolicy(orgID string) OrgPolicy {
+	var raw string
+	_ = s.DB.Raw("SELECT value FROM global_configs WHERE key = ?", "org_policy:"+orgID).Scan(&raw).Error
+	if raw != "" {
+		type cfg struct {
+			AllowedScopes   []string `json:"allowed_scopes"`
+			RequireApproval bool     `json:"require_approval"`
+			MaxTokenTTLSec  int      `json:"max_token_ttl_sec"`
+			IPWhitelist     []string `json:"ip_whitelist"`
+			MaxRatePerSec   int      `json:"max_rate_per_sec"`
+		}
+		var c cfg
+		if err := json.Unmarshal([]byte(raw), &c); err == nil {
+			return OrgPolicy{AllowedScopes: c.AllowedScopes, RequireApproval: c.RequireApproval, MaxTokenTTLSec: c.MaxTokenTTLSec, IPWhitelist: c.IPWhitelist, MaxRatePerSec: c.MaxRatePerSec}
+		}
+	}
+	return OrgPolicy{AllowedScopes: []string{"ocr:read", "face:read", "liveness:read", "kyc:verify"}, RequireApproval: false, MaxTokenTTLSec: 86400, IPWhitelist: nil, MaxRatePerSec: 100}
+}
+
+func (s *KYCService) ValidateScopesSubset(allowed []string, requested []string) bool {
+	set := map[string]struct{}{}
+	for _, a := range allowed {
+		set[a] = struct{}{}
+	}
+	for _, r := range requested {
+		if _, ok := set[r]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func (s *KYCService) ValidateIPWhitelistSubset(allowed []string, requested []string) bool {
+	if len(allowed) == 0 {
+		return true
+	}
+	set := map[string]struct{}{}
+	for _, a := range allowed {
+		set[a] = struct{}{}
+	}
+	for _, r := range requested {
+		if _, ok := set[r]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func NewKYCService(db *gorm.DB, redis *redis.Client, cfg *config.Config) *KYCService {
@@ -426,10 +483,10 @@ func (s *KYCService) RecordAuditLog(ctx context.Context, action, resource, resou
 		Message:   message,
 	}
 
-    if err := s.DB.Create(auditLog).Error; err != nil {
-        logger.GetLogger().WithError(err).Error("记录审计日志失败")
-    }
-    metrics.RecordAuditEvent(ctx, action, resource, status)
+	if err := s.DB.Create(auditLog).Error; err != nil {
+		logger.GetLogger().WithError(err).Error("记录审计日志失败")
+	}
+	metrics.RecordAuditEvent(ctx, action, resource, status)
 }
 
 // 用户管理相关方法

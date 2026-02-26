@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	pq "github.com/lib/pq"
 )
 
 type ClientHandler struct {
@@ -24,11 +25,14 @@ func NewClientHandler(svc *service.KYCService) *ClientHandler {
 
 // ClientRegistrationRequest 客户端注册请求
 type ClientRegistrationRequest struct {
-	Name            string `json:"name" binding:"required"`
-	Description     string `json:"description"`
-	RedirectURI     string `json:"redirect_uri" binding:"required"`
-	Scopes          string `json:"scopes" binding:"required"`
-	TokenTTLSeconds int    `json:"token_ttl_seconds"`
+	Name            string   `json:"name" binding:"required"`
+	Description     string   `json:"description"`
+	RedirectURI     string   `json:"redirect_uri"`
+	Scopes          string   `json:"scopes" binding:"required"`
+	TokenTTLSeconds int      `json:"token_ttl_seconds"`
+	OwnerID         string   `json:"owner_id"`
+	IPWhitelist     []string `json:"ip_whitelist"`
+	RateLimitPerSec int      `json:"rate_limit_per_sec"`
 }
 
 // ClientRegistrationResponse 客户端注册响应
@@ -41,6 +45,7 @@ type ClientRegistrationResponse struct {
 	Scopes       string    `json:"scopes"`
 	Status       string    `json:"status"`
 	CreatedAt    time.Time `json:"created_at"`
+	OwnerID      string    `json:"owner_id"`
 }
 
 // ClientListResponse 客户端列表响应
@@ -72,21 +77,67 @@ func (h *ClientHandler) RegisterClient(c *gin.Context) {
 		return
 	}
 
+	// 组织策略校验
+	orgID := c.GetString("orgID")
+	policy := h.service.GetOrgPolicy(orgID)
+	scopesArr := func(s string) []string {
+		ss := strings.Fields(strings.TrimSpace(s))
+		out := make([]string, 0, len(ss))
+		for _, x := range ss {
+			if x != "" {
+				out = append(out, x)
+			}
+		}
+		return out
+	}(req.Scopes)
+	if !h.service.ValidateScopesSubset(policy.AllowedScopes, scopesArr) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Scopes not allowed by organization policy"})
+		return
+	}
+	if req.RateLimitPerSec <= 0 || req.RateLimitPerSec > policy.MaxRatePerSec {
+		req.RateLimitPerSec = policy.MaxRatePerSec
+	}
+	if !h.service.ValidateIPWhitelistSubset(policy.IPWhitelist, req.IPWhitelist) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "IP whitelist not allowed by organization policy"})
+		return
+	}
+	if req.TokenTTLSeconds <= 0 || req.TokenTTLSeconds > policy.MaxTokenTTLSec {
+		req.TokenTTLSeconds = policy.MaxTokenTTLSec
+	}
+
 	// 生成客户端凭证
 	clientID := uuid.New().String()
 	clientSecret := uuid.New().String()
 
 	// 创建客户端记录
+	ownerID := c.GetString("userID")
+	if req.OwnerID != "" && req.OwnerID != ownerID {
+		role := c.GetString("orgRole")
+		if role != "owner" && role != "admin" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions to assign owner"})
+			return
+		}
+		var member models.OrganizationMember
+		if err := h.service.DB.Where("organization_id = ? AND user_id = ? AND status = ?", orgID, req.OwnerID, "active").First(&member).Error; err != nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Owner must be an active organization member"})
+			return
+		}
+		ownerID = req.OwnerID
+	}
 	client := &models.OAuthClient{
-		ID:              clientID,
-		Secret:          clientSecret,
-		Name:            req.Name,
-		Description:     req.Description,
-		RedirectURI:     req.RedirectURI,
-		Scopes:          req.Scopes,
-		Status:          "active",
-		OrgID:           c.GetString("orgID"),
+		ID:          clientID,
+		Secret:      clientSecret,
+		Name:        req.Name,
+		Description: req.Description,
+		RedirectURI: req.RedirectURI,
+		Scopes:      req.Scopes,
+		//Status:          map[bool]string{true: "pending", false: "active"}[policy.RequireApproval],
+		Status:          map[bool]string{true: "active", false: "active"}[policy.RequireApproval],
+		OrgID:           orgID,
 		TokenTTLSeconds: req.TokenTTLSeconds,
+		OwnerID:         ownerID,
+		IPWhitelist:     pq.StringArray(req.IPWhitelist),
+		RateLimitPerSec: req.RateLimitPerSec,
 	}
 
 	if err := h.service.DB.Create(client).Error; err != nil {
@@ -105,8 +156,9 @@ func (h *ClientHandler) RegisterClient(c *gin.Context) {
 		Description:  req.Description,
 		RedirectURI:  req.RedirectURI,
 		Scopes:       req.Scopes,
-		Status:       "active",
+		Status:       client.Status,
 		CreatedAt:    client.CreatedAt,
+		OwnerID:      client.OwnerID,
 	})
 }
 
