@@ -57,7 +57,27 @@ func APIKeyAuth(service *service.KYCService) gin.HandlerFunc {
 		}
 
 		// 检查密钥状态
-		if key.Status != "active" {
+		switch key.Status {
+		case "active":
+			// ok
+		case "rate_limited":
+			c.JSON(429, gin.H{
+				"success": false,
+				"error":   "Rate limit exceeded",
+				"code":    "RATE_LIMITED",
+			})
+			c.Abort()
+			return
+		case "quota_exceeded":
+			c.JSON(429, gin.H{
+				"success": false,
+				"error":   "Quota exceeded",
+				"code":    "QUOTA_EXCEEDED",
+			})
+			c.Abort()
+			return
+		default:
+			// revoked or unknown
 			c.JSON(401, gin.H{
 				"success": false,
 				"error":   "API key is revoked",

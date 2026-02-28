@@ -25,12 +25,9 @@ func RateLimitWithKey(redisClient *redis.Client, svc *service.KYCService) gin.Ha
 			return
 		}
 		if current >= 300 {
-			if apiKeyID := c.GetString("apiKeyID"); apiKeyID != "" {
-				if key, e := svc.GetAPIKeyByID(apiKeyID); e == nil {
-					key.Status = "rate_limited"
-					_ = svc.UpdateAPIKey(key)
-				}
-			}
+			// IMPORTANT: rate limiting should NOT permanently change API key status.
+			// Otherwise, clients will see 401 "revoked" on subsequent requests, which breaks retry semantics.
+			c.Header("Retry-After", "1")
 			c.JSON(http.StatusTooManyRequests, gin.H{"code": 1005, "message": "请求过于频繁"})
 			c.Abort()
 			return
