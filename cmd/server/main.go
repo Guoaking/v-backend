@@ -1112,6 +1112,10 @@ func main() {
 			kyc.POST("/liveness/silent", middleware.RequireKeyScope("liveness:read"), kycHandler.LivenessSilent)
 			kyc.POST("/liveness/video", middleware.RequireKeyScope("liveness:read"), kycHandler.LivenessVideo)
 			kyc.GET("/liveness/ws", middleware.RequireKeyScope("liveness:read"), kycHandler.LivenessWebSocket)
+			// Action liveness (MVP placeholder)
+			kyc.POST("/liveness/action/session", middleware.RequireKeyScope("liveness:read"), kycHandler.LivenessActionSession)
+			kyc.POST("/liveness/action/upload", middleware.RequireKeyScope("liveness:read"), kycHandler.LivenessActionUpload)
+			kyc.POST("/liveness/action/verify", middleware.RequireKeyScope("liveness:read"), kycHandler.LivenessActionVerify)
 			// 完整KYC流程
 			kyc.POST("/verify", middleware.RequireKeyScope("kyc:verify"), kycHandler.CompleteKYC)
 
