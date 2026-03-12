@@ -120,6 +120,7 @@ func autoMigrate(db *gorm.DB) error {
 		&models.FaceImageRef{},
 		&models.ImageAsset{},
 		&models.VideoAsset{},
+		&models.LivenessTask{},
 		&models.KYCRequest{}, // 确保 KYCRequest 模型被包含在自动迁移中
 	}
 

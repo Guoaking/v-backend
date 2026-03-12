@@ -68,7 +68,9 @@ type SecurityConfig struct {
 }
 
 type StorageConfig struct {
+	Mode      string `mapstructure:"mode"` // "local" or "remote"
 	IngestDir string `mapstructure:"ingest_dir"`
+	BaseURL   string `mapstructure:"base_url"`
 }
 
 type ThirdPartyConfig struct {
@@ -99,6 +101,13 @@ type ThirdPartyConfig struct {
 		Timeout    int    `mapstructure:"timeout"`
 		RetryCount int    `mapstructure:"retry_count"`
 	} `mapstructure:"liveness_video"`
+	LivenessAction struct {
+		SubmitURL   string `mapstructure:"submit_url"`
+		PollURL     string `mapstructure:"poll_url"`
+		CallbackURL string `mapstructure:"callback_url"` // New: Callback URL for async results
+		Timeout     int    `mapstructure:"timeout"`
+		RetryCount  int    `mapstructure:"retry_count"`
+	} `mapstructure:"liveness_action"`
 }
 
 func Load(configFile string) *Config {
@@ -172,7 +181,9 @@ func setDefaults() {
 	viper.SetDefault("security.kong_shared_secret", "kong-shared-secret-key-2024")
 	viper.SetDefault("security.service_secret_key", "kyc-service-secret-key-2024")
 
+	viper.SetDefault("storage.mode", "local")
 	viper.SetDefault("storage.ingest_dir", "/data/ingest")
+	viper.SetDefault("storage.base_url", "")
 
 	// 第三方服务默认值
 	viper.SetDefault("third_party.ocr_service.timeout", 30)
@@ -181,6 +192,9 @@ func setDefaults() {
 	viper.SetDefault("third_party.face_service.retry_count", 3)
 	viper.SetDefault("third_party.liveness_service.timeout", 60)
 	viper.SetDefault("third_party.liveness_service.retry_count", 3)
+	viper.SetDefault("third_party.liveness_action.timeout", 60)
+	viper.SetDefault("third_party.liveness_action.retry_count", 3)
+	viper.SetDefault("third_party.liveness_action.callback_url", "") // Default empty
 
 	// 监控默认值
 	viper.SetDefault("monitoring.metrics.enabled", true)

@@ -10,6 +10,8 @@ func ocrGetProcessor(name string) ocrProc {
 		fallthrough
 	case "vat_certificate":
 		fallthrough
+	case "passport":
+		fallthrough
 	case "NPWP":
 		return func(ctx context.Context, s *KYCService, req *OCRRequest) (*OCRResponse, error) {
 			return s.callOCRService(ctx, req)

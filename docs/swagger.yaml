@@ -1,5 +1,17 @@
 basePath: /api/v1
 definitions:
+  api.ActionLivenessSessionResponse:
+    properties:
+      actions:
+        items:
+          type: string
+        type: array
+      request_id:
+        description: Trace/request id is put here for client debug convenience.
+        type: string
+      session_id:
+        type: string
+    type: object
   api.ClientListResponse:
     properties:
       client_id:
@@ -169,7 +181,7 @@ definitions:
     properties:
       code:
         allOf:
-        - $ref: '#/definitions/api.ResponseCode'
+        - $ref: '#/definitions/response.ResponseCode'
         description: response code
       error:
         description: error detail
@@ -177,7 +189,7 @@ definitions:
       errors:
         description: field errors
         items:
-          $ref: '#/definitions/api.FieldError'
+          $ref: '#/definitions/response.FieldError'
         type: array
       message:
         description: response message
@@ -219,7 +231,7 @@ definitions:
     properties:
       code:
         allOf:
-        - $ref: '#/definitions/api.ResponseCode'
+        - $ref: '#/definitions/response.ResponseCode'
         description: response code
       data:
         $ref: '#/definitions/api.FaceCompareDTO'
@@ -279,7 +291,7 @@ definitions:
     properties:
       code:
         allOf:
-        - $ref: '#/definitions/api.ResponseCode'
+        - $ref: '#/definitions/response.ResponseCode'
         description: response code
       data:
         $ref: '#/definitions/api.FaceDetectDTO'
@@ -322,7 +334,7 @@ definitions:
     properties:
       code:
         allOf:
-        - $ref: '#/definitions/api.ResponseCode'
+        - $ref: '#/definitions/response.ResponseCode'
         description: response code
       data:
         $ref: '#/definitions/api.FaceSearchDTO'
@@ -335,18 +347,6 @@ definitions:
       timestamp:
         description: timestamp (ms)
         type: integer
-    type: object
-  api.FieldError:
-    properties:
-      field:
-        description: field name
-        type: string
-      message:
-        description: error message
-        type: string
-      value:
-        description: field value
-        type: string
     type: object
   api.GoogleTokenRequest:
     properties:
@@ -389,7 +389,7 @@ definitions:
     properties:
       code:
         allOf:
-        - $ref: '#/definitions/api.ResponseCode'
+        - $ref: '#/definitions/response.ResponseCode'
         description: response code
       data:
         $ref: '#/definitions/api.LivenessSilentDTO'
@@ -427,7 +427,7 @@ definitions:
     properties:
       code:
         allOf:
-        - $ref: '#/definitions/api.ResponseCode'
+        - $ref: '#/definitions/response.ResponseCode'
         description: response code
       data:
         $ref: '#/definitions/api.LivenessVideoDTO'
@@ -460,7 +460,7 @@ definitions:
     properties:
       code:
         allOf:
-        - $ref: '#/definitions/api.ResponseCode'
+        - $ref: '#/definitions/response.ResponseCode'
         description: response code
       data:
         $ref: '#/definitions/api.OCRPublicResult'
@@ -647,7 +647,7 @@ definitions:
     properties:
       code:
         allOf:
-        - $ref: '#/definitions/api.ResponseCode'
+        - $ref: '#/definitions/response.ResponseCode'
         description: response code
       data:
         description: response data
@@ -716,6 +716,115 @@ definitions:
     required:
     - status
     type: object
+  response.FieldError:
+    properties:
+      field:
+        description: field name
+        type: string
+      message:
+        description: error message
+        type: string
+      value:
+        description: field value
+        type: string
+    type: object
+  response.ResponseCode:
+    enum:
+    - 200
+    - 1000
+    - 1001
+    - 1002
+    - 1003
+    - 1004
+    - 1005
+    - 1006
+    - 1007
+    - 2000
+    - 2001
+    - 2002
+    - 2003
+    - 2004
+    - 2005
+    - 2006
+    - 2007
+    - 40201
+    - 5000
+    - 5001
+    - 5002
+    - 5003
+    - 5004
+    type: integer
+    x-enum-comments:
+      CodeBadRequest: invalid request parameters
+      CodeBusinessError: generic business error
+      CodeConflict: resource conflict
+      CodeDatabaseError: database error
+      CodeEncryptionError: encryption error
+      CodeFaceNotMatch: face not matched
+      CodeFaceVerifyFailed: face verification failed
+      CodeForbidden: forbidden
+      CodeIDCardNotMatch: id card information not matched
+      CodeInternalError: internal server error
+      CodeInvalidParameter: invalid parameter
+      CodeKYCFailed: kyc verification failed
+      CodeLivenessFailed: liveness detection failed
+      CodeMethodNotAllowed: method not allowed
+      CodeMissingParameter: missing parameter
+      CodeNotFound: resource not found
+      CodeOCRFailed: ocr recognition failed
+      CodePaymentRequired: quota exceeded, please upgrade your plan
+      CodeServiceUnavailable: service unavailable
+      CodeThirdPartyError: third party service error
+      CodeTooManyRequests: too many requests
+      CodeUnauthorized: unauthorized
+    x-enum-descriptions:
+    - ""
+    - invalid request parameters
+    - unauthorized
+    - forbidden
+    - resource not found
+    - method not allowed
+    - too many requests
+    - invalid parameter
+    - missing parameter
+    - generic business error
+    - ocr recognition failed
+    - face verification failed
+    - liveness detection failed
+    - kyc verification failed
+    - id card information not matched
+    - face not matched
+    - resource conflict
+    - quota exceeded, please upgrade your plan
+    - internal server error
+    - database error
+    - third party service error
+    - service unavailable
+    - encryption error
+    x-enum-varnames:
+    - CodeSuccess
+    - CodeBadRequest
+    - CodeUnauthorized
+    - CodeForbidden
+    - CodeNotFound
+    - CodeMethodNotAllowed
+    - CodeTooManyRequests
+    - CodeInvalidParameter
+    - CodeMissingParameter
+    - CodeBusinessError
+    - CodeOCRFailed
+    - CodeFaceVerifyFailed
+    - CodeLivenessFailed
+    - CodeKYCFailed
+    - CodeIDCardNotMatch
+    - CodeFaceNotMatch
+    - CodeConflict
+    - CodePaymentRequired
+    - CodeInternalError
+    - CodeDatabaseError
+    - CodeThirdPartyError
+    - CodeServiceUnavailable
+    - CodeEncryptionError
 host: localhost:8080
 info:
   contact:
@@ -1417,6 +1526,17 @@ paths:
       tags:
       - Auth
       - Public
+  /callbacks/liveness/action:
+    post:
+      consumes:
+      - application/json
+      description: Callback for action liveness result
+      produces:
+      - application/json
+      responses: {}
+      summary: Action liveness callback
+      tags:
+      - KYC
   /clients:
     get:
       consumes:
@@ -1609,6 +1729,69 @@ paths:
       summary: Face search
       tags:
       - Public
+  /kyc/liveness/action/session:
+    post:
+      consumes:
+      - application/json
+      description: Create an action-liveness session. (Placeholder implementation)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ActionLivenessSessionResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Action liveness create session (MVP)
+      tags:
+      - KYC
+  /kyc/liveness/action/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload media for action-liveness session. (Placeholder implementation)
+      parameters:
+      - description: Session ID
+        in: formData
+        name: session_id
+        required: true
+        type: string
+      - description: Video
+        in: formData
+        name: video
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Action liveness upload (MVP)
+      tags:
+      - KYC
+  /kyc/liveness/action/verify:
+    post:
+      consumes:
+      - application/json
+      description: Verify action-liveness session. (Placeholder implementation)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Action liveness verify (MVP)
+      tags:
+      - KYC
   /kyc/liveness/silent:
     post:
       consumes:

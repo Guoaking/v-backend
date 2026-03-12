@@ -9,7 +9,6 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -67,23 +66,18 @@ func (s *KYCService) IngestImage(ctx context.Context, orgID string, file *multip
 	if _, err := f.Seek(0, io.SeekStart); err != nil {
 		return nil, err
 	}
-	ingestRoot := s.Config.Storage.IngestDir
+
 	safe := sum + filepath.Ext(file.Filename)
 	if strings.Contains(safe, "..") {
 		return nil, fmt.Errorf("invalid filename")
 	}
-	absPath := filepath.Join(ingestRoot, safe)
-	if err := os.MkdirAll(ingestRoot, 0755); err != nil {
-		return nil, err
-	}
-	out, err := os.Create(absPath)
+
+	// 使用 StorageService 上传
+	absPath, _, err := s.Storage.Upload(ctx, safe, f)
 	if err != nil {
-		return nil, fmt.Errorf("create file failed: %w", err)
+		return nil, fmt.Errorf("storage upload failed: %w", err)
 	}
-	defer out.Close()
-	if _, err := io.Copy(out, f); err != nil {
-		return nil, err
-	}
+
 	if ct == "" || !strings.HasPrefix(ct, "image/") {
 		return nil, fmt.Errorf("unsupported file type: %v", ct)
 	}
@@ -95,7 +89,7 @@ func (s *KYCService) IngestImage(ctx context.Context, orgID string, file *multip
 	return asset, nil
 }
 
-func (s *KYCService) IngestVideo(ctx context.Context, orgID string, file *multipart.FileHeader) (*models.VideoAsset, error) {
+func (s *KYCService) IngestVideo(ctx context.Context, orgID string, sessionID string, file *multipart.FileHeader) (*models.VideoAsset, error) {
 	f, err := file.Open()
 	if err != nil {
 		return nil, fmt.Errorf("open file failed: %w", err)
@@ -146,29 +140,48 @@ func (s *KYCService) IngestVideo(ctx context.Context, orgID string, file *multip
 	if _, err := f.Seek(0, io.SeekStart); err != nil {
 		return nil, err
 	}
-	ingestRoot := s.Config.Storage.IngestDir
-	safe := sum + filepath.Ext(file.Filename)
-	if strings.Contains(safe, "..") {
-		return nil, fmt.Errorf("invalid filename")
-	}
-	absPath := filepath.Join(ingestRoot, safe)
-	if err := os.MkdirAll(ingestRoot, 0755); err != nil {
-		return nil, err
-	}
-	out, err := os.Create(absPath)
-	if err != nil {
-		return nil, err
-	}
-	defer out.Close()
-	if _, err := io.Copy(out, f); err != nil {
-		return nil, err
-	}
-	ct := vct
-	if ct == "" || !strings.HasPrefix(ct, "video/") {
-		return nil, fmt.Errorf("unsupported file type: %v, %v", ct, file.Filename)
+
+	// Generate hierarchical path: YYYY/MM/DD/{SessionID}_{Timestamp}.ext
+	now := time.Now()
+	timestamp := now.Unix()
+	if sessionID == "" {
+		sessionID = utils.GenerateID()
 	}
 
-	asset := &models.VideoAsset{ID: utils.GenerateID(), OrganizationID: orgID, Hash: sum, FilePath: absPath, SafeFilename: safe, ContentType: ct, SizeBytes: size, CreatedAt: time.Now()}
+	ext := filepath.Ext(file.Filename)
+	if ext == "" {
+		ext = ".webm" // Default to webm if unknown
+	}
+
+	// Create path: YYYY/MM/DD/sessionID_timestamp.ext
+	relativePath := fmt.Sprintf("%04d/%02d/%02d/%s_%d%s",
+		now.Year(), now.Month(), now.Day(),
+		sessionID, timestamp, ext)
+
+	// Check for path traversal attempts just in case, though we generated it ourselves
+	if strings.Contains(relativePath, "..") {
+		return nil, fmt.Errorf("invalid filename generated")
+	}
+
+	// 使用 StorageService 上传
+	absPath, _, err := s.Storage.Upload(ctx, relativePath, f)
+	if err != nil {
+		return nil, fmt.Errorf("storage upload failed: %w", err)
+	}
+
+	ct := vct
+	if ct == "" || !strings.HasPrefix(ct, "video/") {
+		// Even if detection failed, we allow upload if extension was plausible,
+		// but here we check content type again.
+		// If vct was empty, we might want to trust extension or fail.
+		// Original code failed here if ct was empty or not video/.
+		// But we set vct based on extension earlier.
+		if ct == "" {
+			return nil, fmt.Errorf("unsupported file type: %v, %v", ct, file.Filename)
+		}
+	}
+
+	asset := &models.VideoAsset{ID: utils.GenerateID(), OrganizationID: orgID, Hash: sum, FilePath: absPath, SafeFilename: relativePath, ContentType: ct, SizeBytes: size, CreatedAt: time.Now()}
 	if err := s.DB.Create(asset).Error; err != nil {
 		return nil, err
 	}

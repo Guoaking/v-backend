@@ -1,6 +1,8 @@
 package api
 
 import (
+	"kyc-service/pkg/response"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -122,8 +124,8 @@ func (h *DocsHandler) ErrorCodesDoc(c *gin.Context) {
 		case CodeEncryptionError:
 			name = "CodeEncryptionError"
 		}
-		entry := ErrorCodeEntry{Code: code, Name: name, Message: ResponseMessage[code], HTTPStatus: getHTTPStatusCode(code)}
-		switch {
+		entry := ErrorCodeEntry{Code: code, Name: name, Message: response.ResponseMessage[code], HTTPStatus: response.GetHTTPStatusCode(code)}
+	switch {
 		case code >= 1000 && code < 2000:
 			out.Client = append(out.Client, entry)
 		case code >= 2000 && code < 3000:

@@ -57,7 +57,8 @@ func (s *KYCService) LivenessSilent(ctx context.Context, file *multipart.FileHea
 	}
 	start := time.Now()
 	tp := NewThirdPartyService(s.Config)
-	out, err := tp.CallLivenessSilent(ctx, asset.FilePath, language)
+	publicURL := s.Storage.GetPublicURL(asset.FilePath)
+	out, err := tp.CallLivenessSilent(ctx, asset.FilePath, publicURL, language)
 	if err != nil {
 		metrics.RecordBusinessOperation(ctx, "liveness_silent", false, time.Since(start), "third_party_error")
 		return nil, err
@@ -85,13 +86,14 @@ func (s *KYCService) LivenessVideo(ctx context.Context, file *multipart.FileHead
 		}
 		return nil, err
 	}
-	asset, err := s.IngestVideo(ctx, orgID, file)
+	asset, err := s.IngestVideo(ctx, orgID, "", file)
 	if err != nil {
 		return nil, err
 	}
 	start := time.Now()
 	tp := NewThirdPartyService(s.Config)
-	out, err := tp.CallLivenessVideo(ctx, asset.FilePath, language)
+	publicURL := s.Storage.GetPublicURL(asset.FilePath)
+	out, err := tp.CallLivenessVideo(ctx, asset.FilePath, publicURL, language)
 	if err != nil {
 		metrics.RecordBusinessOperation(ctx, "liveness_video", false, time.Since(start), "third_party_error")
 		return nil, err

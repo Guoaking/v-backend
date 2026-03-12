@@ -33,6 +33,7 @@ cmd/kyc-loadtest/kyc-loadtest
 *.log*
 *.out
 .claude
+test
 
 # Local-only files / binaries
 config.local.yaml

@@ -10,6 +10,7 @@ import (
 
 	"kyc-service/internal/config"
 	"kyc-service/internal/models"
+	"kyc-service/internal/storage"
 	"kyc-service/pkg/crypto"
 	"kyc-service/pkg/httpclient"
 	"kyc-service/pkg/logger"
@@ -27,6 +28,8 @@ type KYCService struct {
 	DB         *gorm.DB
 	Redis      *redis.Client
 	Config     *config.Config
+	Storage    storage.StorageService
+	ThirdParty *ThirdPartyService
 	Encryptor  *crypto.Encryptor
 	Upgrader   websocket.Upgrader
 	HTTPClient *httpclient.Client // 新增HTTP客户端
@@ -112,12 +115,22 @@ func NewKYCService(db *gorm.DB, redis *redis.Client, cfg *config.Config) *KYCSer
 		Config:     cfg,
 		Encryptor:  encryptor,
 		HTTPClient: httpClient, // 初始化HTTP客户端
+		ThirdParty: NewThirdPartyService(cfg),
 		Upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
 				return true // 生产环境需要配置具体的域名
 			},
 		},
 	}
+
+	storageService, err := storage.NewStorageService(cfg)
+	if err != nil {
+		logger.GetLogger().WithError(err).Error("初始化存储服务失败")
+		// 在这里我们记录错误，但可能不想让服务崩溃，或者我们应该panic
+		// 鉴于存储对于某些功能至关重要，panic可能是合适的，但在生产中通常避免
+		// 这里我们假设如果本地目录创建失败，后面上传时会报错
+	}
+	service.Storage = storageService
 
 	// 初始化OTel指标
 	if cfg.Monitoring.Metrics.Enabled {

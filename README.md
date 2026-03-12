@@ -46,29 +46,12 @@
 - Redis 7+
 
 ### 2. 本地开发
-
 ```bash
-# 克隆项目
-git clone <repository-url>
-cd v-backend
-
-# 安装依赖
-go mod download
-
-# 启动基础设施（PostgreSQL + Redis）
-docker network create kyc-network 2>/dev/null || true
-
-docker run -d --name database --network kyc-network -p 5432:5432 \
-  -e POSTGRES_USER=kong -e POSTGRES_PASSWORD=kongpassword -e POSTGRES_DB=kong \
-  postgres:15-alpine
-
-docker run -d --name redis --network kyc-network -p 6379:6379 \
-  redis:7
-
-# 构建服务
-go build -o kyc-service ./cmd/server/main.go
-
-# 运行服务
+# 启动后端服务 (默认使用 config.local.yaml)
+make run
+```
+或手动：
+```bash
 ./kyc-service -config config.local
 ```
 

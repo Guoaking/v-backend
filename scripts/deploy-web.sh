@@ -15,7 +15,7 @@ send_files() {
   OUT_FILE="$1"
   OUT_BASE="$(basename "$OUT_FILE")"
   scp -i "$SSH_KEY" "$OUT_FILE" "$REMOTE:$REMOTE_BASE/"
-  scp -i "$SSH_KEY" -r cert "$REMOTE:$REMOTE_DIR/"
+  # scp -i "$SSH_KEY" -r cert "$REMOTE:$REMOTE_DIR/"
   scp -i "$SSH_KEY" -r nginx.conf "$REMOTE:$REMOTE_DIR/"
   scp -i "$SSH_KEY" -r docker-compose.yml "$REMOTE:$REMOTE_DIR/"
 }

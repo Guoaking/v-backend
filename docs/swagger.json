@@ -1062,6 +1062,22 @@
                 }
             }
         },
+        "/callbacks/liveness/action": {
+            "post": {
+                "description": "Callback for action liveness result",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "KYC"
+                ],
+                "summary": "Action liveness callback",
+                "responses": {}
+            }
+        },
         "/clients": {
             "get": {
                 "description": "List OAuth clients in current organization",
@@ -1357,6 +1373,107 @@
                 }
             }
         },
+        "/kyc/liveness/action/session": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Create an action-liveness session. (Placeholder implementation)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "KYC"
+                ],
+                "summary": "Action liveness create session (MVP)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.ActionLivenessSessionResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/kyc/liveness/action/upload": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Upload media for action-liveness session. (Placeholder implementation)",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "KYC"
+                ],
+                "summary": "Action liveness upload (MVP)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Session ID",
+                        "name": "session_id",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Video",
+                        "name": "video",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/kyc/liveness/action/verify": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Verify action-liveness session. (Placeholder implementation)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "KYC"
+                ],
+                "summary": "Action liveness verify (MVP)",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/kyc/liveness/silent": {
             "post": {
                 "security": [
@@ -1630,6 +1747,24 @@
         }
     },
     "definitions": {
+        "api.ActionLivenessSessionResponse": {
+            "type": "object",
+            "properties": {
+                "actions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "request_id": {
+                    "description": "Trace/request id is put here for client debug convenience.",
+                    "type": "string"
+                },
+                "session_id": {
+                    "type": "string"
+                }
+            }
+        },
         "api.ClientListResponse": {
             "type": "object",
             "properties": {
@@ -1882,7 +2017,7 @@
                     "description": "response code",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/api.ResponseCode"
+                            "$ref": "#/definitions/response.ResponseCode"
                         }
                     ]
                 },
@@ -1894,7 +2029,7 @@
                     "description": "field errors",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/api.FieldError"
+                        "$ref": "#/definitions/response.FieldError"
                     }
                 },
                 "message": {
@@ -1958,7 +2093,7 @@
                     "description": "response code",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/api.ResponseCode"
+                            "$ref": "#/definitions/response.ResponseCode"
                         }
                     ]
                 },
@@ -2051,7 +2186,7 @@
                     "description": "response code",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/api.ResponseCode"
+                            "$ref": "#/definitions/response.ResponseCode"
                         }
                     ]
                 },
@@ -2118,7 +2253,7 @@
                     "description": "response code",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/api.ResponseCode"
+                            "$ref": "#/definitions/response.ResponseCode"
                         }
                     ]
                 },
@@ -2136,23 +2271,6 @@
                 "timestamp": {
                     "description": "timestamp (ms)",
                     "type": "integer"
-                }
-            }
-        },
-        "api.FieldError": {
-            "type": "object",
-            "properties": {
-                "field": {
-                    "description": "field name",
-                    "type": "string"
-                },
-                "message": {
-                    "description": "error message",
-                    "type": "string"
-                },
-                "value": {
-                    "description": "field value",
-                    "type": "string"
                 }
             }
         },
@@ -2220,7 +2338,7 @@
                     "description": "response code",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/api.ResponseCode"
+                            "$ref": "#/definitions/response.ResponseCode"
                         }
                     ]
                 },
@@ -2279,7 +2397,7 @@
                     "description": "response code",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/api.ResponseCode"
+                            "$ref": "#/definitions/response.ResponseCode"
                         }
                     ]
                 },
@@ -2330,7 +2448,7 @@
                     "description": "response code",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/api.ResponseCode"
+                            "$ref": "#/definitions/response.ResponseCode"
                         }
                     ]
                 },
@@ -2570,7 +2688,7 @@
                     "description": "response code",
                     "allOf": [
                         {
-                            "$ref": "#/definitions/api.ResponseCode"
+                            "$ref": "#/definitions/response.ResponseCode"
                         }
                     ]
                 },
@@ -2671,6 +2789,125 @@
                     ]
                 }
             }
+        },
+        "response.FieldError": {
+            "type": "object",
+            "properties": {
+                "field": {
+                    "description": "field name",
+                    "type": "string"
+                },
+                "message": {
+                    "description": "error message",
+                    "type": "string"
+                },
+                "value": {
+                    "description": "field value",
+                    "type": "string"
+                }
+            }
+        },
+        "response.ResponseCode": {
+            "type": "integer",
+            "enum": [
+                200,
+                1000,
+                1001,
+                1002,
+                1003,
+                1004,
+                1005,
+                1006,
+                1007,
+                2000,
+                2001,
+                2002,
+                2003,
+                2004,
+                2005,
+                2006,
+                2007,
+                40201,
+                5000,
+                5001,
+                5002,
+                5003,
+                5004
+            ],
+            "x-enum-comments": {
+                "CodeBadRequest": "invalid request parameters",
+                "CodeBusinessError": "generic business error",
+                "CodeConflict": "resource conflict",
+                "CodeDatabaseError": "database error",
+                "CodeEncryptionError": "encryption error",
+                "CodeFaceNotMatch": "face not matched",
+                "CodeFaceVerifyFailed": "face verification failed",
+                "CodeForbidden": "forbidden",
+                "CodeIDCardNotMatch": "id card information not matched",
+                "CodeInternalError": "internal server error",
+                "CodeInvalidParameter": "invalid parameter",
+                "CodeKYCFailed": "kyc verification failed",
+                "CodeLivenessFailed": "liveness detection failed",
+                "CodeMethodNotAllowed": "method not allowed",
+                "CodeMissingParameter": "missing parameter",
+                "CodeNotFound": "resource not found",
+                "CodeOCRFailed": "ocr recognition failed",
+                "CodePaymentRequired": "quota exceeded, please upgrade your plan",
+                "CodeServiceUnavailable": "service unavailable",
+                "CodeThirdPartyError": "third party service error",
+                "CodeTooManyRequests": "too many requests",
+                "CodeUnauthorized": "unauthorized"
+            },
+            "x-enum-descriptions": [
+                "",
+                "invalid request parameters",
+                "unauthorized",
+                "forbidden",
+                "resource not found",
+                "method not allowed",
+                "too many requests",
+                "invalid parameter",
+                "missing parameter",
+                "generic business error",
+                "ocr recognition failed",
+                "face verification failed",
+                "liveness detection failed",
+                "kyc verification failed",
+                "id card information not matched",
+                "face not matched",
+                "resource conflict",
+                "quota exceeded, please upgrade your plan",
+                "internal server error",
+                "database error",
+                "third party service error",
+                "service unavailable",
+                "encryption error"
+            ],
+            "x-enum-varnames": [
+                "CodeSuccess",
+                "CodeBadRequest",
+                "CodeUnauthorized",
+                "CodeForbidden",
+                "CodeNotFound",
+                "CodeMethodNotAllowed",
+                "CodeTooManyRequests",
+                "CodeInvalidParameter",
+                "CodeMissingParameter",
+                "CodeBusinessError",
+                "CodeOCRFailed",
+                "CodeFaceVerifyFailed",
+                "CodeLivenessFailed",
+                "CodeKYCFailed",
+                "CodeIDCardNotMatch",
+                "CodeFaceNotMatch",
+                "CodeConflict",
+                "CodePaymentRequired",
+                "CodeInternalError",
+                "CodeDatabaseError",
+                "CodeThirdPartyError",
+                "CodeServiceUnavailable",
+                "CodeEncryptionError"
+            ]
         }
     },
     "securityDefinitions": {

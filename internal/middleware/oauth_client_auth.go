@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"net/http"
 	"strings"
 	"time"
 
@@ -10,6 +9,7 @@ import (
 	"kyc-service/internal/service"
 	"kyc-service/pkg/crypto"
 	"kyc-service/pkg/logger"
+	"kyc-service/pkg/response"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -72,7 +72,7 @@ func OAuth2ClientAuth(svc *service.KYCService) gin.HandlerFunc {
 		}
 		headerOrg := c.Request.Header.Get("X-Organization-ID")
 		if headerOrg != "" && org != "" && headerOrg != org {
-			c.JSON(403, gin.H{"error": "organization mismatch", "expected": org, "provided": headerOrg})
+			response.JSONError(c, response.CodeForbidden, "organization mismatch")
 			c.Abort()
 			return
 		}
@@ -91,13 +91,13 @@ func APIOrOAuthAuth(svc *service.KYCService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		auth := c.GetHeader("Authorization")
 		if auth == "" {
-			c.JSON(401, gin.H{"error": "Missing authorization header"})
+			response.JSONError(c, response.CodeUnauthorized, "Missing authorization header")
 			c.Abort()
 			return
 		}
 		parts := strings.Split(auth, " ")
 		if len(parts) != 2 || parts[0] != "Bearer" {
-			c.JSON(401, gin.H{"error": "Invalid authorization header format"})
+			response.JSONError(c, response.CodeUnauthorized, "Invalid authorization header format")
 			c.Abort()
 			return
 		}
@@ -108,7 +108,7 @@ func APIOrOAuthAuth(svc *service.KYCService) gin.HandlerFunc {
 			if claims, ok := tok.Claims.(jwt.MapClaims); ok {
 				// 过期校验
 				if v, ok := claims["exp"].(float64); ok && time.Now().Unix() > int64(v) {
-					c.JSON(401, gin.H{"error": "token expired"})
+					response.JSONError(c, response.CodeUnauthorized, "token expired")
 					c.Abort()
 					return
 				}
@@ -116,13 +116,13 @@ func APIOrOAuthAuth(svc *service.KYCService) gin.HandlerFunc {
 				scopeStr, _ := claims["scope"].(string)
 				claimOrgID, _ := claims["org_id"].(string)
 				if clientID == "" {
-					c.JSON(401, gin.H{"error": "invalid token claims"})
+					response.JSONError(c, response.CodeUnauthorized, "invalid token claims")
 					c.Abort()
 					return
 				}
 				var client models.OAuthClient
 				if err := svc.DB.Where("id = ? AND status = ?", clientID, "active").First(&client).Error; err != nil {
-					c.JSON(401, gin.H{"error": "invalid client"})
+					response.JSONError(c, response.CodeUnauthorized, "invalid client")
 					c.Abort()
 					return
 				}
@@ -132,7 +132,7 @@ func APIOrOAuthAuth(svc *service.KYCService) gin.HandlerFunc {
 				}
 				hdrOrg := c.Request.Header.Get("X-Organization-ID")
 				if hdrOrg != "" && org != "" && hdrOrg != org {
-					c.JSON(403, gin.H{"error": "organization mismatch", "expected": org, "provided": hdrOrg})
+					response.JSONError(c, response.CodeForbidden, "organization mismatch")
 					c.Abort()
 					return
 				}
@@ -151,7 +151,7 @@ func APIOrOAuthAuth(svc *service.KYCService) gin.HandlerFunc {
 				if len(client.IPWhitelist) > 0 {
 					ip := c.ClientIP()
 					if !isIPAllowed(ip, client.IPWhitelist) {
-						c.JSON(http.StatusForbidden, gin.H{"error": "IP not allowed", "details": gin.H{"client_ip": ip, "allowed_ips": client.IPWhitelist}})
+						response.JSONError(c, response.CodeForbidden, "IP not allowed")
 						c.Abort()
 						return
 					}
@@ -168,12 +168,12 @@ func APIOrOAuthAuth(svc *service.KYCService) gin.HandlerFunc {
 					key := "rate_limit:oauth_client:" + clientID
 					cur, err := svc.Redis.Get(ctx, key).Int()
 					if err != nil && err.Error() != "redis: nil" {
-						c.JSON(http.StatusInternalServerError, gin.H{"error": "rate limit error"})
+						response.JSONError(c, response.CodeInternalError, "rate limit error")
 						c.Abort()
 						return
 					}
 					if cur >= limit {
-						c.JSON(http.StatusTooManyRequests, gin.H{"error": "too many requests"})
+						response.JSONError(c, response.CodeTooManyRequests, "too many requests")
 						c.Abort()
 						return
 					}
@@ -192,12 +192,12 @@ func APIOrOAuthAuth(svc *service.KYCService) gin.HandlerFunc {
 		key, err := svc.GetAPIKeyBySecretHash(hash)
 		if err != nil {
 			logger.GetLogger().WithError(err).Error("API key查询失败")
-			c.JSON(401, gin.H{"error": "Invalid API key"})
+			response.JSONError(c, response.CodeUnauthorized, "Invalid API key")
 			c.Abort()
 			return
 		}
 		if key.Status != "active" {
-			c.JSON(401, gin.H{"error": "API key is revoked"})
+			response.JSONError(c, response.CodeUnauthorized, "API key is revoked")
 			c.Abort()
 			return
 		}
@@ -205,7 +205,7 @@ func APIOrOAuthAuth(svc *service.KYCService) gin.HandlerFunc {
 		if len(key.IPWhitelist) > 0 {
 			clientIP := c.ClientIP()
 			if !isIPAllowed(clientIP, key.IPWhitelist) {
-				c.JSON(403, gin.H{"error": "IP not allowed", "details": gin.H{"client_ip": clientIP, "allowed_ips": key.IPWhitelist}})
+				response.JSONError(c, response.CodeForbidden, "IP not allowed")
 				c.Abort()
 				return
 			}

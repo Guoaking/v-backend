@@ -1026,6 +1026,13 @@ func main() {
 			c.Writer.WriteString(`<!doctype html><html><head><title>Swagger UI</title><link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css"></head><body><div id="swagger"></div><script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script><script>window.ui=SwaggerUIBundle({url:'/swagger-public.json',dom_id:'#swagger'});</script></body></html>`)
 		})
 
+		// Callback endpoints
+		callbacks := v1.Group("/callbacks")
+		{
+			kycHandler := api.NewKYCHandler(kycService)
+			callbacks.POST("/liveness/action", kycHandler.LivenessActionCallback)
+		}
+
 		// API密钥管理（需要用户认证）
 		//keys := v1.Group("/keys")
 		//keys.Use(middleware.JWTAuth(kycService))

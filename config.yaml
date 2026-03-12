@@ -66,6 +66,18 @@ third_party:
     timeout: 600
     retry_count: 0
 
+  liveness_action:
+    submit_url: "http://159.138.228.40:8060/vrlActionLiveness/submit"
+    poll_url: "http://159.138.228.40:8060/vrlActionLiveness/poll"
+    timeout: 600
+    retry_count: 0
+
+  liveness_action:
+    submit_url: "http://159.138.228.40:8060/vrlActionLiveness/submit"
+    poll_url: "http://159.138.228.40:8060/vrlActionLiveness/poll"
+    timeout: 600
+    retry_count: 0
+
 monitoring:
   metrics:
     enabled: true
