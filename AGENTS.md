@@ -2,17 +2,26 @@
 
 > **CRITICAL INSTRUCTION**: This is the source of truth for architecture and constraints.
 >
-> 1. **Check `BACKEND_GUIDE.md`** for coding standards before writing any code.
-> 2. **Check `docs/AUTH_UNIFICATION_PLAN.md`** before touching auth logic.
+> 1. **Check `docs/BACKEND_GUIDE.md`** for coding standards before writing any code.
+> 2. **Check `docs/architecture/AUTH_UNIFICATION.md`** before touching auth logic.
 > 3. **DO NOT** rely on legacy patterns found in old handlers.
 
 ## 1. Documentation Index
 
-- **Standards**: [BACKEND_GUIDE.md](BACKEND_GUIDE.md) (Checklist, Error Codes, API Contract)
-- **Knowledge Base**: [docs/AI_FIRST_BACKEND_KB.md](docs/AI_FIRST_BACKEND_KB.md) (Runbooks, Commands)
+- **Standards**: [docs/BACKEND_GUIDE.md](docs/BACKEND_GUIDE.md) (Checklist, Error Codes, API Contract)
+- **Knowledge Base**: [docs/kb/AI_KNOWLEDGE_BASE.md](docs/kb/AI_KNOWLEDGE_BASE.md) (Runbooks, Commands)
 - **Architecture**:
-  - [STS / Token Service](docs/STS_ARCHITECTURE.md)
-  - [Auth Unification](docs/AUTH_UNIFICATION_PLAN.md)
+  - [Auth Unification](docs/architecture/AUTH_UNIFICATION.md)
+  - [Action Liveness Spec](docs/specs/action_liveness_backend_spec.md)
+
+### Documentation Maintenance (Gardening)
+
+- **Index It or Lose It**: Every new markdown file MUST be indexed here or in `docs/BACKEND_GUIDE.md`. Unindexed files are considered "dead code".
+- **Prune relentlessly**: After major features or refactors, review existing docs.
+  - **Delete** outdated files.
+  - **Merge** fragmented notes into Guides.
+  - **Clarify** ambiguous sections.
+- **Objective Truth**: Docs should reflect the _current_ state of code.
 
 ## 2. Code Map (Where things live)
 
@@ -31,7 +40,7 @@
 
 - **Current State**: Mixed (API Key + OAuth2 Client Credentials).
 - **Target State**: Unified Middleware handling both.
-- **Rule**: When adding new endpoints, use `UnifiedAuthMiddleware` (once available) or follow `docs/AUTH_UNIFICATION_PLAN.md`.
+- **Rule**: When adding new endpoints, use `UnifiedAuthMiddleware` (once available) or follow `docs/architecture/AUTH_UNIFICATION.md`.
 
 ### Billing & Quota
 
@@ -60,5 +69,12 @@
 - **Docs**: `swag init -g cmd/server/main.go -o docs` (Update Swagger)
 
 ---
+
+## 6. Golden Rules
+
+1.  **Verify**: Run `./scripts/test-quick.sh` before finishing.
+2.  **Sync**: Update frontend `types.ts` if API changes.
+3.  **Style**: Mimic existing Go patterns (e.g., `if err != nil`).
+4.  **Deps**: No new Go modules without strong justification.
 
 _End of Context_

@@ -124,9 +124,11 @@ func (s *KYCService) UploadVideo(ctx context.Context, sessionID string, file *mu
 		// Let's assume failures are rare and acceptable, or the function handles it.
 		// But integrating SubmitThirdParty here ensures that we don't have a state where "Upload success (quota used)" but "Submit never called".
 
-		if _, err := s.SubmitThirdParty(ctx, sessionID); err != nil {
+		updatedTask, err := s.SubmitThirdParty(ctx, sessionID)
+		if err != nil {
 			return err
 		}
+		task = *updatedTask
 
 		// 4. Sensitive Data Audit (Video contains face)
 		metrics.RecordSensitiveDataAccess(ctx, "liveness_video", getOrgID(ctx), true, "UploadVideo")

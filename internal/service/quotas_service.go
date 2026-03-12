@@ -11,7 +11,6 @@ import (
 	"kyc-service/pkg/utils"
 
 	"github.com/go-redis/redis/v8"
-	"gorm.io/gorm"
 )
 
 func (s *KYCService) checkAndConsumeQuota(ctx context.Context, orgID, serviceType string, run func() error) error {
@@ -48,23 +47,28 @@ func (s *KYCService) checkAndConsumeQuota(ctx context.Context, orgID, serviceTyp
 			logger.GetLogger().WithError(rerr).Warn("quota redis path error, fallback to db")
 		}
 	}
-	return s.DB.Transaction(func(tx *gorm.DB) error {
-		type rid struct{ ID string }
-		var r rid
-		if err := tx.Raw("UPDATE organization_quotas SET consumed = consumed + 1 WHERE organization_id = ? AND service_type = ? AND consumed < allocation RETURNING id", orgID, serviceType).Scan(&r).Error; err != nil {
-			return err
-		}
-		if r.ID == "" {
-			return fmt.Errorf("QUOTA_EXCEEDED")
-		}
-		metrics.IncOrgQuotaUsed(ctx, orgID, serviceType, 1)
-		if err := run(); err != nil {
-			_ = tx.Exec("UPDATE organization_quotas SET consumed = consumed - 1 WHERE id = ?", r.ID).Error
-			metrics.IncOrgQuotaUsed(ctx, orgID, serviceType, -1)
-			return err
-		}
-		return nil
-	})
+	// DB Fallback
+	type rid struct{ ID string }
+	var r rid
+	// 1. Attempt to consume quota (Atomic Update)
+	// We do NOT use a transaction wrapper around 'run()' to avoid holding DB locks during external calls or long operations.
+	if err := s.DB.Raw("UPDATE organization_quotas SET consumed = consumed + 1 WHERE organization_id = ? AND service_type = ? AND consumed < allocation RETURNING id", orgID, serviceType).Scan(&r).Error; err != nil {
+		return err
+	}
+	if r.ID == "" {
+		return fmt.Errorf("QUOTA_EXCEEDED")
+	}
+
+	metrics.IncOrgQuotaUsed(ctx, orgID, serviceType, 1)
+
+	// 2. Execute Business Logic
+	if err := run(); err != nil {
+		// 3. Refund on failure
+		_ = s.DB.Exec("UPDATE organization_quotas SET consumed = consumed - 1 WHERE id = ?", r.ID).Error
+		metrics.IncOrgQuotaUsed(ctx, orgID, serviceType, -1)
+		return err
+	}
+	return nil
 }
 
 func quotaLimitKey(orgID, serviceType string) string {

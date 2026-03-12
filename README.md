@@ -4,7 +4,9 @@
 
 ## 知识库
 
-- 后端业务实现知识库（AI First 版）：`docs/AI_FIRST_BACKEND_KB.md`
+- 开发规范与指南：`docs/BACKEND_GUIDE.md`
+- 后端业务实现知识库（AI First 版）：`docs/kb/AI_KNOWLEDGE_BASE.md`
+- CI/CD配置指南：`docs/guides/CI_SETUP.md`
 
 ## 功能特性
 

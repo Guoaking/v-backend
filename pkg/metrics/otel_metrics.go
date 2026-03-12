@@ -419,6 +419,9 @@ func RecordPermissionDenied(ctx context.Context, resource, action, userID, reaso
 
 // RecordSensitiveDataAccess 记录敏感数据访问
 func RecordSensitiveDataAccess(ctx context.Context, dataType, userID string, authorized bool, endpoint string) {
+	if !otelMetricsInitialized {
+		return
+	}
 	status := "authorized"
 	if !authorized {
 		status = "unauthorized"
@@ -436,6 +439,9 @@ func RecordSensitiveDataAccess(ctx context.Context, dataType, userID string, aut
 
 // RecordDependencyCall 记录依赖调用
 func RecordDependencyCall(ctx context.Context, service, method string, success bool, duration time.Duration) {
+	if !otelMetricsInitialized {
+		return
+	}
 	status := "success"
 	if !success {
 		status = "failed"
@@ -469,6 +475,9 @@ func RecordDependencyCall(ctx context.Context, service, method string, success b
 }
 
 func RecordDependencyCallCode(ctx context.Context, service, method string, success bool, duration time.Duration, code string) {
+	if !otelMetricsInitialized {
+		return
+	}
 	status := "success"
 	if !success {
 		status = "failed"
@@ -504,7 +513,11 @@ func RecordThirdPartyRequest(ctx context.Context, thirdPartyName, result, httpSt
 	RecordThirdPartyRequestWithOp(ctx, thirdPartyName, "", result, httpStatusCode, duration)
 }
 
+// RecordThirdPartyRequestWithOp 记录第三方服务请求指标
 func RecordThirdPartyRequestWithOp(ctx context.Context, thirdPartyName, operation, result, httpStatusCode string, duration time.Duration) {
+	if !otelMetricsInitialized {
+		return
+	}
 	orgID := ""
 	if v := ctx.Value("org_id"); v != nil {
 		if s, ok := v.(string); ok {
@@ -574,6 +587,9 @@ func RecordThirdPartyError(ctx context.Context, thirdPartyName, operation, error
 
 // RecordAuditEvent 记录审计事件计数
 func RecordAuditEvent(ctx context.Context, action, resource, status string) {
+	if !otelMetricsInitialized {
+		return
+	}
 	orgID := ""
 	if v := ctx.Value("org_id"); v != nil {
 		if s, ok := v.(string); ok {
@@ -628,6 +644,9 @@ func RecordActiveRequest(ctx context.Context, requestType string, delta int64) {
 }
 
 func SetOrgQuotaLimit(ctx context.Context, orgID, serviceType string, newLimit int) {
+	if !otelMetricsInitialized {
+		return
+	}
 	key := orgID + ":" + serviceType
 	old := lastQuotaLimit[key]
 	delta := newLimit - old
@@ -644,6 +663,9 @@ func SetOrgQuotaLimit(ctx context.Context, orgID, serviceType string, newLimit i
 }
 
 func IncOrgQuotaUsed(ctx context.Context, orgID, serviceType string, delta int) {
+	if !otelMetricsInitialized {
+		return
+	}
 	attrs := []attribute.KeyValue{
 		attribute.String("org_id", orgID),
 		attribute.String("service_type", serviceType),

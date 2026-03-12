@@ -600,57 +600,6 @@ func (t *ThirdPartyService) CallLivenessSilent(ctx context.Context, picturePath,
 	return &out, nil
 }
 
-// SubmitActionLiveness 提交动作活体检测任务 (异步回调模式)
-// Deprecated: Use SubmitActionLivenessV2 instead
-func (t *ThirdPartyService) SubmitActionLiveness(ctx context.Context, taskID, videoPath, videoURL, action, callbackURL string) error {
-	start := time.Now()
-	status := "success"
-	var httpCode string
-	defer func() {
-		metrics.RecordThirdPartyRequestWithOp(ctx, "liveness", "action_submit", status, httpCode, time.Since(start))
-	}()
-	url := t.config.ThirdParty.LivenessAction.SubmitURL
-
-	payload := make(map[string]string)
-	payload["task_id"] = taskID
-	payload["action"] = action
-	if callbackURL != "" {
-		payload["callback_url"] = callbackURL
-	}
-
-	if t.config.Storage.Mode == "remote" && videoURL != "" {
-		payload["video_url"] = videoURL
-	} else {
-		payload["video_path"] = videoPath
-	}
-
-	b, _ := json.Marshal(payload)
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(b))
-	if err != nil {
-		return fmt.Errorf("create request failed: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+t.config.Security.ServiceSecretKey) // Assuming internal auth or configured key
-	req.Header.Set("X-Request-ID", fmt.Sprintf("%v", ctx.Value("request_id")))
-
-	resp, err := t.client.Do(req)
-	if err != nil {
-		httpCode = "client_error"
-		status = "failed"
-		metrics.RecordThirdPartyError(ctx, "liveness", "action_submit", metrics.ResultHTTPClientError)
-		return fmt.Errorf("submit action liveness failed: %w", err)
-	}
-	defer resp.Body.Close()
-	httpCode = fmt.Sprintf("%d", resp.StatusCode)
-
-	if resp.StatusCode != http.StatusOK {
-		status = "failed"
-		metrics.RecordThirdPartyError(ctx, "liveness", "action_submit", fmt.Sprintf("http_%d", resp.StatusCode))
-		return fmt.Errorf("submit action liveness returned %d", resp.StatusCode)
-	}
-
-	return nil
-}
 
 // CallLivenessVideo 调用动态活体服务 (Video Silent Liveness)
 func (t *ThirdPartyService) CallLivenessVideo(ctx context.Context, videoPath, videoURL, language string) (*LivenessVideoResponse, error) {
