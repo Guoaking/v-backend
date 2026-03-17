@@ -270,6 +270,8 @@ func Quota(redisClient *redis.Client, svc interface {
 			serviceType = "face"
 		} else if strings.Contains(p, "/kyc/face/compare") {
 			serviceType = "face"
+		} else if strings.Contains(p, "/kyc/face/id-match") {
+			serviceType = "face"
 		} else if strings.Contains(p, "/kyc/face/detect") {
 			serviceType = "face"
 		} else if strings.Contains(p, "/kyc/liveness/silent") {

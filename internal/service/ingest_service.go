@@ -73,7 +73,9 @@ func (s *KYCService) IngestImage(ctx context.Context, orgID string, file *multip
 	}
 
 	// 使用 StorageService 上传
-	absPath, _, err := s.Storage.Upload(ctx, safe, f)
+	// Prefix with "images/" to signal StorageService to use ImageDir
+	uploadName := "images/" + safe
+	absPath, _, err := s.Storage.Upload(ctx, uploadName, f)
 	if err != nil {
 		return nil, fmt.Errorf("storage upload failed: %w", err)
 	}
@@ -153,8 +155,9 @@ func (s *KYCService) IngestVideo(ctx context.Context, orgID string, sessionID st
 		ext = ".webm" // Default to webm if unknown
 	}
 
-	// Create path: YYYY/MM/DD/sessionID_timestamp.ext
-	relativePath := fmt.Sprintf("%04d/%02d/%02d/%s_%d%s",
+	// Create path: videos/YYYY/MM/DD/sessionID_timestamp.ext
+	// Note: We use "videos/" prefix which StorageService will strip before saving to BaseDir
+	relativePath := fmt.Sprintf("videos/%04d/%02d/%02d/%s_%d%s",
 		now.Year(), now.Month(), now.Day(),
 		sessionID, timestamp, ext)
 

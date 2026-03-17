@@ -4,7 +4,8 @@ log_level: info
 use_mock: false
 
 storage:
-  ingest_dir: /opt/test
+  ingest_dir: /data/videos/
+  image_dir: /opt/test
 
 database:
   host: database
@@ -44,13 +45,13 @@ third_party:
     api_key: "ocr-api-key"
     timeout: 300
     retry_count: 0
-  
+
   face_service:
     url: "http://159.138.228.40:8070"
     api_key: "face-api-key"
     timeout: 300
     retry_count: 0
-  
+
   liveness_silent:
     url: "http://159.138.228.40:8060/vrlSilentLiveness"
     api_key: "liveness-api-key"
@@ -60,6 +61,13 @@ third_party:
   liveness_video:
     url: "http://159.138.228.40:8060/vrlMoveLiveness"
     api_key: "liveness-api-key"
+    timeout: 600
+    retry_count: 0
+  liveness_action:
+    submit_url: "http://159.138.228.40:8071/vrlMoveLiveness"
+    poll_url: ""
+    #callback_url: "http://localhost:8092/api/v1/callbacks/liveness/action" # Use host.docker.internal for local dev if 3rd party is in container, or public IP
+    callback_url: "" # Use host.docker.internal for local dev if 3rd party is in container, or public IP
     timeout: 600
     retry_count: 0
 
@@ -72,7 +80,7 @@ monitoring:
     subsystem: "service"
     push_interval: "30s"
     histogram_buckets: [0.1, 0.5, 1, 2, 5, 10]
-  
+
   tracing:
     enabled: true
     service_name: "kyc-service"

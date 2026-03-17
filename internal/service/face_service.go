@@ -204,6 +204,57 @@ func (s *KYCService) FaceCompare(ctx context.Context, src, dst *multipart.FileHe
 	return out, nil
 }
 
+func (s *KYCService) FaceIdMatch(ctx context.Context, src, dst *multipart.FileHeader) (*FaceCompareResponse, error) {
+	ctx, span := tracing.StartSpan(ctx, "KYCService.FaceIdMatch")
+	defer span.End()
+	span.SetAttributes(attribute.String("service.name", "face-service"), attribute.String("face.op", "id_match"), attribute.String("org.id", getOrgID(ctx)))
+	orgID := getOrgID(ctx)
+	if orgID == "" {
+		return nil, fmt.Errorf("missing organization context")
+	}
+	start := time.Now()
+	if err := s.checkAndConsumeQuota(ctx, orgID, "face", func() error { return nil }); err != nil {
+		if strings.Contains(err.Error(), "QUOTA_EXCEEDED") {
+			if s.faceVerifySuccessRate != nil {
+				s.faceVerifySuccessRate.Record(ctx, 0.0)
+			}
+			metrics.RecordBusinessOperation(ctx, "face_id_match", false, time.Since(start), "quota_exceeded")
+			return nil, fmt.Errorf("Quota exceeded. Please upgrade your plan.")
+		}
+		if s.faceVerifySuccessRate != nil {
+			s.faceVerifySuccessRate.Record(ctx, 0.0)
+		}
+		metrics.RecordBusinessOperation(ctx, "face_id_match", false, time.Since(start), "quota_error")
+		return nil, err
+	}
+	f1, err := src.Open()
+	if err != nil {
+		return nil, fmt.Errorf("open image1 failed: %w", err)
+	}
+	defer f1.Close()
+	f2, err := dst.Open()
+	if err != nil {
+		return nil, fmt.Errorf("open image2 failed: %w", err)
+	}
+	defer f2.Close()
+
+	tp := NewThirdPartyService(s.Config)
+	out, err := tp.CallFaceIdMatch(ctx, f1, src.Filename, f2, dst.Filename)
+	if err != nil {
+		if s.faceVerifySuccessRate != nil {
+			s.faceVerifySuccessRate.Record(ctx, 0.0)
+		}
+		metrics.RecordBusinessOperation(ctx, "face_id_match", false, time.Since(start), "third_party_error")
+		return nil, err
+	}
+	s.RecordAuditLog(ctx, "face.id_match", "face", "", "success", "")
+	if s.faceVerifySuccessRate != nil {
+		s.faceVerifySuccessRate.Record(ctx, 1.0)
+	}
+	metrics.RecordBusinessOperation(ctx, "face_id_match", true, time.Since(start), "")
+	return out, nil
+}
+
 type FaceDetectResponse struct {
 	Code             int    `json:"code"`
 	Msg              string `json:"msg"`

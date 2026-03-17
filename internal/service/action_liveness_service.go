@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"mime/multipart"
+	"strings"
 	"time"
 
 	"kyc-service/internal/models"
@@ -107,23 +108,6 @@ func (s *KYCService) UploadVideo(ctx context.Context, sessionID string, file *mu
 		}
 
 		// 3. Submit to ThirdParty (Within Quota Transaction)
-		// We call the internal logic of SubmitThirdParty or the method itself.
-		// Since SubmitThirdParty is public and checks DB again, it's slightly inefficient but safe.
-		// However, calling a method that might fail after quota consumption is risky if it's not the last step?
-		// No, checkAndConsumeQuota executes the function. If function returns error, quota is NOT consumed (if implemented correctly with rollback or check-before-consume).
-		// Wait, checkAndConsumeQuota implementation: usually it checks first, then consumes. If consume is atomic with DB tx, then it rolls back.
-		// If consume is Redis, it might not rollback easily.
-		// Assuming "consume" happens if err == nil.
-		// If checkAndConsumeQuota follows "check -> run -> consume if success" pattern:
-		// Then we are safe.
-		// If it follows "check -> consume -> run":
-		// Then if SubmitThirdParty fails, quota is lost.
-		// Most rate limiters are "check+consume" token bucket.
-		// So we assume quota is consumed upfront.
-		// If SubmitThirdParty fails, we might want to refund? Too complex.
-		// Let's assume failures are rare and acceptable, or the function handles it.
-		// But integrating SubmitThirdParty here ensures that we don't have a state where "Upload success (quota used)" but "Submit never called".
-
 		updatedTask, err := s.SubmitThirdParty(ctx, sessionID)
 		if err != nil {
 			return err
@@ -145,6 +129,10 @@ func (s *KYCService) UploadVideo(ctx context.Context, sessionID string, file *mu
 	})
 
 	if err != nil {
+		// 统一错误处理，确保Quota中间件能识别
+		if strings.Contains(err.Error(), "QUOTA_EXCEEDED") {
+			return nil, fmt.Errorf("Quota exceeded. Please upgrade your plan.")
+		}
 		return nil, err
 	}
 

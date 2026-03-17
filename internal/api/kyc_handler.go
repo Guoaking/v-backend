@@ -195,7 +195,38 @@ func (h *KYCHandler) FaceCompare(c *gin.Context) {
 	JSONSuccess(c, res)
 }
 
-// FaceDetect 人脸检测
+// FaceIdMatch godoc
+// @Summary 人证比对
+// @Description 上传两张人脸图片进行比对，验证是否为同一人（其中一张为证件照）
+// @Tags KYC
+// @Accept multipart/form-data
+// @Produce json
+// @Param image1 formData file true "人脸图片1"
+// @Param image2 formData file true "人脸图片2 (证件照)"
+// @Success 200 {object} service.FaceCompareResponse
+// @Router /api/v1/kyc/face/id-match [post]
+func (h *KYCHandler) FaceIdMatch(c *gin.Context) {
+	file1, err := c.FormFile("image1")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "image1 is required"})
+		return
+	}
+	file2, err := c.FormFile("image2")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "image2 is required"})
+		return
+	}
+
+	resp, err := h.service.FaceIdMatch(c.Request.Context(), file1, file2)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	JSONSuccess(c, resp)
+}
+
+// FaceDetect godoc人脸检测
 // @Summary Face detection
 // @Description Upload an image for face detection
 // @Tags Public

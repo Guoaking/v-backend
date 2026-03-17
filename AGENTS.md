@@ -65,7 +65,8 @@
 
 - **Test**: `./scripts/test-quick.sh` (Fast unit tests)
 - **Lint**: `go vet ./...`
-- **Run**: `go run cmd/server/main.go -config config.local`
+- **Run**: `make run` (Uses `config.local.yaml` by default)
+- **Build**: `make build`
 - **Docs**: `swag init -g cmd/server/main.go -o docs` (Update Swagger)
 
 ---

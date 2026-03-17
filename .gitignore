@@ -34,6 +34,7 @@ cmd/kyc-loadtest/kyc-loadtest
 *.out
 .claude
 test
+kyc-service-linux
 
 # Local-only files / binaries
 config.local.yaml

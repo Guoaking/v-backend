@@ -70,6 +70,7 @@ type SecurityConfig struct {
 type StorageConfig struct {
 	Mode      string `mapstructure:"mode"` // "local" or "remote"
 	IngestDir string `mapstructure:"ingest_dir"`
+	ImageDir  string `mapstructure:"image_dir"` // Optional: Separate dir for images
 	BaseURL   string `mapstructure:"base_url"`
 }
 
@@ -183,6 +184,7 @@ func setDefaults() {
 
 	viper.SetDefault("storage.mode", "local")
 	viper.SetDefault("storage.ingest_dir", "/data/ingest")
+	viper.SetDefault("storage.image_dir", "") // Default empty, use ingest_dir
 	viper.SetDefault("storage.base_url", "")
 
 	// 第三方服务默认值

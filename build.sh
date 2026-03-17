@@ -49,7 +49,25 @@ prune_remote_tars() {
 prune_remote_prod_images() {
   keep="$1"
   # Keep currently running prod image and latest N prod-* tags
-  remote "cur=\$(docker inspect -f '{{.Config.Image}}' verilocale-backend 2>/dev/null || echo ''); rep='${IMAGE_NAME}'; tags=\$(docker images \"\$rep\" --format '{{.Tag}}' | grep '^prod-' | sort -r); keep_list=\$(echo \"\$tags\" | tr ' ' '\n' | head -n $keep | tr '\n' ' '); for t in \$tags; do echo \"\$keep_list\" | grep -q \"\<$t\>\" && continue; [ -n \"\$cur\" ] && echo \"\$cur\" | grep -q \"\:$t\" && continue; docker image rm \"\$rep:\$t\" >/dev/null 2>&1 || true; done"
+  remote "cur=\$(docker inspect -f '{{.Config.Image}}' verilocale-backend 2>/dev/null || echo ''); \
+  rep='${IMAGE_NAME}'; \
+  tags=\$(docker images \"\$rep\" --format '{{.Tag}}' | grep '^prod-' | sort -r); \
+  keep_list=\$(echo \"\$tags\" | tr ' ' '\n' | head -n $keep | tr '\n' ' '); \
+  echo \"Current Image: \$cur\"; \
+  echo \"Keeping Tags: \$keep_list\"; \
+  for t in \$tags; do \
+    echo \"Checking tag: \$t\"; \
+    if echo \"\$keep_list\" | grep -q \"\<$t\>\"; then \
+      echo \"  Skipping (Keep List)\"; \
+      continue; \
+    fi; \
+    if [ -n \"\$cur\" ] && echo \"\$cur\" | grep -q \"\:$t\"; then \
+      echo \"  Skipping (Currently Running)\"; \
+      continue; \
+    fi; \
+    echo \"  Removing \$rep:\$t\"; \
+    docker rmi \"\$rep:\$t\" || true; \
+  done"
 }
 
 case "$CMD" in
@@ -114,6 +132,8 @@ case "$CMD" in
     # Backup current running image
     remote "cur=\$(docker inspect -f '{{.Config.Image}}' verilocale-backend 2>/dev/null || echo ''); if [ -n \"\$cur\" ]; then tag=\$(echo \"\$cur\" | awk -F: '{print \$2}'); [ -n \"\$tag\" ] && docker save \"\$cur\" | gzip > $REMOTE_BASE/backups/${IMAGE_NAME##*/}_\$tag.tar.gz && echo \"\$tag\" > $REMOTE_DIR/.prod_prev; fi || true"
     
+    # Clean up existing container to avoid name conflict
+    remote "docker rm -f kyc-service 2>/dev/null || true"
     remote "cd $REMOTE_DIR; PROD_TAG=$NEW_TAG docker compose up -d kyc-service"
     health_wait "kyc-service" 60
     prune_remote_prod_images 3

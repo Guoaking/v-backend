@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 
+	"strings"
+
 	"kyc-service/internal/service"
 	"kyc-service/pkg/logger"
 	"kyc-service/pkg/tracing"
@@ -87,6 +89,16 @@ func (h *KYCHandler) LivenessActionUpload(c *gin.Context) {
 	ctx = context.WithValue(ctx, "org_id", c.GetString("orgID"))
 	if _, err := h.service.UploadVideo(ctx, sid, file); err != nil {
 		span.RecordError(err)
+		if strings.Contains(err.Error(), "Quota exceeded") {
+			c.Header("X-RateLimit-Remaining", "0")
+			c.JSON(http.StatusTooManyRequests, gin.H{
+				"code":       CodeTooManyRequests,
+				"message":    "Quota Limit Reached",
+				"error":      "QUOTA_EXHAUSTED",
+				"request_id": c.GetString("request_id"),
+			})
+			return
+		}
 		JSONError(c, CodeBusinessError, err.Error())
 		return
 	}

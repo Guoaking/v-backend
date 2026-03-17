@@ -1,12 +1,13 @@
 module kyc-loadtest
 
-go 1.21
+go 1.23.0
 
 require (
 	github.com/golang-jwt/jwt/v5 v5.2.0
 	github.com/google/uuid v1.5.0
-	github.com/prometheus/client_golang v1.17.0
+	github.com/prometheus/client_golang v1.20.4
 	github.com/spf13/cobra v1.8.0
+)
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect

@@ -205,108 +205,6 @@ func (t *ThirdPartyService) CallOCRService(ctx context.Context, imageData []byte
 	return &result, nil
 }
 
-// CallFaceService 调用人脸识别服务
-func (t *ThirdPartyService) CallFaceService(ctx context.Context, image1Data, image2Data []byte) (*FaceServiceResponse, error) {
-	start := time.Now()
-	status := "success"
-	httpCode := ""
-	defer func() {
-		metrics.RecordThirdPartyRequestWithOp(ctx, "face", "verify", status, httpCode, time.Since(start))
-	}()
-
-	url := t.config.ThirdParty.FaceService.URL + "/api/v1/face/compare"
-
-	// 创建multipart请求
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-
-	// 添加第一张图片
-	hdr1 := make(textproto.MIMEHeader)
-	hdr1.Set("Content-Disposition", `form-data; name="image1"; filename="image1.jpg"`)
-	ct1 := detectContentTypeFromBytes(image1Data, "image/jpeg")
-	hdr1.Set("Content-Type", ct1)
-	part1, err := writer.CreatePart(hdr1)
-	if err != nil {
-		return nil, fmt.Errorf("创建第一张图片表单失败: %w", err)
-	}
-	if _, err := io.Copy(part1, bytes.NewReader(image1Data)); err != nil {
-		return nil, fmt.Errorf("复制第一张图片数据失败: %w", err)
-	}
-
-	// 添加第二张图片
-	hdr2 := make(textproto.MIMEHeader)
-	hdr2.Set("Content-Disposition", `form-data; name="image2"; filename="image2.jpg"`)
-	ct2 := detectContentTypeFromBytes(image2Data, "image/jpeg")
-	hdr2.Set("Content-Type", ct2)
-	part2, err := writer.CreatePart(hdr2)
-	if err != nil {
-		return nil, fmt.Errorf("创建第二张图片表单失败: %w", err)
-	}
-	if _, err := io.Copy(part2, bytes.NewReader(image2Data)); err != nil {
-		return nil, fmt.Errorf("复制第二张图片数据失败: %w", err)
-	}
-
-	if err := writer.Close(); err != nil {
-		return nil, fmt.Errorf("关闭表单写入器失败: %w", err)
-	}
-
-	// 创建请求
-	req, err := http.NewRequestWithContext(ctx, "POST", url, body)
-	if err != nil {
-		return nil, fmt.Errorf("创建请求失败: %w", err)
-	}
-
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.Header.Set("Authorization", "Bearer "+t.config.ThirdParty.FaceService.APIKey)
-	req.Header.Set("X-Request-ID", fmt.Sprintf("%v", ctx.Value("request_id")))
-
-	// 发送请求
-	resp, err := t.client.Do(req)
-	if err != nil {
-		status = "failed"
-		httpCode = "client_error"
-		metrics.RecordThirdPartyError(ctx, "face", "verify", metrics.ResultHTTPClientError)
-		return nil, fmt.Errorf("人脸识别服务请求失败: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// 读取响应
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("读取响应失败: %w", err)
-	}
-
-	// 解析响应
-	var result FaceServiceResponse
-	if err := json.Unmarshal(respBody, &result); err != nil {
-		return nil, fmt.Errorf("解析响应失败: %w", err)
-	}
-
-	// 检查响应状态
-	httpCode = fmt.Sprintf("%d", resp.StatusCode)
-	if resp.StatusCode != http.StatusOK {
-		status = "failed"
-		metrics.RecordThirdPartyError(ctx, "face", "verify", fmt.Sprintf("http_%d", resp.StatusCode))
-		return nil, fmt.Errorf("人脸识别服务返回错误: %d - %s", resp.StatusCode, result.Message)
-	}
-
-	if result.Code != 0 {
-		status = "failed"
-		metrics.RecordThirdPartyError(ctx, "face", "verify", metrics.ResultBusinessFailed)
-		return nil, fmt.Errorf("人脸识别失败: %s", result.Message)
-	}
-
-	logger.GetLogger().WithFields(logrus.Fields{
-		"service":  "face",
-		"code":     result.Code,
-		"score":    result.Data.Score,
-		"match":    result.Data.Match,
-		"duration": time.Since(start).Milliseconds(),
-	}).Info("人脸识别成功")
-
-	return &result, nil
-}
-
 // CallFaceSearch 调用人脸搜索服务
 func (t *ThirdPartyService) CallFaceSearch(ctx context.Context, reader io.Reader, filename string) (*FaceSearchResponse, error) {
 	start := time.Now()
@@ -405,6 +303,78 @@ func (t *ThirdPartyService) CallFaceSearch(ctx context.Context, reader io.Reader
 		status = "failed"
 		metrics.RecordThirdPartyError(ctx, "face", "search", metrics.ResultBusinessFailed)
 		return nil, fmt.Errorf("face search failed: code=%d msg=%s", out.Code, out.Msg)
+	}
+	return &out, nil
+}
+
+// CallFaceIdMatch 调用人证比对服务
+func (t *ThirdPartyService) CallFaceIdMatch(ctx context.Context, src io.Reader, srcName string, dst io.Reader, dstName string) (*FaceCompareResponse, error) {
+	start := time.Now()
+	status := "success"
+	var httpCode string
+	defer func() {
+		metrics.RecordThirdPartyRequestWithOp(ctx, "face", "id_match", status, httpCode, time.Since(start))
+	}()
+
+	base := t.config.ThirdParty.FaceService.URL
+	url := base
+	if !strings.Contains(strings.ToLower(base), "vrlfaceidcomparison") {
+		url = strings.TrimRight(base, "/") + "/vrlFaceIdComparison"
+	}
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	hdr1 := make(textproto.MIMEHeader)
+	hdr1.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, "picture1", srcName))
+	hdr1.Set("Content-Type", contentTypeFromFilename(srcName, "image/jpeg"))
+	p1, err := writer.CreatePart(hdr1)
+	if err != nil {
+		return nil, fmt.Errorf("创建第一张图片表单失败: %w", err)
+	}
+	if _, err := io.Copy(p1, src); err != nil {
+		return nil, fmt.Errorf("复制第一张图片失败: %w", err)
+	}
+	hdr2 := make(textproto.MIMEHeader)
+	hdr2.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, "picture2", dstName))
+	hdr2.Set("Content-Type", contentTypeFromFilename(dstName, "image/jpeg"))
+	p2, err := writer.CreatePart(hdr2)
+	if err != nil {
+		return nil, fmt.Errorf("创建第二张图片表单失败: %w", err)
+	}
+	if _, err := io.Copy(p2, dst); err != nil {
+		return nil, fmt.Errorf("复制第二张图片失败: %w", err)
+	}
+	if err := writer.Close(); err != nil {
+		return nil, fmt.Errorf("关闭表单写入器失败: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, body)
+	if err != nil {
+		return nil, fmt.Errorf("创建请求失败: %w", err)
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+t.config.ThirdParty.FaceService.APIKey)
+	req.Header.Set("X-Request-ID", fmt.Sprintf("%v", ctx.Value("request_id")))
+	resp, err := t.client.Do(req)
+	if err != nil {
+		httpCode = "client_error"
+		status = "failed"
+		metrics.RecordThirdPartyError(ctx, "face", "id_match", metrics.ResultHTTPClientError)
+		return nil, fmt.Errorf("人证比对服务请求失败: %w", err)
+	}
+	defer resp.Body.Close()
+	httpCode = fmt.Sprintf("%d", resp.StatusCode)
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("读取响应失败: %w", err)
+	}
+	var out FaceCompareResponse
+	if err := json.Unmarshal(respBody, &out); err != nil {
+		return nil, fmt.Errorf("解析响应失败: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK || out.Code != 0 {
+		status = "failed"
+		metrics.RecordThirdPartyError(ctx, "face", "id_match", metrics.ResultBusinessFailed)
+		return nil, fmt.Errorf("face id match failed: code=%d msg=%s, body=%s", out.Code, out.Msg, respBody)
 	}
 	return &out, nil
 }
@@ -599,7 +569,6 @@ func (t *ThirdPartyService) CallLivenessSilent(ctx context.Context, picturePath,
 	}
 	return &out, nil
 }
-
 
 // CallLivenessVideo 调用动态活体服务 (Video Silent Liveness)
 func (t *ThirdPartyService) CallLivenessVideo(ctx context.Context, videoPath, videoURL, language string) (*LivenessVideoResponse, error) {
