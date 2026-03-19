@@ -7,10 +7,12 @@
 - 开发规范与指南：`docs/BACKEND_GUIDE.md`
 - 后端业务实现知识库（AI First 版）：`docs/kb/AI_KNOWLEDGE_BASE.md`
 - CI/CD配置指南：`docs/guides/CI_SETUP.md`
+- **计费、日志与全链路追踪架构设计**：`docs/architecture/BILLING_AND_LOGGING.md`
 
 ## 功能特性
 
 ### 🔐 安全特性
+
 - **OAuth 2.0认证**: 基于JWT的访问令牌机制
 - **双向认证**: Kong与服务之间的HMAC签名验证
 - **mTLS支持**: 证书双向认证
@@ -21,18 +23,21 @@
 - **IP白名单**: API Key级别的IP访问控制
 
 ### 🚀 性能优化
+
 - **限流控制**: 基于Redis的分布式限流
 - **幂等性**: 防止重复请求的幂等机制
 - **缓存策略**: 多级缓存提升响应速度
 - **连接池**: 数据库和Redis连接池优化
 
 ### 📊 监控告警
+
 - **Prometheus指标**: 全面的业务和技术指标
 - **Grafana仪表板**: 可视化监控面板
 - **OpenTelemetry**: 统一的可观测性支持
 - **告警机制**: 多维度告警规则配置
 
 ### 🔧 技术架构
+
 - **API网关**: Kong作为统一入口
 - **微服务**: Go语言高并发服务
 - **数据库**: PostgreSQL关系型数据库
@@ -42,17 +47,21 @@
 ## 快速开始
 
 ### 1. 环境要求
+
 - Go 1.21+
 - Docker
 - PostgreSQL 15+
 - Redis 7+
 
 ### 2. 本地开发
+
 ```bash
 # 启动后端服务 (默认使用 config.local.yaml)
 make run
 ```
+
 或手动：
+
 ```bash
 ./kyc-service -config config.local
 ```
@@ -70,6 +79,7 @@ docker-compose up -d
 ## 配置说明
 
 ### 配置文件
+
 服务支持通过配置文件和环境变量进行配置，优先级：环境变量 > 配置文件 > 默认值
 
 ```bash
@@ -82,17 +92,17 @@ KYC_PORT=8082 ./kyc-service -config config.local
 
 ### 主要配置项
 
-| 配置项 | 说明 | 默认值 |
-|---------|------|---------|
-| port | 服务监听端口 | 8082 |
-| gin_mode | Gin运行模式 | debug |
-| log_level | 日志级别 | info |
-| database.host | 数据库地址 | localhost |
-| database.port | 数据库端口 | 5432 |
-| redis.host | Redis地址 | localhost |
-| redis.port | Redis端口 | 6379 |
-| security.jwt_secret | JWT密钥 | - |
-| security.encryption_key | 加密密钥 | - |
+| 配置项                  | 说明         | 默认值    |
+| ----------------------- | ------------ | --------- |
+| port                    | 服务监听端口 | 8082      |
+| gin_mode                | Gin运行模式  | debug     |
+| log_level               | 日志级别     | info      |
+| database.host           | 数据库地址   | localhost |
+| database.port           | 数据库端口   | 5432      |
+| redis.host              | Redis地址    | localhost |
+| redis.port              | Redis端口    | 6379      |
+| security.jwt_secret     | JWT密钥      | -         |
+| security.encryption_key | 加密密钥     | -         |
 
 ## API文档
 
@@ -103,6 +113,7 @@ GET /health
 ```
 
 响应示例：
+
 ```json
 {
   "kong_verified": true,
@@ -213,15 +224,19 @@ Authorization: Bearer <token>
 ## 安全配置
 
 ### 数据加密
+
 所有敏感数据（身份证号、姓名、手机号等）都使用AES-256加密存储。
 
 ### 数据脱敏
-- 身份证号：1234****5678
-- 手机号：138****8000
-- 姓名：张*
+
+- 身份证号：1234\*\*\*\*5678
+- 手机号：138\*\*\*\*8000
+- 姓名：张\*
 
 ### 审计日志
+
 所有API调用都会记录审计日志，包括：
+
 - 请求ID
 - 用户ID
 - 操作类型
@@ -283,6 +298,7 @@ v-backend/
 - **pre-push**: 运行 `test-all.sh`
 
 跳过验证：
+
 ```bash
 git commit --no-verify -m "紧急修复"
 git push --no-verify origin main
@@ -307,6 +323,7 @@ git push --no-verify origin main
 ## 更新日志
 
 ### v1.0.0 (2026-02-26)
+
 - ✨ 完整的服务功能实现
 - 🔧 配置系统优化，支持命令行参数指定配置文件
 - 📊 OpenTelemetry监控集成

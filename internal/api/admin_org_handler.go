@@ -10,6 +10,7 @@ import (
 	"kyc-service/pkg/logger"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/datatypes"
 )
 
 func (h *AdminHandler) GetOrganizationList(c *gin.Context) {
@@ -283,7 +284,7 @@ func (h *AdminHandler) AdjustOrganizationQuota(c *gin.Context) {
 	// 审计日志
 	details := map[string]interface{}{"org_id": orgID, "service_type": req.ServiceType, "adjustment": req.Adjustment, "reason": req.Reason}
 	b, _ := json.Marshal(details)
-	al := &models.AuditLog{UserID: c.GetString("userID"), OrgID: orgID, Action: "quota.adjust", Resource: "organization_quotas", Details: string(b), IP: c.ClientIP(), UserAgent: c.Request.UserAgent(), Status: "success", Message: "Admin adjusted quota"}
+	al := &models.AuditLog{UserID: c.GetString("userID"), OrgID: orgID, Action: "quota.adjust", Resource: "organization_quotas", Details: datatypes.JSON(b), IP: c.ClientIP(), UserAgent: c.Request.UserAgent(), Status: "success", Message: "Admin adjusted quota"}
 	_ = h.service.DB.Create(al).Error
 	JSONSuccess(c, gin.H{"adjusted": r.ID})
 }
@@ -327,7 +328,7 @@ func (h *AdminHandler) UpdateOrganizationPlan(c *gin.Context) {
 	}
 	details := map[string]interface{}{"org_id": orgID, "plan_id": req.PlanID, "immediate": imm, "reset_usage": reset}
 	b, _ := json.Marshal(details)
-	al := &models.AuditLog{UserID: c.GetString("userID"), OrgID: orgID, Action: "admin.update_org_plan", Resource: "organizations", Details: string(b), IP: c.ClientIP(), UserAgent: c.Request.UserAgent(), Status: "success", Message: "Update organization plan"}
+	al := &models.AuditLog{UserID: c.GetString("userID"), OrgID: orgID, Action: "admin.update_org_plan", Resource: "organizations", Details: datatypes.JSON(b), IP: c.ClientIP(), UserAgent: c.Request.UserAgent(), Status: "success", Message: "Update organization plan"}
 	_ = h.service.DB.Create(al).Error
 	JSONSuccess(c, gin.H{"org_id": orgID, "new_plan": req.PlanID, "quotas": resp})
 }

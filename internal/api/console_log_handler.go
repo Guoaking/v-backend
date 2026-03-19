@@ -2,19 +2,16 @@ package api
 
 import (
 	"fmt"
-	"strings"
 
 	"kyc-service/internal/models"
-	"kyc-service/pkg/logger"
 	"kyc-service/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 )
 
-func (h *ConsoleHandler) recordAuditLog(log *models.AuditLog) {
-	if err := h.service.DB.Create(log).Error; err != nil {
-		logger.GetLogger().WithError(err).Error("记录审计日志失败")
-	}
+func (h *ConsoleHandler) recordAuditLog(log *models.AuditLog) error {
+	h.service.LogWorker.RecordAuditLog(log)
+	return nil
 }
 
 func (h *ConsoleHandler) GetLogs(c *gin.Context) {
@@ -37,7 +34,7 @@ func (h *ConsoleHandler) GetLogs(c *gin.Context) {
 	userID := c.GetString("userID")
 	role := c.GetString("orgRole")
 	orgID := c.GetString("orgID")
-	var logs []models.APIRequestLog
+	var logs []models.UsageLog
 	q := h.service.DB.Where("org_id = ?", orgID).Order("created_at DESC").Offset(offset).Limit(limit)
 	// key_id 过滤与权限校验
 	if kid := c.Query("key_id"); kid != "" {
@@ -51,10 +48,12 @@ func (h *ConsoleHandler) GetLogs(c *gin.Context) {
 			return
 		}
 		q = q.Where("api_key_id = ?", kid)
-	} else if role != "owner" && role != "admin" {
-		// 非管理员仅查看自己Key的日志
-		q = q.Where("api_key_owner_id = ?", userID)
 	}
+	// TODO: UsageLog 目前没有 api_key_owner_id，暂不限制普通用户查看自己Key的逻辑
+	// else if role != "owner" && role != "admin" {
+	// 	// 非管理员仅查看自己Key的日志
+	// 	q = q.Where("api_key_owner_id = ?", userID)
+	// }
 	if status := c.Query("status"); status != "" {
 		if status == "success" {
 			q = q.Where("status_code < 400")
@@ -74,10 +73,10 @@ func (h *ConsoleHandler) GetLogs(c *gin.Context) {
 		}
 	}
 	if p := c.Query("path"); p != "" {
-		q = q.Where("path LIKE ?", "%"+p+"%")
+		q = q.Where("endpoint LIKE ?", "%"+p+"%")
 	}
 	if m := c.Query("method"); m != "" {
-		q = q.Where("method = ?", strings.ToUpper(m))
+		// q = q.Where("method = ?", strings.ToUpper(m)) // UsageLog 不支持
 	}
 	if sd := c.Query("start_date"); sd != "" {
 		q = q.Where("created_at >= ?::date", sd)
@@ -93,12 +92,14 @@ func (h *ConsoleHandler) GetLogs(c *gin.Context) {
 		return
 	}
 	var total int64
-	cq := h.service.DB.Model(&models.APIRequestLog{}).Where("org_id = ?", orgID)
+	cq := h.service.DB.Model(&models.UsageLog{}).Where("org_id = ?", orgID)
 	if kid := c.Query("key_id"); kid != "" {
 		cq = cq.Where("api_key_id = ?", kid)
-	} else if role != "owner" && role != "admin" {
-		cq = cq.Where("api_key_owner_id = ?", userID)
 	}
+	// TODO: UsageLog 目前没有 api_key_owner_id
+	// else if role != "owner" && role != "admin" {
+	// 	cq = cq.Where("api_key_owner_id = ?", userID)
+	// }
 	if status := c.Query("status"); status != "" {
 		if status == "success" {
 			cq = cq.Where("status_code < 400")
@@ -118,10 +119,10 @@ func (h *ConsoleHandler) GetLogs(c *gin.Context) {
 		}
 	}
 	if p := c.Query("path"); p != "" {
-		cq = cq.Where("path LIKE ?", "%"+p+"%")
+		cq = cq.Where("endpoint LIKE ?", "%"+p+"%")
 	}
 	if m := c.Query("method"); m != "" {
-		cq = cq.Where("method = ?", strings.ToUpper(m))
+		// cq = cq.Where("method = ?", strings.ToUpper(m)) // UsageLog 不支持
 	}
 	if sd := c.Query("start_date"); sd != "" {
 		cq = cq.Where("created_at >= ?::date", sd)
@@ -135,32 +136,20 @@ func (h *ConsoleHandler) GetLogs(c *gin.Context) {
 	_ = cq.Count(&total).Error
 	items := make([]LogItem, len(logs))
 	for i, lg := range logs {
-		rb := summarizeJSON(string(lg.RequestBody))
-		sb := summarizeJSON(string(lg.ResponseBody))
 		items[i] = LogItem{
 			ID:           lg.ID,
-			Method:       lg.Method,
-			Path:         lg.Path,
+			Method:       "N/A", // UsageLog 中暂未记录 Method
+			Path:         lg.Endpoint,
 			StatusCode:   lg.StatusCode,
-			LatencyMs:    lg.LatencyMs,
-			ClientIP:     lg.ClientIP,
+			LatencyMs:    0, // UsageLog 中暂未记录 Latency
+			ClientIP:     "N/A", // UsageLog 中暂未记录 ClientIP
 			CreatedAt:    utils.FormatTime(lg.CreatedAt),
 			TimeStamp:    utils.FormatTimeUnix(lg.CreatedAt),
-			RequestBody:  rb,
-			ResponseBody: sb,
-			KeyID: func() string {
-				if lg.APIKeyID != nil {
-					return *lg.APIKeyID
-				}
-				return ""
-			}(),
-			KeyName: lg.APIKeyName,
-			KeyOwnerID: func() string {
-				if lg.APIKeyOwnerID != nil {
-					return *lg.APIKeyOwnerID
-				}
-				return ""
-			}(),
+			RequestBody:  "{}", // 计费日志不存 Body
+			ResponseBody: "{}", // 计费日志不存 Body
+			KeyID:        lg.APIKeyID,
+			KeyName:      "N/A", // 需要关联查询 APIKey 表
+			KeyOwnerID:   lg.UserID, // UserID 在这里相当于 OwnerID 的语义
 		}
 	}
 	JSONSuccess(c, gin.H{"page": page, "limit": limit, "total": total, "items": items})

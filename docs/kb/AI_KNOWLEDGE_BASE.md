@@ -80,6 +80,7 @@
 - 数据模型：核心表与索引、迁移策略
 - API 契约：入口、鉴权方式、错误码
 - 质量保障：本地 CI、Git hooks、发布前清单
+- 架构指南：计费、日志、全链路追踪设计 (`docs/architecture/BILLING_AND_LOGGING.md`)
 
 ## 5. 本地启动 Runbook
 

@@ -30,7 +30,7 @@ func NewKYCHandler(svc *service.KYCService) *KYCHandler {
 // @Accept multipart/form-data
 // @Produce json
 // @Param picture formData file true "ID card image"
-// @Param language formData string false "Language default:thai" Enums(thai,vietnamese,indonesian,chinese,english,tagalog,malay) example(thai)
+// @Param language formData string false "Language default:thai" Enums(thai,vietnamese,indonesian,chinese,english,tagalog,malay,khmer,lao,tamil) example(thai)
 // @Success 200 {object} OCRSuccessResponse
 // @Router /kyc/ocr [post]
 // @Security ApiKeyAuth
@@ -120,6 +120,12 @@ func GetSupportLang(lang string) string {
 		return "malay"
 	case "vi", "vietnamese":
 		return "vietnamese"
+	case "km", "khmer":
+		return "khmer"
+	case "lo", "lao":
+		return "lao"
+	case "ta", "tamil":
+		return "tamil"
 	default:
 		return "thai"
 	}

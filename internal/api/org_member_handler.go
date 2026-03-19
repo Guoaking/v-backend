@@ -301,8 +301,20 @@ func (h *OrgMemberHandler) ResetMemberPassword(c *gin.Context) {
 	// 审计
 	details := map[string]interface{}{"target_user_id": user.ID, "member_id": memberID}
 	b, _ := json.Marshal(details)
-	al := &models.AuditLog{UserID: c.GetString("userID"), OrgID: orgID, Action: "user.update_password", Resource: "users", Details: string(b), IP: c.ClientIP(), UserAgent: c.Request.UserAgent(), Status: "success", Message: "Reset member password"}
-	_ = h.service.DB.Create(al).Error
+	auditLog := &models.AuditLog{
+		UserID:    c.GetString("userID"),
+		OrgID:     orgID,
+		Action:    "user.update_password",
+		Resource:  "users",
+		Details:   datatypes.JSON(b),
+		IP:        c.ClientIP(),
+		UserAgent: c.Request.UserAgent(),
+		Status:    "success",
+		Message:   "Reset member password",
+	}
+	if err := h.service.DB.Create(auditLog).Error; err != nil {
+		logger.GetLogger().WithError(err).Error("记录审计日志失败")
+	}
 	JSONSuccess(c, gin.H{"updated": user.ID})
 }
 

@@ -61,6 +61,13 @@ func InitDB(cfg config.DatabaseConfig) (*gorm.DB, error) {
 
 	// 自动迁移表结构（可配置）
 	if cfg.AutoMigrateEnabled {
+		// 1. 执行预迁移处理（处理破坏性变更）
+		if err := preAutoMigrate(db); err != nil {
+			logger.GetLogger().Warnf("数据库预迁移失败: %v", err)
+			// 不阻断，尝试继续
+		}
+
+		// 2. 执行 GORM AutoMigrate
 		if err := autoMigrate(db); err != nil {
 			logger.GetLogger().Warnf("数据库迁移失败: %v", err)
 			return nil, err
@@ -68,6 +75,32 @@ func InitDB(cfg config.DatabaseConfig) (*gorm.DB, error) {
 	}
 
 	return db, nil
+}
+
+// preAutoMigrate 处理 GORM 无法自动处理的破坏性变更
+func preAutoMigrate(db *gorm.DB) error {
+	// 1. 处理 audit_logs.details 从 text 到 jsonb 的变更
+	// 为了数据安全，我们将旧的 text 列重命名为 details_text，让 GORM 创建新的 details (jsonb) 列
+	// 这样既保留了历史数据，又解决了类型冲突
+	err := db.Exec(`
+		DO $$
+		BEGIN
+			IF EXISTS (
+				SELECT 1 
+				FROM information_schema.columns 
+				WHERE table_name = 'audit_logs' 
+				AND column_name = 'details' 
+				AND data_type = 'text'
+			) THEN
+				RAISE NOTICE 'Renaming audit_logs.details to details_text to allow type migration';
+				ALTER TABLE audit_logs RENAME COLUMN details TO details_text;
+			END IF;
+		END $$;
+	`).Error
+	if err != nil {
+		return fmt.Errorf("audit_logs migration failed: %w", err)
+	}
+	return nil
 }
 
 // InitRedis 初始化Redis连接

@@ -19,7 +19,7 @@ func StartStatsRefresher(svc *service.KYCService, interval time.Duration) {
 				LastErrorMessage string
 				LastErrorAt      *time.Time
 			}
-			svc.DB.Raw(`SELECT api_key_id AS api_key_id, COUNT(*) AS total, SUM(CASE WHEN status_code < 400 THEN 1 ELSE 0 END) AS success, MAX(CASE WHEN status_code >= 400 THEN response_body::text END) AS last_error_message, MAX(CASE WHEN status_code >= 400 THEN created_at END) AS last_error_at FROM api_request_logs WHERE created_at >= ? GROUP BY api_key_id`, since).Scan(&rows)
+			svc.DB.Raw(`SELECT api_key_id AS api_key_id, COUNT(*) AS total, SUM(CASE WHEN status_code < 400 THEN 1 ELSE 0 END) AS success, MAX(CASE WHEN status_code >= 400 THEN endpoint END) AS last_error_message, MAX(CASE WHEN status_code >= 400 THEN created_at END) AS last_error_at FROM usage_logs WHERE created_at >= ? GROUP BY api_key_id`, since).Scan(&rows)
 			for _, r := range rows {
 				var key models.APIKey
 				if err := svc.DB.First(&key, "id = ?", r.APIKeyID).Error; err == nil {

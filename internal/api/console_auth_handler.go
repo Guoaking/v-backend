@@ -571,7 +571,5 @@ func (h *ConsoleAuthHandler) generateAPIKeySecret() string {
 
 // recordAuditLog 记录审计日志
 func (h *ConsoleAuthHandler) recordAuditLog(log *models.AuditLog) {
-	if err := h.service.DB.Create(log).Error; err != nil {
-		logger.GetLogger().WithError(err).Error("记录审计日志失败")
-	}
+	h.service.LogWorker.RecordAuditLog(log)
 }

@@ -163,17 +163,13 @@ func (h *AdminHandler) GetAuditLogs(c *gin.Context) {
 }
 
 func (h *AdminHandler) recordAuditLog(c *gin.Context, userID, action, status, message string) {
-	go func() {
-		auditLog := &models.AuditLog{
-			UserID:    userID,
-			Action:    action,
-			IP:        c.ClientIP(),
-			UserAgent: c.Request.UserAgent(),
-			Status:    status,
-			Message:   message,
-		}
-		if err := h.service.DB.Create(auditLog).Error; err != nil {
-			logger.GetLogger().WithError(err).Error("记录审计日志失败")
-		}
-	}()
+	auditLog := &models.AuditLog{
+		UserID:    userID,
+		Action:    action,
+		IP:        c.ClientIP(),
+		UserAgent: c.Request.UserAgent(),
+		Status:    status,
+		Message:   message,
+	}
+	h.service.LogWorker.RecordAuditLog(auditLog)
 }

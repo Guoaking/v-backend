@@ -17,61 +17,6 @@ import (
 	"github.com/go-redis/redis/v8"
 )
 
-// Logger 日志中间件 - 包含trace信息
-func Logger() gin.HandlerFunc {
-	return gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
-		// 脱敏处理
-		path := param.Path
-		if strings.Contains(path, "idcard") || strings.Contains(path, "phone") {
-			path = "[DESENSITIZED]"
-		}
-
-		// 获取trace信息（从gin.Context的Keys中获取）
-		requestID := ""
-		traceID := ""
-		spanID := ""
-
-		// 尝试从gin.Context获取trace信息
-		if c, exists := param.Keys["request_id"]; exists {
-			requestID = fmt.Sprintf("%v", c)
-		}
-		if c, exists := param.Keys["trace_id"]; exists {
-			traceID = fmt.Sprintf("%v", c)
-		}
-		if c, exists := param.Keys["span_id"]; exists {
-			spanID = fmt.Sprintf("%v", c)
-		}
-
-		// 如果trace信息为空，尝试从请求头获取
-		if traceID == "" && param.Request != nil {
-			if tid := param.Request.Header.Get("X-Trace-ID"); tid != "" {
-				traceID = tid
-			}
-		}
-
-		if strings.Contains(path, "/metrics") {
-
-			return ""
-
-		}
-
-		return fmt.Sprintf("%s - [%s] \"%s %s %s %d %s \"%s\" %s\" trace_id=%s span_id=%s request_id=%s\n",
-			param.ClientIP,
-			param.TimeStamp.Format(time.RFC3339),
-			param.Method,
-			path,
-			param.Request.Proto,
-			param.StatusCode,
-			param.Latency,
-			param.Request.UserAgent(),
-			param.ErrorMessage,
-			traceID,
-			spanID,
-			requestID,
-		)
-	})
-}
-
 // CORS CORS中间件
 func CORS() gin.HandlerFunc {
 	return func(c *gin.Context) {

@@ -32,18 +32,18 @@ type KYCRequest struct {
 
 // AuditLog 审计日志
 type AuditLog struct {
-	ID        uint      `gorm:"primaryKey" json:"id"`
-	RequestID string    `gorm:"index" json:"request_id"`
-	UserID    string    `gorm:"index" json:"user_id"`
-	OrgID     string    `gorm:"index" json:"org_id"`
-	Action    string    `json:"action"`
-	Resource  string    `json:"resource"`
-	Details   string    `json:"details"` // JSON格式的详细信息
-	IP        string    `json:"ip"`
-	UserAgent string    `json:"user_agent"`
-	Status    string    `json:"status"`
-	Message   string    `json:"message"`
-	CreatedAt time.Time `json:"created_at"`
+	ID        uint           `gorm:"primaryKey" json:"id"`
+	OrgID     string         `gorm:"index" json:"org_id"`
+	UserID    string         `gorm:"index" json:"user_id"`
+	RequestID string         `gorm:"index" json:"request_id"`
+	Action    string         `json:"action"`
+	Resource  string         `json:"resource"`
+	IP        string         `json:"ip"`
+	UserAgent string         `json:"user_agent"`
+	Status    string         `json:"status"`
+	Message   string         `json:"message"`
+	Details   datatypes.JSON `json:"details" gorm:"type:jsonb"`
+	CreatedAt time.Time      `json:"created_at"`
 }
 
 // User 用户
@@ -142,11 +142,16 @@ type UsageLog struct {
 	OrgID         string    `gorm:"index" json:"org_id"`
 	APIKeyID      string    `gorm:"index" json:"api_key_id"`
 	UserID        string    `gorm:"index" json:"user_id"`
-	OAuthClientID *string   `gorm:"index" json:"oauth_client_id,omitempty"`
+	OAuthClientID string    `gorm:"index" json:"oauth_client_id,omitempty"` // 指针改为字符串
 	Endpoint      string    `json:"endpoint"`
 	StatusCode    int       `json:"status_code"`
 	RequestID     string    `json:"request_id"`
-	CreatedAt     time.Time `json:"created_at"`
+	ServiceType   string    `gorm:"index" json:"service_type"` // 新增: 核心计费项分类
+	UsageUnits    int       `json:"usage_units"`               // 新增: 计费单位(次数/秒数)
+	Billable      bool      `gorm:"index" json:"billable"`     // 新增: 是否纳入计费
+	SessionID     string    `gorm:"index" json:"session_id,omitempty"` // 新增: 会话ID，用于关联多个子服务的计费事件
+	Metadata      datatypes.JSON `gorm:"type:jsonb" json:"metadata,omitempty"` // 新增: 扩展元数据(如1/2级分类、标签等)
+	CreatedAt     time.Time `gorm:"index" json:"created_at"`   // 加索引优化按时间范围统计
 }
 
 // OAuthToken OAuth令牌

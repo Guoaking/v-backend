@@ -63,6 +63,14 @@ func main() {
 		log.Fatalf("Migration failed: %v", err)
 	}
 
+	// 启动异步日志Worker
+	// logWorker 在 bootstrap.Init 中已启动
+	defer app.LogWorker.Stop()
+
+	// 注册全局Worker实例到中间件（需要修改中间件以支持注入Worker，或者使用全局单例）
+	// 为了简单起见，这里可以将logWorker注入到Service中，或者作为全局变量
+	// 但更好的方式是在 bootstrap.App 中添加 LogWorker 字段
+
 	// 3. Router: 初始化路由和中间件
 	r, heartbeatManager := router.New(app.Config, app.KYCService, app.RedisClient)
 

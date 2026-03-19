@@ -74,21 +74,6 @@ definitions:
       status:
         type: string
     type: object
-  api.ConsoleCreateAPIKeyRequest:
-    properties:
-      name:
-        maxLength: 100
-        minLength: 1
-        type: string
-      scopes:
-        items:
-          type: string
-        minItems: 1
-        type: array
-    required:
-    - name
-    - scopes
-    type: object
   api.ConsoleLoginRequest:
     properties:
       email:
@@ -120,15 +105,6 @@ definitions:
     - email
     - full_name
     - password
-    type: object
-  api.ConsoleUpdateUserRequest:
-    properties:
-      avatar:
-        type: string
-      company:
-        type: string
-      name:
-        type: string
     type: object
   api.CreateAPIKeyRequest:
     properties:
@@ -706,16 +682,6 @@ definitions:
     required:
     - plan_id
     type: object
-  api.UpdateUserStatusRequest:
-    properties:
-      status:
-        enum:
-        - active
-        - suspended
-        type: string
-    required:
-    - status
-    type: object
   response.FieldError:
     properties:
       field:
@@ -825,6 +791,32 @@ definitions:
     - CodeThirdPartyError
     - CodeServiceUnavailable
     - CodeEncryptionError
+  service.FaceCompareResponse:
+    properties:
+      code:
+        type: integer
+      comparison_results:
+        properties:
+          confidence:
+            type: number
+          confidence_exist:
+            items:
+              type: number
+            type: array
+          detection_result:
+            type: string
+          is_face_exist:
+            type: integer
+          is_same_face:
+            type: integer
+        type: object
+      filename:
+        items:
+          type: string
+        type: array
+      msg:
+        type: string
+    type: object
 host: localhost:8080
 info:
   contact:
@@ -839,199 +831,6 @@ info:
   title: KYC Service API
   version: "1.0"
 paths:
-  /api/v1/admin/audit-logs:
-    get:
-      consumes:
-      - application/json
-      description: 超级管理员获取全平台审计日志，支持多种筛选条件
-      parameters:
-      - default: 1
-        description: 页码，从1开始
-        in: query
-        name: page
-        type: integer
-      - default: 50
-        description: 每页数量，默认50
-        in: query
-        name: limit
-        type: integer
-      - description: 偏移量，可选，如果提供则优先使用
-        in: query
-        name: offset
-        type: integer
-      - description: 用户ID筛选
-        in: query
-        name: user_id
-        type: string
-      - description: 操作类型筛选
-        in: query
-        name: action
-        type: string
-      - description: 状态筛选
-        in: query
-        name: status
-        type: string
-      - description: 开始日期 (YYYY-MM-DD)
-        in: query
-        name: date_from
-        type: string
-      - description: 结束日期 (YYYY-MM-DD)
-        in: query
-        name: date_to
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/api.SuccessResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/api.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/api.ErrorResponse'
-      summary: 管理员获取审计日志
-      tags:
-      - Admin
-  /api/v1/admin/organizations:
-    get:
-      consumes:
-      - application/json
-      description: 超级管理员获取所有组织列表，包含成员数量和用量统计
-      parameters:
-      - default: 1
-        description: 页码，从1开始
-        in: query
-        name: page
-        type: integer
-      - default: 10
-        description: 每页数量，默认10
-        in: query
-        name: limit
-        type: integer
-      - description: 偏移量，可选，如果提供则优先使用
-        in: query
-        name: offset
-        type: integer
-      - description: 搜索关键词
-        in: query
-        name: search
-        type: string
-      - description: 组织状态
-        in: query
-        name: status
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/api.SuccessResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/api.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/api.ErrorResponse'
-      summary: 管理员获取组织列表
-      tags:
-      - Admin
-  /api/v1/admin/users:
-    get:
-      consumes:
-      - application/json
-      description: 管理员获取所有用户列表，包含组织信息和用量统计
-      parameters:
-      - default: 1
-        description: 页码，从1开始
-        in: query
-        name: page
-        type: integer
-      - default: 10
-        description: 每页数量，默认10
-        in: query
-        name: limit
-        type: integer
-      - description: 偏移量，可选，如果提供则优先使用
-        in: query
-        name: offset
-        type: integer
-      - description: 搜索关键词
-        in: query
-        name: search
-        type: string
-      - description: 用户状态
-        in: query
-        name: status
-        type: string
-      - description: 用户角色
-        in: query
-        name: role
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/api.SuccessResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/api.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/api.ErrorResponse'
-      summary: 管理员获取用户列表
-      tags:
-      - Admin
-  /api/v1/admin/users/{id}/status:
-    put:
-      consumes:
-      - application/json
-      description: 管理员更新用户状态（激活/禁用）
-      parameters:
-      - description: 用户ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: 状态更新请求
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/api.UpdateUserStatusRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/api.SuccessResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/api.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/api.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/api.ErrorResponse'
-      summary: 管理员更新用户状态
-      tags:
-      - Admin
   /api/v1/auth/google:
     post:
       consumes:
@@ -1228,12 +1027,12 @@ paths:
       - application/json
       description: 创建新的API密钥
       parameters:
-      - description: 创建API密钥请求
+      - description: API密钥信息
         in: body
-        name: request
+        name: key
         required: true
         schema:
-          $ref: '#/definitions/api.ConsoleCreateAPIKeyRequest'
+          $ref: '#/definitions/api.CreateAPIKeyRequest'
       produces:
       - application/json
       responses:
@@ -1251,12 +1050,12 @@ paths:
             $ref: '#/definitions/api.ErrorResponse'
       summary: 创建API密钥
       tags:
-      - Console
+      - Credentials
   /api/v1/keys/{id}:
     delete:
       consumes:
       - application/json
-      description: 撤销指定的API密钥
+      description: 删除指定的API密钥
       parameters:
       - description: API密钥ID
         in: path
@@ -1270,10 +1069,6 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/api.SuccessResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/api.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
@@ -1282,9 +1077,35 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/api.ErrorResponse'
-      summary: 撤销API密钥
+      summary: 删除API密钥
       tags:
-      - Console
+      - Credentials
+  /api/v1/kyc/face/id-match:
+    post:
+      consumes:
+      - multipart/form-data
+      description: 上传两张人脸图片进行比对，验证是否为同一人（其中一张为证件照）
+      parameters:
+      - description: 人脸图片1
+        in: formData
+        name: image1
+        required: true
+        type: file
+      - description: 人脸图片2 (证件照)
+        in: formData
+        name: image2
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/service.FaceCompareResponse'
+      summary: 人证比对
+      tags:
+      - KYC
   /api/v1/orgs/current:
     get:
       consumes:
@@ -1432,54 +1253,6 @@ paths:
       summary: 切换当前组织
       tags:
       - Organization
-  /api/v1/users/me:
-    get:
-      consumes:
-      - application/json
-      description: 获取当前登录用户的详细信息和API密钥列表
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/api.SuccessResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/api.ErrorResponse'
-      summary: 获取当前用户信息
-      tags:
-      - Console
-    put:
-      consumes:
-      - application/json
-      description: 更新当前用户的个人资料
-      parameters:
-      - description: 更新用户资料请求
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/api.ConsoleUpdateUserRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/api.SuccessResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/api.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/api.ErrorResponse'
-      summary: 更新用户资料
-      tags:
-      - Console
   /auth/refresh:
     post:
       consumes:
@@ -1889,6 +1662,9 @@ paths:
         - english
         - tagalog
         - malay
+        - khmer
+        - lao
+        - tamil
         example: thai
         in: formData
         name: language

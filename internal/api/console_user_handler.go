@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -186,14 +187,16 @@ func (h *ConsoleHandler) UpdateUserProfile(c *gin.Context) {
 	auditLog := &models.AuditLog{
 		UserID:    userID,
 		OrgID:     user.OrgID,
-		Action:    "user_profile_updated",
+		Action:    "update_user_profile",
+		Resource:  "user",
+		Details:   datatypes.JSON(fmt.Sprintf(`{"updates": "%+v"}`, updates)),
 		IP:        c.ClientIP(),
 		UserAgent: c.Request.UserAgent(),
 		Status:    "success",
-		Message:   fmt.Sprintf("User profile updated: %s", userID),
-		Details:   fmt.Sprintf("Updates: %+v", updates),
 	}
-	h.recordAuditLog(auditLog)
+	if err := h.recordAuditLog(auditLog); err != nil {
+		logger.GetLogger().WithError(err).Error("记录审计日志失败")
+	}
 
 	// 记录业务操作成功
 	middleware.RecordBusinessOperation("update_user_profile", true, time.Since(start), "")

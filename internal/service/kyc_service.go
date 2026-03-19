@@ -11,6 +11,7 @@ import (
 	"kyc-service/internal/config"
 	"kyc-service/internal/models"
 	"kyc-service/internal/storage"
+	"kyc-service/internal/worker"
 	"kyc-service/pkg/crypto"
 	"kyc-service/pkg/httpclient"
 	"kyc-service/pkg/logger"
@@ -33,6 +34,7 @@ type KYCService struct {
 	Encryptor  *crypto.Encryptor
 	Upgrader   websocket.Upgrader
 	HTTPClient *httpclient.Client // 新增HTTP客户端
+	LogWorker  *worker.AsyncLogWorker
 
 	// OTel指标
 	ocrSuccessRate        metric.Float64Gauge
@@ -98,7 +100,7 @@ func (s *KYCService) ValidateIPWhitelistSubset(allowed []string, requested []str
 	return true
 }
 
-func NewKYCService(db *gorm.DB, redis *redis.Client, cfg *config.Config) *KYCService {
+func NewKYCService(db *gorm.DB, redis *redis.Client, cfg *config.Config, logWorker *worker.AsyncLogWorker) *KYCService {
 	encryptor, _ := crypto.NewEncryptor(cfg.Security.EncryptionKey)
 
 	// 配置HTTP客户端
@@ -115,6 +117,7 @@ func NewKYCService(db *gorm.DB, redis *redis.Client, cfg *config.Config) *KYCSer
 		Config:     cfg,
 		Encryptor:  encryptor,
 		HTTPClient: httpClient, // 初始化HTTP客户端
+		LogWorker:  logWorker,
 		ThirdParty: NewThirdPartyService(cfg),
 		Upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
@@ -496,9 +499,7 @@ func (s *KYCService) RecordAuditLog(ctx context.Context, action, resource, resou
 		Message:   message,
 	}
 
-	if err := s.DB.Create(auditLog).Error; err != nil {
-		logger.GetLogger().WithError(err).Error("记录审计日志失败")
-	}
+	s.LogWorker.RecordAuditLog(auditLog)
 	metrics.RecordAuditEvent(ctx, action, resource, status)
 }
 
@@ -529,7 +530,8 @@ func (s *KYCService) CreateUser(user *models.User) error {
 
 // CreateAuditLog 创建审计日志
 func (s *KYCService) CreateAuditLog(auditLog *models.AuditLog) error {
-	return s.DB.Create(auditLog).Error
+	s.LogWorker.RecordAuditLog(auditLog)
+	return nil
 }
 
 // 组织管理相关方法

@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
 // New initializes the Gin engine and routes
@@ -47,16 +48,20 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 	r := gin.New()
 
 	// 全局中间件 - 顺序很重要
-	r.Use(middleware.Recovery())                         // 自定义恢复中间件
+	r.Use(middleware.Recovery()) // 自定义恢复中间件
+	// 引入 OTel 中间件，作为最外层 Tracing 入口 (服务名从配置取，或默认 kyc-service)
+	serviceName := cfg.Monitoring.Tracing.ServiceName
+	if serviceName == "" {
+		serviceName = "kyc-service"
+	}
+	r.Use(otelgin.Middleware(serviceName))
+
+	r.Use(middleware.UnifiedContextMiddleware())         // 1. 统一上下文（TraceID/RequestID）
+	r.Use(middleware.SystemLoggerMiddleware())           // 2. 系统日志（Stdout）
 	r.Use(middleware.ErrorHandler())                     // 统一错误处理中间件
 	r.Use(middleware.EnterpriseMetricsInstrumentation()) // 企业级OTel指标
-	r.Use(middleware.TraceMiddleware())                  // Trace中间件必须在Logger之前
 	r.Use(middleware.CORS())
 	r.Use(middleware.Security())
-	//r.Use(bidirectionalAuth.BypassDetectionMiddleware()) // 绕过检测中间件
-	//r.Use(bidirectionalAuth.KongAuthMiddleware())        // Kong网关身份验证
-	//r.Use(bidirectionalAuth.ServiceAuthMiddleware())     // 服务到网关认证
-	r.Use(middleware.Logger()) // Logger中间件最后，可以访问trace信息
 
 	// 健康检查（支持双向鉴权）
 	healthCheck := middleware.NewBidirectionalHealthCheck(bidirectionalAuth)
@@ -72,7 +77,7 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 	// API路由组
 	v1 := r.Group("/api/v1")
 	v1.Use(middleware.InjectOrgContext())
-	v1.Use(middleware.APIRequestLogMiddleware(kycService))
+	// v1.Use(middleware.APIRequestLogMiddleware(kycService)) // 已废弃，由 SystemLoggerMiddleware 替代
 	{
 		meta := api.NewMetaHandler(kycService)
 		v1.GET("/meta/permissions", meta.GetPermissions)
@@ -290,8 +295,8 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 		kyc := v1.Group("/kyc")
 		kyc.Use(middleware.APIOrOAuthAuth(kycService)) // 支持OAuth2客户端凭证或API Key
 		kyc.Use(middleware.InjectOrgContext())
-		kyc.Use(middleware.RequestBodyLogger())
-		kyc.Use(middleware.ResponseCapture())
+		// kyc.Use(middleware.RequestBodyLogger()) // 暂时移除，待统一重构
+		// kyc.Use(middleware.ResponseCapture())   // 暂时移除，待统一重构
 		kyc.Use(middleware.Idempotency(redisClient))
 		kyc.Use(middleware.RateLimitWithKey(redisClient, kycService)) // 启用IP级别限流（每秒100次）并标记Key
 		kyc.Use(middleware.Quota(redisClient, kycService))            // 按组织计划配额检查与扣费

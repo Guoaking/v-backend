@@ -9,6 +9,7 @@ import (
 	"kyc-service/internal/service"
 	"kyc-service/internal/storage"
 	"kyc-service/internal/tasks"
+	"kyc-service/internal/worker"
 	"kyc-service/pkg/logger"
 	"kyc-service/pkg/metrics"
 	"kyc-service/pkg/tracing"
@@ -23,6 +24,7 @@ type App struct {
 	DB          *gorm.DB
 	RedisClient *redis.Client
 	KYCService  *service.KYCService
+	LogWorker   *worker.AsyncLogWorker
 }
 
 // Init initializes the application dependencies
@@ -67,13 +69,19 @@ func Init(ctx context.Context, configFile string) (*App, func(), error) {
 		log.Fatalf("Redis初始化失败: %v", err)
 	}
 
+	// 初始化异步日志Worker
+	billingStore := storage.NewPostgresBillingStorage(db)
+	auditStore := storage.NewPostgresAuditStorage(db)
+	logWorker := worker.NewAsyncLogWorker(billingStore, auditStore)
+	logWorker.Start()
+
 	// 初始化服务
-	kycService := service.NewKYCService(db, redisClient, cfg)
+	kycService := service.NewKYCService(db, redisClient, cfg, logWorker)
 	tasks.StartStatsRefresher(kycService, 5*time.Minute)
 	tasks.StartInvitationCleaner(kycService, time.Hour)
 	tasks.StartAuditActionsSync(kycService, 10*time.Minute)
 	tasks.StartQuotaResetter(db, time.Hour)
-	tasks.StartUsageMeterConsumer(kycService, 100, time.Second)
+	// tasks.StartUsageMeterConsumer(kycService, 100, time.Second) // 已废弃，改用 AsyncLogWorker
 
 	// 启动后同步现有组织的配额（Plans -> OrganizationQuotas）
 	{
@@ -104,6 +112,7 @@ func Init(ctx context.Context, configFile string) (*App, func(), error) {
 		DB:          db,
 		RedisClient: redisClient,
 		KYCService:  kycService,
+		LogWorker:   logWorker,
 	}
 
 	return app, tracerCleanup, nil

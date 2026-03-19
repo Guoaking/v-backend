@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/datatypes"
 )
 
 type AdminUserListResponse struct {
@@ -245,7 +246,7 @@ func (h *AdminHandler) UpdateUserAdmin(c *gin.Context) {
 	// 审计日志
 	details := map[string]interface{}{"target_user_id": userID, "updated_fields": updates}
 	b, _ := json.Marshal(details)
-	al := &models.AuditLog{UserID: c.GetString("userID"), OrgID: user.OrgID, Action: "admin.user_update", Resource: "users", Details: string(b), IP: c.ClientIP(), UserAgent: c.Request.UserAgent(), Status: "success", Message: "Admin updated user"}
+	al := &models.AuditLog{UserID: c.GetString("userID"), OrgID: user.OrgID, Action: "admin.user_update", Resource: "users", Details: datatypes.JSON(b), IP: c.ClientIP(), UserAgent: c.Request.UserAgent(), Status: "success", Message: "Admin updated user"}
 	_ = h.service.DB.Create(al).Error
 	JSONSuccess(c, gin.H{"updated": userID})
 }
