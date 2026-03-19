@@ -42,7 +42,8 @@ WORKDIR /app
 
 # 复制二进制文件
 COPY --from=builder /app/kyc-service .
-COPY --from=builder /app/config.yaml .
+# 在构建生产镜像时，将 config.prod.yaml 复制为容器内的 config.yaml
+COPY --from=builder /app/config.prod.yaml ./config.yaml
 
 # 创建日志目录
 RUN mkdir -p /app/logs && chown -R appuser:appuser /app
