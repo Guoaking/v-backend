@@ -10,7 +10,7 @@ services:
     networks:
       - shared-network
     volumes:
-      - ./config.dev.yaml:/app/config.yaml:ro
+      - ${CONFIG_FILE:-./config.dev.yaml}:/app/config.yaml:ro
       - /opt/test:/opt/test:rw
       - /data:/data:rw
     extra_hosts:
@@ -48,7 +48,7 @@ services:
     networks:
       - shared-network
     volumes:
-      - ./config.yaml:/app/config.yaml:ro
+      - ${CONFIG_FILE:-./config.prod.yaml}:/app/config.yaml:ro
       - /opt/test:/opt/test:rw
       - /data:/data:rw
     extra_hosts:

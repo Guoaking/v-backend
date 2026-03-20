@@ -44,9 +44,15 @@ import (
 func main() {
 	ctx := context.Background()
 
-	// 解析命令行参数
+	// 解析命令行参数与环境变量
 	var configFile string
-	flag.StringVar(&configFile, "config", "config.local", "配置文件路径 (不包含 .yaml 扩展名)")
+	// 优先读取环境变量 KYC_CONFIG_FILE，如果没有则使用命令行参数，再没有则默认 "config.local"
+	envConfig := os.Getenv("KYC_CONFIG_FILE")
+	defaultConfig := "config.local"
+	if envConfig != "" {
+		defaultConfig = envConfig
+	}
+	flag.StringVar(&configFile, "config", defaultConfig, "配置文件路径 (不包含 .yaml 扩展名)，也可通过环境变量 KYC_CONFIG_FILE 设置")
 	flag.Parse()
 
 	// 1. Bootstrap: 初始化配置、日志、存储、服务等

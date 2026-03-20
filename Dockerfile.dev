@@ -13,7 +13,7 @@ WORKDIR /app
 # Copy binary from host
 COPY kyc-service-linux ./kyc-service
 # We copy config.dev.yaml to config.yaml inside the container so the app can find it by default
-COPY config.dev.yaml ./config.yaml
+COPY config.dev.yaml .
 
 RUN mkdir -p /app/logs && chown -R appuser:appuser /app
 
