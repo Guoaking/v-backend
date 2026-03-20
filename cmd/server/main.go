@@ -38,6 +38,7 @@ import (
 // @tokenUrl /api/v1/oauth/token
 // @scope ocr:read "OCR read access"
 // @scope face:read "Face read access"
+// @scope face:write "Face write access"
 // @scope liveness:read "Liveness read access"
 // @scope kyc:verify "KYC verify access"
 

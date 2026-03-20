@@ -315,23 +315,23 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 			kycHandler := api.NewKYCHandler(kycService)
 
 			// OCR识别
-			kyc.POST("/ocr", middleware.RequireKeyScope("ocr:read"), kycHandler.OCR)
+			kyc.POST("/ocr", middleware.RequireKeyScope(models.ScopeOCRRead), kycHandler.OCR)
 			// 人脸识别
-			kyc.POST("/face/search", middleware.RequireKeyScope("face:read"), kycHandler.FaceSearch)
-			kyc.POST("/face/compare", middleware.RequireKeyScope("face:read"), kycHandler.FaceCompare)
-			kyc.POST("/face/id-match", middleware.RequireKeyScope("face:read"), kycHandler.FaceIdMatch)
-			kyc.POST("/face/detect", middleware.RequireKeyScope("face:read"), kycHandler.FaceDetect)
+			kyc.POST("/face/search", middleware.RequireKeyScope(models.ScopeFaceRead), kycHandler.FaceSearch)
+			kyc.POST("/face/compare", middleware.RequireKeyScope(models.ScopeFaceRead), kycHandler.FaceCompare)
+			kyc.POST("/face/id-match", middleware.RequireKeyScope(models.ScopeFaceRead), kycHandler.FaceIdMatch)
+			kyc.POST("/face/detect", middleware.RequireKeyScope(models.ScopeFaceRead), kycHandler.FaceDetect)
 
 			// 活体检测（WebSocket）
-			kyc.POST("/liveness/silent", middleware.RequireKeyScope("liveness:read"), kycHandler.LivenessSilent)
-			kyc.POST("/liveness/video", middleware.RequireKeyScope("liveness:read"), kycHandler.LivenessVideo)
-			kyc.GET("/liveness/ws", middleware.RequireKeyScope("liveness:read"), kycHandler.LivenessWebSocket)
+			kyc.POST("/liveness/silent", middleware.RequireKeyScope(models.ScopeLivenessRead), kycHandler.LivenessSilent)
+			kyc.POST("/liveness/video", middleware.RequireKeyScope(models.ScopeLivenessRead), kycHandler.LivenessVideo)
+			kyc.GET("/liveness/ws", middleware.RequireKeyScope(models.ScopeLivenessRead), kycHandler.LivenessWebSocket)
 			// Action liveness (MVP placeholder)
-			kyc.POST("/liveness/action/session", middleware.RequireKeyScope("liveness:read"), kycHandler.LivenessActionSession)
-			kyc.POST("/liveness/action/upload", middleware.RequireKeyScope("liveness:read"), kycHandler.LivenessActionUpload)
-			kyc.POST("/liveness/action/verify", middleware.RequireKeyScope("liveness:read"), kycHandler.LivenessActionVerify)
+			kyc.POST("/liveness/action/session", middleware.RequireKeyScope(models.ScopeLivenessRead), kycHandler.LivenessActionSession)
+			kyc.POST("/liveness/action/upload", middleware.RequireKeyScope(models.ScopeLivenessRead), kycHandler.LivenessActionUpload)
+			kyc.POST("/liveness/action/verify", middleware.RequireKeyScope(models.ScopeLivenessRead), kycHandler.LivenessActionVerify)
 			// 完整KYC流程
-			kyc.POST("/verify", middleware.RequireKeyScope("kyc:verify"), kycHandler.CompleteKYC)
+			kyc.POST("/verify", middleware.RequireKeyScope(models.ScopeKYCVerify), kycHandler.CompleteKYC)
 
 			// 查询KYC状态
 			kyc.GET("/status/:request_id", kycHandler.GetKYCStatus)

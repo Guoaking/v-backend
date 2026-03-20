@@ -29,4 +29,21 @@ const (
 
 	// Notifications
 	PermNotificationsSend = "notifications.send"
+
+	// -----------------------------------------------------------------------------
+	// Business / API Scopes Constants (Used for OAuth / API Keys)
+	// -----------------------------------------------------------------------------
+
+	// OCR
+	ScopeOCRRead = "ocr:read"
+
+	// Face
+	ScopeFaceRead  = "face:read"
+	ScopeFaceWrite = "face:write"
+
+	// Liveness
+	ScopeLivenessRead = "liveness:read"
+
+	// KYC
+	ScopeKYCVerify = "kyc:verify"
 )

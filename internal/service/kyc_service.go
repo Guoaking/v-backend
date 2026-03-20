@@ -68,7 +68,7 @@ func (s *KYCService) GetOrgPolicy(orgID string) OrgPolicy {
 			return OrgPolicy{AllowedScopes: c.AllowedScopes, RequireApproval: c.RequireApproval, MaxTokenTTLSec: c.MaxTokenTTLSec, IPWhitelist: c.IPWhitelist, MaxRatePerSec: c.MaxRatePerSec}
 		}
 	}
-	return OrgPolicy{AllowedScopes: []string{"ocr:read", "face:read", "face:write", "liveness:read", "kyc:verify"}, RequireApproval: false, MaxTokenTTLSec: 86400, IPWhitelist: nil, MaxRatePerSec: 100}
+	return OrgPolicy{AllowedScopes: []string{models.ScopeOCRRead, models.ScopeFaceRead, models.ScopeFaceWrite, models.ScopeLivenessRead, models.ScopeKYCVerify}, RequireApproval: false, MaxTokenTTLSec: 86400, IPWhitelist: nil, MaxRatePerSec: 100}
 }
 
 func (s *KYCService) ValidateScopesSubset(allowed []string, requested []string) bool {

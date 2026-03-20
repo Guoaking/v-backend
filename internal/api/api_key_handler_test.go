@@ -161,7 +161,7 @@ func TestAPIKeyHandler_GetAPIKeys(t *testing.T) {
 		OrgID:       orgID,
 		Name:        "Key 1",
 		Status:      "active",
-		Scopes:      `["ocr:read"]`,
+		Scopes:      `["` + models.ScopeOCRRead + `"]`,
 	})
 
 	r.GET("/keys", handler.GetAPIKeys)
