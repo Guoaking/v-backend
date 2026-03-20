@@ -589,11 +589,27 @@ func Run(db *gorm.DB) error {
 	}
 	_ = db.Exec("INSERT INTO global_configs(key,value) VALUES('daily_registration_cap','1000') ON CONFLICT (key) DO NOTHING").Error
 
-	// 自动更新旧的 keys.read/keys.write 为 oauth.read/oauth.write
-	_ = db.Exec("UPDATE permissions SET id = 'oauth.read', category = 'OAuth Apps', name = 'View OAuth Apps' WHERE id = 'keys.read'").Error
-	_ = db.Exec("UPDATE permissions SET id = 'oauth.write', category = 'OAuth Apps', name = 'Manage OAuth Apps' WHERE id = 'keys.write'").Error
-	_ = db.Exec("UPDATE role_permissions SET permission_id = 'oauth.read' WHERE permission_id = 'keys.read'").Error
-	_ = db.Exec("UPDATE role_permissions SET permission_id = 'oauth.write' WHERE permission_id = 'keys.write'").Error
+	// 安全且幂等的权限名称变更 (绕过外键约束问题)
+	// 我们不直接 UPDATE 主键，而是:
+	// 1. 插入新权限
+	// 2. 将关联表数据复制到新权限
+	// 3. 删除旧权限
+	migratePermission := func(oldID, newID, category, name, desc string) {
+		// 1. 插入新权限（如果不存在）
+		_ = db.Exec("INSERT INTO permissions(id, category, name, description) VALUES(?, ?, ?, ?) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name", newID, category, name, desc).Error
+		
+		// 2. 迁移角色关联：把拥有旧权限的角色，也赋予新权限
+		_ = db.Exec("INSERT INTO role_permissions(role_id, permission_id) SELECT role_id, ? FROM role_permissions WHERE permission_id = ? ON CONFLICT DO NOTHING", newID, oldID).Error
+		
+		// 3. 删除旧权限的关联
+		_ = db.Exec("DELETE FROM role_permissions WHERE permission_id = ?", oldID).Error
+		
+		// 4. 删除旧权限定义
+		_ = db.Exec("DELETE FROM permissions WHERE id = ?", oldID).Error
+	}
+
+	migratePermission("keys.read", "oauth.read", "OAuth Apps", "View OAuth Apps", "View OAuth applications")
+	migratePermission("keys.write", "oauth.write", "OAuth Apps", "Manage OAuth Apps", "Create/Revoke OAuth applications")
 
 	// 权限与角色种子
 	{
