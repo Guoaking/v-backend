@@ -39,12 +39,14 @@
        "client_id": "sys_web_console_playground",
        "org_id": "Org_A", // 继承张三当前所在的组织
        "user_id": "User_Zhang3", // 记录操作人，用于审计
+       "scope": "ocr:read face:read liveness:read kyc:verify", // 注入全量测试权限
        "source": "playground",
        "exp": 1712345678
      }
      ```
 3. **前端消费 Token**：前端拿到这个短效 JWT 后，放入 `Authorization: Bearer <Token>` 请求真正的 AI 接口。
-4. **统一计费与限流**：底层的 AI 网关/中间件解析 JWT，看到 `org_id = Org_A`，直接从 Org A 的配额池中扣除额度，实现了 Playground 用量与 API 用量的统一计费。
+4. **权限校验 (Scope Guard)**：底层 AI 网关的 `RequireKeyScope` 中间件解析 JWT，发现 `scope` 字段包含了当前接口所需的权限，予以放行。
+5. **统一计费与限流**：AI 网关继续向下流转，计费中间件提取到 `org_id = Org_A`，直接从 Org A 的配额池中扣除额度。
 
 ### 2.3 第三方 App 内嵌 H5 场景 (3rd-Party Embed)
 
