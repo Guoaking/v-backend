@@ -33,7 +33,7 @@ func NewStorageService(cfg *config.Config) (StorageService, error) {
 		if imageDir == "" {
 			imageDir = cfg.Storage.IngestDir
 		}
-		
+
 		return &LocalStorage{
 			BaseDir:  cfg.Storage.IngestDir,
 			ImageDir: imageDir,

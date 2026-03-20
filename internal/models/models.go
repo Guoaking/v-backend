@@ -139,20 +139,20 @@ type APIKey struct {
 
 // UsageLog 用量日志表
 type UsageLog struct {
-	ID            string    `gorm:"primaryKey" json:"id"`
-	OrgID         string    `gorm:"index" json:"org_id"`
-	APIKeyID      string    `gorm:"index" json:"api_key_id"`
-	UserID        string    `gorm:"index" json:"user_id"`
-	OAuthClientID string    `gorm:"index" json:"oauth_client_id,omitempty"` // 指针改为字符串
-	Endpoint      string    `json:"endpoint"`
-	StatusCode    int       `json:"status_code"`
-	RequestID     string    `json:"request_id"`
-	ServiceType   string    `gorm:"index" json:"service_type"` // 新增: 核心计费项分类
-	UsageUnits    int       `json:"usage_units"`               // 新增: 计费单位(次数/秒数)
-	Billable      bool      `gorm:"index" json:"billable"`     // 新增: 是否纳入计费
-	SessionID     string    `gorm:"index" json:"session_id,omitempty"` // 新增: 会话ID，用于关联多个子服务的计费事件
+	ID            string         `gorm:"primaryKey" json:"id"`
+	OrgID         string         `gorm:"index" json:"org_id"`
+	APIKeyID      string         `gorm:"index" json:"api_key_id"`
+	UserID        string         `gorm:"index" json:"user_id"`
+	OAuthClientID string         `gorm:"index" json:"oauth_client_id,omitempty"` // 指针改为字符串
+	Endpoint      string         `json:"endpoint"`
+	StatusCode    int            `json:"status_code"`
+	RequestID     string         `json:"request_id"`
+	ServiceType   string         `gorm:"index" json:"service_type"`            // 新增: 核心计费项分类
+	UsageUnits    int            `json:"usage_units"`                          // 新增: 计费单位(次数/秒数)
+	Billable      bool           `gorm:"index" json:"billable"`                // 新增: 是否纳入计费
+	SessionID     string         `gorm:"index" json:"session_id,omitempty"`    // 新增: 会话ID，用于关联多个子服务的计费事件
 	Metadata      datatypes.JSON `gorm:"type:jsonb" json:"metadata,omitempty"` // 新增: 扩展元数据(如1/2级分类、标签等)
-	CreatedAt     time.Time `gorm:"index" json:"created_at"`   // 加索引优化按时间范围统计
+	CreatedAt     time.Time      `gorm:"index" json:"created_at"`              // 加索引优化按时间范围统计
 }
 
 // OAuthToken OAuth令牌

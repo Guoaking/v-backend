@@ -141,14 +141,14 @@ func (h *ConsoleHandler) GetLogs(c *gin.Context) {
 			Method:       "N/A", // UsageLog 中暂未记录 Method
 			Path:         lg.Endpoint,
 			StatusCode:   lg.StatusCode,
-			LatencyMs:    0, // UsageLog 中暂未记录 Latency
+			LatencyMs:    0,     // UsageLog 中暂未记录 Latency
 			ClientIP:     "N/A", // UsageLog 中暂未记录 ClientIP
 			CreatedAt:    utils.FormatTime(lg.CreatedAt),
 			TimeStamp:    utils.FormatTimeUnix(lg.CreatedAt),
 			RequestBody:  "{}", // 计费日志不存 Body
 			ResponseBody: "{}", // 计费日志不存 Body
 			KeyID:        lg.APIKeyID,
-			KeyName:      "N/A", // 需要关联查询 APIKey 表
+			KeyName:      "N/A",     // 需要关联查询 APIKey 表
 			KeyOwnerID:   lg.UserID, // UserID 在这里相当于 OwnerID 的语义
 		}
 	}

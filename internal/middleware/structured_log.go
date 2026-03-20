@@ -40,7 +40,7 @@ func UnifiedContextMiddleware() gin.HandlerFunc {
 				traceID = uuid.New().String()
 			}
 		}
-		
+
 		// 统一回写 Header，方便下游服务或客户端获取
 		c.Header("X-Trace-ID", traceID)
 
@@ -93,7 +93,7 @@ func SystemLoggerMiddleware() gin.HandlerFunc {
 				RequestID: c.GetString(models.ContextKeyRequestID),
 			},
 			Identity: models.IdentityInfo{
-				TenantID: c.GetString("orgID"), // 兼容现有 key
+				TenantID: c.GetString("orgID"),    // 兼容现有 key
 				UserID:   getString(c, "user_id"), // 兼容现有 key
 				ClientIP: clientIP,
 			},

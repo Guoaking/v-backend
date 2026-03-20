@@ -10,7 +10,7 @@ import (
 
 	"kyc-service/internal/config"
 	"kyc-service/internal/models"
-	
+
 	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -80,7 +80,7 @@ func createMultipartFileHeader(t *testing.T, content []byte, filename string) *m
 
 	req := httptest.NewRequest("POST", "/", pr)
 	req.Header.Set("Content-Type", writer.FormDataContentType())
-	
+
 	err := req.ParseMultipartForm(1024 * 1024) // 1MB
 	assert.NoError(t, err)
 
@@ -156,7 +156,7 @@ func TestActionLivenessFlow(t *testing.T) {
 		task, err := svc.UploadVideo(ctx, sid, fileHeader)
 		if assert.NoError(t, err) {
 			assert.NotNil(t, task)
-			assert.Equal(t, "submitted", task.Status) 
+			assert.Equal(t, "submitted", task.Status)
 		}
 
 		// Verify Quota Consumed

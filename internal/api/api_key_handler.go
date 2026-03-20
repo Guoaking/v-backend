@@ -106,6 +106,7 @@ func (h *APIKeyHandler) GetAPIKeys(c *gin.Context) {
 
 	JSONSuccess(c, response)
 }
+
 // @Summary 创建API密钥
 // @Description 创建新的API密钥
 // @Tags Credentials

@@ -23,7 +23,7 @@ func TestEncryptDecrypt(t *testing.T) {
 	enc, _ := NewEncryptor(key)
 
 	plaintext := "secret message"
-	
+
 	// Encrypt
 	ciphertext, err := enc.Encrypt(plaintext)
 	assert.NoError(t, err)

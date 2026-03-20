@@ -324,7 +324,7 @@ func (h *ConsoleHandler) ListAPIKeys(c *gin.Context) {
 	role := c.GetString("orgRole")
 	var keys []models.APIKey
 	qb := h.service.DB.Model(&models.APIKey{}).Where("org_id = ? AND status <> ?", orgID, "revoked").Order("created_at DESC")
-	
+
 	// Check dynamic permissions
 	perms, _ := c.Get("permissions")
 	permList, _ := perms.([]string)
@@ -335,7 +335,7 @@ func (h *ConsoleHandler) ListAPIKeys(c *gin.Context) {
 			break
 		}
 	}
-	
+
 	if !canRead {
 		JSONSuccess(c, []ConsoleAPIKeyResponse{})
 		return
@@ -344,7 +344,7 @@ func (h *ConsoleHandler) ListAPIKeys(c *gin.Context) {
 	if role == "editor" || role == "developer" {
 		qb = qb.Where("created_by_user_id = ?", userID)
 	}
-	
+
 	if err := qb.Find(&keys).Error; err != nil {
 		JSONError(c, CodeDatabaseError, "查询失败")
 		return

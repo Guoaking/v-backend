@@ -69,7 +69,7 @@ func (a *loginAuth) Next(fromServer []byte, more bool) ([]byte, error) {
 }
 
 func SendSMTP(cfg SMTPConfig, to string, subject string, bodyHTML string, bodyText string) error {
-	addr := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
+	addr := net.JoinHostPort(cfg.Host, fmt.Sprintf("%d", cfg.Port))
 	msg := buildMessage(cfg.From, to, subject, bodyHTML, bodyText)
 	// Implicit TLS (SMTPS 465)
 	if cfg.TLS && cfg.Port == 465 {

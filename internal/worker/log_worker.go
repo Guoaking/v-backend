@@ -43,7 +43,7 @@ func NewAsyncLogWorker(billingStore storage.BillingLogStorage, auditStore storag
 		billingStore:  billingStore,
 		auditStore:    auditStore,
 		logChan:       make(chan models.LogEnvelope, 10000), // 缓冲区大小 10000
-		auditLogChan:  make(chan models.AuditLog, 10000),        // 审计日志缓冲区
+		auditLogChan:  make(chan models.AuditLog, 10000),    // 审计日志缓冲区
 		stopChan:      make(chan struct{}),
 		batchSize:     100,
 		flushInterval: 5 * time.Second,
@@ -89,7 +89,7 @@ func (w *AsyncLogWorker) processLogs() {
 
 	var billingLogs []models.UsageLog
 	var auditLogs []models.AuditLog
-	
+
 	ticker := time.NewTicker(w.flushInterval)
 	defer ticker.Stop()
 

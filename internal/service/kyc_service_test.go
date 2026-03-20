@@ -2,13 +2,10 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"testing"
 
-	"kyc-service/internal/config"
 	"kyc-service/internal/models"
-	"kyc-service/pkg/logger"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/go-redis/redis/v8"
@@ -49,7 +46,7 @@ func initTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("failed to connect database: %v", err)
 	}
-	
+
 	// AutoMigrate all needed models
 	err = db.AutoMigrate(
 		&models.Organization{},
@@ -88,8 +85,8 @@ func TestKYCService_GetOrgPolicy(t *testing.T) {
 		wantRate int
 	}{
 		{
-			name: "Default Policy",
-			setup: func() {},
+			name:     "Default Policy",
+			setup:    func() {},
 			wantRate: 100, // Default from code
 		},
 		{
@@ -145,10 +142,10 @@ func TestKYCService_QuotaConsumption(t *testing.T) {
 			executed = true
 			return nil
 		})
-		
+
 		assert.NoError(t, err)
 		assert.True(t, executed)
-		
+
 		// Verify Redis state (Lua script increments it)
 		val, _ := rdb.Get(ctx, "quota:consumed:"+orgID+":"+svcType).Int()
 		assert.Equal(t, 1, val)
@@ -157,12 +154,12 @@ func TestKYCService_QuotaConsumption(t *testing.T) {
 	t.Run("Quota Exceeded", func(t *testing.T) {
 		// Consume second token
 		_ = svc.checkAndConsumeQuota(ctx, orgID, svcType, func() error { return nil })
-		
+
 		// Attempt third (limit is 2)
 		err := svc.checkAndConsumeQuota(ctx, orgID, svcType, func() error {
 			return nil
 		})
-		
+
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "QUOTA_EXCEEDED")
 	})
@@ -176,7 +173,7 @@ func TestKYCService_AuditLogging(t *testing.T) {
 
 	t.Run("Record Audit Log Success", func(t *testing.T) {
 		svc.RecordAuditLog(ctx, "test.action", "test.resource", "res-123", "success", "all good")
-		
+
 		var log models.AuditLog
 		err := db.First(&log).Error
 		assert.NoError(t, err)

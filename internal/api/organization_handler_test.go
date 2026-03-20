@@ -32,16 +32,16 @@ func TestOrganizationHandler_Create(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, 200, w.Code)
-	
+
 	var org models.Organization
 	db.First(&org, "name = ?", "New Org")
 	assert.NotEmpty(t, org.ID)
 	assert.Equal(t, userID, org.OwnerID)
 }
 
-func TestOrganizationHandler_InviteMember(t *testing.T) {
+func TestOrganizationHandler_InviteOrganizationMember(t *testing.T) {
 	svc, db := setupTestService(t)
-	handler := NewOrganizationHandler(svc)
+	handler := NewOrgMemberHandler(svc)
 	r := setupRouter()
 
 	ownerID := "u1"
@@ -62,16 +62,16 @@ func TestOrganizationHandler_InviteMember(t *testing.T) {
 		r.ServeHTTP(w, req)
 
 		assert.Equal(t, 200, w.Code)
-		
+
 		var inv models.OrganizationInvitation
 		db.First(&inv, "email = ?", "new@example.com")
 		assert.Equal(t, "invited", inv.Status)
 	})
 }
 
-func TestOrganizationHandler_DeleteMember(t *testing.T) {
+func TestOrganizationHandler_DeleteOrganizationMember(t *testing.T) {
 	svc, db := setupTestService(t)
-	handler := NewOrganizationHandler(svc)
+	handler := NewOrgMemberHandler(svc)
 	r := setupRouter()
 
 	orgID := "org1"
@@ -88,7 +88,7 @@ func TestOrganizationHandler_DeleteMember(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, 200, w.Code)
-	
+
 	var count int64
 	db.Model(&models.OrganizationMember{}).Where("id = ?", memID).Count(&count)
 	assert.Equal(t, int64(0), count)
@@ -96,7 +96,7 @@ func TestOrganizationHandler_DeleteMember(t *testing.T) {
 
 func TestOrganizationHandler_GetUsageDetailedV2(t *testing.T) {
 	svc, db := setupTestService(t)
-	handler := NewOrganizationHandler(svc)
+	handler := NewOrgUsageHandler(svc)
 	r := setupRouter()
 
 	orgID := "org1"

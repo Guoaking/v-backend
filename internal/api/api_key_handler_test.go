@@ -95,7 +95,7 @@ func TestAPIKeyHandler_CreateAPIKey(t *testing.T) {
 		}
 		body, _ := json.Marshal(reqBody)
 		req := httptest.NewRequest("POST", "/keys", bytes.NewBuffer(body))
-		
+
 		token := GenerateTestToken(t, userID, orgID, "admin", svc.Config.Security.JWTSecret)
 		req.Header.Set("Authorization", "Bearer "+token)
 		req.Header.Set("Content-Type", "application/json")
@@ -156,12 +156,12 @@ func TestAPIKeyHandler_GetAPIKeys(t *testing.T) {
 	})
 
 	db.Create(&models.APIKey{
-		ID:          "kyc_key1",
-		UserID:      userID,
-		OrgID:       orgID,
-		Name:        "Key 1",
-		Status:      "active",
-		Scopes:      `["` + models.ScopeOCRRead + `"]`,
+		ID:     "kyc_key1",
+		UserID: userID,
+		OrgID:  orgID,
+		Name:   "Key 1",
+		Status: "active",
+		Scopes: `["` + models.ScopeOCRRead + `"]`,
 	})
 
 	r.GET("/keys", handler.GetAPIKeys)
