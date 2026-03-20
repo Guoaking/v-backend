@@ -204,6 +204,13 @@ func JSONErrorWithStatus(c *gin.Context, code ResponseCode, err string, status i
 	c.JSON(status, resp)
 }
 
+// JSONSuccessWithStatus 返回带自定义HTTP状态码的成功响应
+func JSONSuccessWithStatus(c *gin.Context, status int, data interface{}) {
+	resp := NewSuccessResponse(data)
+	resp.SetRequestInfo(c)
+	c.JSON(status, resp)
+}
+
 // JSONPaginated 返回分页JSON响应
 func JSONPaginated(c *gin.Context, data interface{}, page, pageSize, total int) {
 	resp := NewPaginatedResponse(data, page, pageSize, total)

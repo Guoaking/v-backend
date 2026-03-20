@@ -82,6 +82,10 @@ func JSONErrorWithStatus(c *gin.Context, code ResponseCode, err string, status i
 	response.JSONErrorWithStatus(c, code, err, status)
 }
 
+func JSONSuccessWithStatus(c *gin.Context, status int, data interface{}) {
+	response.JSONSuccessWithStatus(c, status, data)
+}
+
 func JSONPaginated(c *gin.Context, data interface{}, page, pageSize, total int) {
 	response.JSONPaginated(c, data, page, pageSize, total)
 }

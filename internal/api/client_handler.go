@@ -73,7 +73,7 @@ type ClientListResponse struct {
 func (h *ClientHandler) RegisterClient(c *gin.Context) {
 	var req ClientRegistrationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		JSONError(c, CodeInvalidParameter, "Invalid request body")
 		return
 	}
 
@@ -91,14 +91,14 @@ func (h *ClientHandler) RegisterClient(c *gin.Context) {
 		return out
 	}(req.Scopes)
 	if !h.service.ValidateScopesSubset(policy.AllowedScopes, scopesArr) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Scopes not allowed by organization policy"})
+		JSONError(c, CodeForbidden, "Scopes not allowed by organization policy")
 		return
 	}
 	if req.RateLimitPerSec <= 0 || req.RateLimitPerSec > policy.MaxRatePerSec {
 		req.RateLimitPerSec = policy.MaxRatePerSec
 	}
 	if !h.service.ValidateIPWhitelistSubset(policy.IPWhitelist, req.IPWhitelist) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "IP whitelist not allowed by organization policy"})
+		JSONError(c, CodeForbidden, "IP whitelist not allowed by organization policy")
 		return
 	}
 	if req.TokenTTLSeconds <= 0 || req.TokenTTLSeconds > policy.MaxTokenTTLSec {
@@ -114,12 +114,12 @@ func (h *ClientHandler) RegisterClient(c *gin.Context) {
 	if req.OwnerID != "" && req.OwnerID != ownerID {
 		role := c.GetString("orgRole")
 		if role != "owner" && role != "admin" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions to assign owner"})
+			JSONError(c, CodeForbidden, "Insufficient permissions to assign owner")
 			return
 		}
 		var member models.OrganizationMember
 		if err := h.service.DB.Where("organization_id = ? AND user_id = ? AND status = ?", orgID, req.OwnerID, "active").First(&member).Error; err != nil {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Owner must be an active organization member"})
+			JSONError(c, CodeForbidden, "Owner must be an active organization member")
 			return
 		}
 		ownerID = req.OwnerID
@@ -142,14 +142,14 @@ func (h *ClientHandler) RegisterClient(c *gin.Context) {
 
 	if err := h.service.DB.Create(client).Error; err != nil {
 		logger.GetLogger().WithError(err).Error("create client failed")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create client"})
+		JSONError(c, CodeInternalError, "Failed to create client")
 		return
 	}
 
 	// 记录客户端注册审计日志
 	h.service.RecordAuditLog(c, "client.register", "client", clientID, "success", "client registered")
 
-	c.JSON(http.StatusCreated, ClientRegistrationResponse{
+	JSONSuccessWithStatus(c, http.StatusCreated, ClientRegistrationResponse{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
 		Name:         req.Name,
