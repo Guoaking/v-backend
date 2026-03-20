@@ -105,6 +105,7 @@
 2. **STS 端点开发**: 新增 `POST /api/v1/console/sandbox/token` 接口。
    - 依赖现有的 `JWTAuth` 中间件确保调用者已登录。
    - 根据调用者的 `OrgID`，使用系统 Client 的凭证动态签发包含此 `OrgID` 的 15 分钟短效 JWT。
+   - **Scopes 注入**: 考虑到沙盒需要全功能测试，STS 签发的 JWT `scope` 字段应包含所有必要的权限（如 `ocr:read face:read liveness:read kyc:verify`），以通过下游的 `RequireKeyScope` 中间件校验。
 3. **列表 API 过滤**: 修改 `GetOAuthClients` Handler，增加 `is_system = false` 过滤条件。
 4. **RBAC 拦截**: 修改 API 凭证相关的 Handler，如果是 Viewer 角色直接返回 403；如果是 Editor 则只返回/操作 `created_by == currentUser.ID` 的记录。
 

@@ -63,6 +63,9 @@ func UnifiedAuthMiddleware() gin.HandlerFunc {
             IsMachine:   true,
         })
 
+        // 兼容遗留的 scope 校验逻辑 (如 middleware.RequireKeyScope)
+        c.Set("scopes", identity.Scopes)
+
         c.Next()
     }
 }
