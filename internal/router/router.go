@@ -6,6 +6,7 @@ import (
 	"kyc-service/internal/api"
 	"kyc-service/internal/config"
 	"kyc-service/internal/middleware"
+	"kyc-service/internal/models"
 	"kyc-service/internal/service"
 	"kyc-service/pkg/logger"
 
@@ -126,9 +127,9 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 			console.GET("/keys/:id/secret", middleware.RequireOrganizationHeader(kycService), middleware.RequirePermission("keys.read"), consoleHandler.GetAPIKeySecret)
 			// ----------------------------------------
 
-			console.GET("/usage", middleware.RequireOrganizationHeader(kycService), middleware.RequirePermission("logs.read"), consoleHandler.GetUsage)
-			console.GET("/usage/stats", middleware.RequireOrganizationHeader(kycService), middleware.RequirePermission("logs.read"), consoleHandler.GetUsageStats)
-			console.GET("/logs", middleware.RequireOrganizationHeader(kycService), middleware.RequirePermission("logs.read"), consoleHandler.GetLogs)
+			console.GET("/usage", middleware.RequireOrganizationHeader(kycService), middleware.RequirePermission(models.PermLogsRead), consoleHandler.GetUsage)
+			console.GET("/usage/stats", middleware.RequireOrganizationHeader(kycService), middleware.RequirePermission(models.PermLogsRead), consoleHandler.GetUsageStats)
+			console.GET("/logs", middleware.RequireOrganizationHeader(kycService), middleware.RequirePermission(models.PermLogsRead), consoleHandler.GetLogs)
 			console.DELETE("/users/me", consoleHandler.DeleteMe)
 			console.GET("/me/notifications", middleware.JWTAuth(kycService), consoleHandler.GetNotifications)
 			console.PUT("/me/notifications/:id/read", middleware.JWTAuth(kycService), consoleHandler.MarkNotificationRead)
@@ -138,11 +139,11 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 			clientHandler := api.NewClientHandler(kycService)
 			clients := console.Group("/oauth/clients")
 			clients.Use(middleware.RequireOrganizationHeader(kycService))
-			clients.POST("/register", middleware.RequirePermission("oauth.write"), clientHandler.RegisterClient)
-			clients.GET("", middleware.RequirePermission("oauth.read"), clientHandler.ListClients)
-			clients.DELETE(":client_id", middleware.RequirePermission("oauth.write"), clientHandler.DeleteClient)
-			clients.POST(":id/rotate", middleware.RequirePermission("oauth.write"), clientHandler.RotateClientSecret)
-			clients.PATCH(":id/status", middleware.RequirePermission("oauth.write"), clientHandler.UpdateClientStatus)
+			clients.POST("/register", middleware.RequirePermission(models.PermOAuthWrite), clientHandler.RegisterClient)
+			clients.GET("", middleware.RequirePermission(models.PermOAuthRead), clientHandler.ListClients)
+			clients.DELETE(":client_id", middleware.RequirePermission(models.PermOAuthWrite), clientHandler.DeleteClient)
+			clients.POST(":id/rotate", middleware.RequirePermission(models.PermOAuthWrite), clientHandler.RotateClientSecret)
+			clients.PATCH(":id/status", middleware.RequirePermission(models.PermOAuthWrite), clientHandler.UpdateClientStatus)
 			clients.GET(":id/secret", middleware.JWTAuth(kycService), middleware.RequireOrganizationHeader(kycService), middleware.InjectOrgContext(), clientHandler.GetClientSecret)
 
 		}
@@ -218,8 +219,7 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 		//notifications.Use(middleware.JWTAuth(kycService))
 		{
 			nh := api.NewNotificationHandler(kycService)
-			//notifications.POST("/email", middleware.RequirePermission("notifications.send"), nh.SendEmail)
-			notifications.POST("/email", nh.SendEmail)
+			notifications.POST("/email", middleware.RequirePermission(models.PermNotificationsSend), nh.SendEmail)
 		}
 
 		discovery := api.NewDiscoveryHandler()
@@ -260,33 +260,33 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 		orgs.Use(middleware.InjectOrgContext())
 		{
 			// 组织核心能力
-			orgs.GET("/current", middleware.RequirePermission("org.read"), orgCoreHandler.GetCurrentOrganization)
-			orgs.PUT("/plan", middleware.RequirePermission("billing.write"), orgCoreHandler.UpdatePlan)
-			orgs.DELETE("/:id", middleware.RequirePermission("org.delete"), orgCoreHandler.DeleteOrganization)
+			orgs.GET("/current", middleware.RequirePermission(models.PermOrgRead), orgCoreHandler.GetCurrentOrganization)
+			orgs.PUT("/plan", middleware.RequirePermission(models.PermBillingWrite), orgCoreHandler.UpdatePlan)
+			orgs.DELETE("/:id", middleware.RequirePermission(models.PermOrgDelete), orgCoreHandler.DeleteOrganization)
 
 			// 成员管理
-			orgs.GET("/members", middleware.RequirePermission("team.read"), orgMemberHandler.GetOrganizationMembers)
-			orgs.POST("/members", middleware.RequirePermission("team.invite"), orgMemberHandler.InviteOrganizationMember)
-			orgs.PATCH("/members/:id", middleware.RequirePermission("team.write"), orgMemberHandler.UpdateMemberRole)
-			orgs.PUT("/members/:id/password", middleware.RequirePermission("team.write"), orgMemberHandler.ResetMemberPassword)
-			orgs.PATCH("/members/:id/status", middleware.RequirePermission("team.write"), orgMemberHandler.UpdateMemberStatus)
-			orgs.DELETE("/members/:id", middleware.RequirePermission("team.write"), orgMemberHandler.DeleteOrganizationMember)
+			orgs.GET("/members", middleware.RequirePermission(models.PermTeamRead), orgMemberHandler.GetOrganizationMembers)
+			orgs.POST("/members", middleware.RequirePermission(models.PermTeamInvite), orgMemberHandler.InviteOrganizationMember)
+			orgs.PATCH("/members/:id", middleware.RequirePermission(models.PermTeamWrite), orgMemberHandler.UpdateMemberRole)
+			orgs.PUT("/members/:id/password", middleware.RequirePermission(models.PermTeamWrite), orgMemberHandler.ResetMemberPassword)
+			orgs.PATCH("/members/:id/status", middleware.RequirePermission(models.PermTeamWrite), orgMemberHandler.UpdateMemberStatus)
+			orgs.DELETE("/members/:id", middleware.RequirePermission(models.PermTeamWrite), orgMemberHandler.DeleteOrganizationMember)
 
 			// 邀请管理
-			orgs.POST("/invitations", middleware.RequirePermission("team.invite"), orgMemberHandler.CreateInvitation)
-			orgs.GET("/invitations", middleware.RequirePermission("team.read"), orgMemberHandler.ListInvitations)
-			orgs.DELETE("/invitations/:id", middleware.RequirePermission("team.write"), orgMemberHandler.RevokeInvitation)
+			orgs.POST("/invitations", middleware.RequirePermission(models.PermTeamInvite), orgMemberHandler.CreateInvitation)
+			orgs.GET("/invitations", middleware.RequirePermission(models.PermTeamRead), orgMemberHandler.ListInvitations)
+			orgs.DELETE("/invitations/:id", middleware.RequirePermission(models.PermTeamWrite), orgMemberHandler.RevokeInvitation)
 
 			// 用量与账单
-			orgs.GET("/:org_id/usage/summary", middleware.RequirePermission("logs.read"), orgUsageHandler.GetUsageSummary)
-			orgs.GET("/billing", middleware.ScopePermission([]string{"org.billing.read", "billing.read"}), orgUsageHandler.GetBilling)
-			orgs.GET("/usage/daily", middleware.ScopePermission([]string{"org.usage.read", "logs.read"}), orgUsageHandler.GetUsageDaily)
-			orgs.GET("/usage/detailed", middleware.ScopePermission([]string{"org.usage.read", "logs.read"}), orgUsageHandler.GetUsageDetailedV2)
+			orgs.GET("/:org_id/usage/summary", middleware.RequirePermission(models.PermLogsRead), orgUsageHandler.GetUsageSummary)
+			orgs.GET("/billing", middleware.ScopePermission([]string{models.PermOrgBillingRead, models.PermBillingRead}), orgUsageHandler.GetBilling)
+			orgs.GET("/usage/daily", middleware.ScopePermission([]string{models.PermOrgUsageRead, models.PermLogsRead}), orgUsageHandler.GetUsageDaily)
+			orgs.GET("/usage/detailed", middleware.ScopePermission([]string{models.PermOrgUsageRead, models.PermLogsRead}), orgUsageHandler.GetUsageDetailedV2)
 
 			// 审计日志
-			orgs.GET("/audit-logs", middleware.RequirePermission("logs.read"), orgAuditHandler.GetOrgAuditLogs)
-			orgs.GET("/audit-logs/actions", middleware.RequirePermission("org.audit"), orgAuditHandler.GetAuditActions)
-			orgs.GET("/audit-logs/export", middleware.RequirePermission("org.audit"), orgAuditHandler.ExportOrgAuditLogs)
+			orgs.GET("/audit-logs", middleware.RequirePermission(models.PermLogsRead), orgAuditHandler.GetOrgAuditLogs)
+			orgs.GET("/audit-logs/actions", middleware.RequirePermission(models.PermOrgAudit), orgAuditHandler.GetAuditActions)
+			orgs.GET("/audit-logs/export", middleware.RequirePermission(models.PermOrgAudit), orgAuditHandler.ExportOrgAuditLogs)
 		}
 
 		// 创建组织（仅JWT，无需组织上下文）

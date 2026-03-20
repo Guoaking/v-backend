@@ -597,19 +597,19 @@ func Run(db *gorm.DB) error {
 	migratePermission := func(oldID, newID, category, name, desc string) {
 		// 1. 插入新权限（如果不存在）
 		_ = db.Exec("INSERT INTO permissions(id, category, name, description) VALUES(?, ?, ?, ?) ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name", newID, category, name, desc).Error
-		
+
 		// 2. 迁移角色关联：把拥有旧权限的角色，也赋予新权限
 		_ = db.Exec("INSERT INTO role_permissions(role_id, permission_id) SELECT role_id, ? FROM role_permissions WHERE permission_id = ? ON CONFLICT DO NOTHING", newID, oldID).Error
-		
+
 		// 3. 删除旧权限的关联
 		_ = db.Exec("DELETE FROM role_permissions WHERE permission_id = ?", oldID).Error
-		
+
 		// 4. 删除旧权限定义
 		_ = db.Exec("DELETE FROM permissions WHERE id = ?", oldID).Error
 	}
 
-	migratePermission("keys.read", "oauth.read", "OAuth Apps", "View OAuth Apps", "View OAuth applications")
-	migratePermission("keys.write", "oauth.write", "OAuth Apps", "Manage OAuth Apps", "Create/Revoke OAuth applications")
+	migratePermission("keys.read", models.PermOAuthRead, "OAuth Apps", "View OAuth Apps", "View OAuth applications")
+	migratePermission("keys.write", models.PermOAuthWrite, "OAuth Apps", "Manage OAuth Apps", "Create/Revoke OAuth applications")
 
 	// 权限与角色种子
 	{
@@ -621,20 +621,20 @@ func Run(db *gorm.DB) error {
 
 		if err == nil && permCount == 0 {
 			permSeeds := []struct{ id, cat, name, desc string }{
-				{"org.read", "Organization", "Read Organization", "Read organization details"},
-				{"org.update", "Organization", "Update Organization", "Update organization settings"},
-				{"org.delete", "Organization", "Delete Organization", "Delete organization"},
-				{"team.read", "Team", "View Members", "View members"},
-				{"team.invite", "Team", "Invite Members", "Invite members"},
-				{"team.write", "Team", "Modify Members", "Modify/remove members"},
-				{"billing.read", "Billing", "View Billing", "View billing"},
-				{"org.billing.read", "Billing", "View Organization Billing", "View org billing"},
-				{"billing.write", "Billing", "Modify Billing", "Modify payment/subscription"},
-				{"oauth.read", "OAuth Apps", "View OAuth Apps", "View OAuth applications"},
-				{"oauth.write", "OAuth Apps", "Manage OAuth Apps", "Create/Revoke OAuth applications"},
-				{"logs.read", "Logs", "View Audit Logs", "View audit logs"},
-				{"org.usage.read", "Logs", "View Usage", "View organization usage"},
-				{"org.audit", "Logs", "Export Audit Logs", "Export organization audit logs"},
+				{models.PermOrgRead, "Organization", "Read Organization", "Read organization details"},
+				{models.PermOrgUpdate, "Organization", "Update Organization", "Update organization settings"},
+				{models.PermOrgDelete, "Organization", "Delete Organization", "Delete organization"},
+				{models.PermTeamRead, "Team", "View Members", "View members"},
+				{models.PermTeamInvite, "Team", "Invite Members", "Invite members"},
+				{models.PermTeamWrite, "Team", "Modify Members", "Modify/remove members"},
+				{models.PermBillingRead, "Billing", "View Billing", "View billing"},
+				{models.PermOrgBillingRead, "Billing", "View Organization Billing", "View org billing"},
+				{models.PermBillingWrite, "Billing", "Modify Billing", "Modify payment/subscription"},
+				{models.PermOAuthRead, "OAuth Apps", "View OAuth Apps", "View OAuth applications"},
+				{models.PermOAuthWrite, "OAuth Apps", "Manage OAuth Apps", "Create/Revoke OAuth applications"},
+				{models.PermLogsRead, "Logs", "View Audit Logs", "View audit logs"},
+				{models.PermOrgUsageRead, "Logs", "View Usage", "View organization usage"},
+				{models.PermOrgAudit, "Logs", "Export Audit Logs", "Export organization audit logs"},
 			}
 			for _, p := range permSeeds {
 				_ = db.Exec("INSERT INTO permissions(id, category, name, description) VALUES(?, ?, ?, ?) ON CONFLICT (id) DO NOTHING", p.id, p.cat, p.name, p.desc).Error
@@ -661,11 +661,11 @@ func Run(db *gorm.DB) error {
 		}
 		seedRole("owner", "Owner", "系统所有者", allIDs)
 		// admin
-		seedRole("admin", "Administrator", "组织管理员", []string{"org.read", "team.read", "team.invite", "team.write", "oauth.read", "oauth.write", "billing.read", "logs.read", "org.audit"})
+		seedRole("admin", "Administrator", "组织管理员", []string{models.PermOrgRead, models.PermTeamRead, models.PermTeamInvite, models.PermTeamWrite, models.PermOAuthRead, models.PermOAuthWrite, models.PermBillingRead, models.PermLogsRead, models.PermOrgAudit})
 		// developer
-		seedRole("developer", "Developer", "开发者", []string{"oauth.read", "oauth.write", "logs.read"})
+		seedRole("developer", "Developer", "开发者", []string{models.PermOAuthRead, models.PermOAuthWrite, models.PermLogsRead})
 		// viewer
-		seedRole("viewer", "Viewer", "只读观察者", []string{"org.read", "team.read", "oauth.read", "billing.read", "logs.read"})
+		seedRole("viewer", "Viewer", "只读观察者", []string{models.PermOrgRead, models.PermTeamRead, models.PermOAuthRead, models.PermBillingRead, models.PermLogsRead})
 	}
 
 	// 平台管理员种子（仅当不存在时创建）
@@ -753,7 +753,7 @@ func Run(db *gorm.DB) error {
 			// 如果没有环境变量，生成一个随机的超长字符串作为兜底，反正前端也不需要知道
 			sysSecret := os.Getenv("SYS_PLAYGROUND_CLIENT_SECRET")
 			if sysSecret == "" {
-				sysSecret = utils.GenerateID() + utils.GenerateID() 
+				sysSecret = utils.GenerateID() + utils.GenerateID()
 			}
 			sysClient := models.OAuthClient{
 				ID:              "sys_web_console_playground", // 强行写入指定 ID
