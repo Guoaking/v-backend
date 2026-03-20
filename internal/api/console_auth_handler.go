@@ -327,7 +327,7 @@ func (h *ConsoleAuthHandler) GenerateSandboxToken(c *gin.Context) {
 	// 查找系统内置客户端
 	var sysClient models.OAuthClient
 	if err := h.service.DB.Where("id = ?", "sys_web_console_playground").First(&sysClient).Error; err != nil {
-		h.service.Logger.Errorf("无法找到系统内置客户端 sys_web_console_playground: %v", err)
+		logger.GetLogger().Errorf("无法找到系统内置客户端 sys_web_console_playground: %v", err)
 		JSONError(c, CodeInternalError, "系统配置错误，无法生成测试令牌")
 		return
 	}
@@ -345,7 +345,7 @@ func (h *ConsoleAuthHandler) GenerateSandboxToken(c *gin.Context) {
 
 	tokenString, err := token.SignedString([]byte(h.service.Config.Security.JWTSecret))
 	if err != nil {
-		h.service.Logger.Errorf("签名 Sandbox JWT 失败: %v", err)
+		logger.GetLogger().Errorf("签名 Sandbox JWT 失败: %v", err)
 		JSONError(c, CodeInternalError, "令牌生成失败")
 		return
 	}
