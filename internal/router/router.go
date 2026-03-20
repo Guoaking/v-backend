@@ -108,7 +108,7 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 		{
 			consoleHandler := api.NewConsoleHandler(kycService)
 			userAuthHandler := api.NewUserAuthHandler(kycService)
-			
+
 			// Sandbox / STS endpoint for playground
 			consoleAuthHandler := api.NewConsoleAuthHandler(kycService)
 			console.POST("/sandbox/token", consoleAuthHandler.GenerateSandboxToken)
@@ -138,11 +138,11 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 			clientHandler := api.NewClientHandler(kycService)
 			clients := console.Group("/oauth/clients")
 			clients.Use(middleware.RequireOrganizationHeader(kycService))
-			clients.POST("/register", middleware.RequirePermission("keys.write"), clientHandler.RegisterClient)
-			clients.GET("", middleware.RequirePermission("keys.read"), clientHandler.ListClients)
-			clients.DELETE(":client_id", middleware.RequirePermission("keys.write"), clientHandler.DeleteClient)
-			clients.POST(":id/rotate", middleware.RequirePermission("keys.write"), clientHandler.RotateClientSecret)
-			clients.PATCH(":id/status", middleware.RequirePermission("keys.write"), clientHandler.UpdateClientStatus)
+			clients.POST("/register", middleware.RequirePermission("oauth.write"), clientHandler.RegisterClient)
+			clients.GET("", middleware.RequirePermission("oauth.read"), clientHandler.ListClients)
+			clients.DELETE(":client_id", middleware.RequirePermission("oauth.write"), clientHandler.DeleteClient)
+			clients.POST(":id/rotate", middleware.RequirePermission("oauth.write"), clientHandler.RotateClientSecret)
+			clients.PATCH(":id/status", middleware.RequirePermission("oauth.write"), clientHandler.UpdateClientStatus)
 			clients.GET(":id/secret", middleware.JWTAuth(kycService), middleware.RequireOrganizationHeader(kycService), middleware.InjectOrgContext(), clientHandler.GetClientSecret)
 
 		}
