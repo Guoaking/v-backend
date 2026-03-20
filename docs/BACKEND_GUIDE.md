@@ -24,6 +24,8 @@
 
 - **API Contract First**:
   - Define Request/Response structs explicitly. No `map[string]any`.
+  - **CRITICAL**: ALL API responses MUST use the standard wrapper functions from `pkg/response/response.go` (e.g., `response.JSONSuccess`, `response.JSONError`, `response.JSONErrorWithStatus`).
+  - **PROHIBITED**: NEVER use raw `c.JSON()` or `c.AbortWithStatusJSON()` in any handlers or middleware. This breaks the unified response structure (`{code, message, timestamp, request_id, data/error}`) that frontend interceptors rely on.
   - Use standard `Code*` error constants.
 
 ## 3. Feature Development Checklist
