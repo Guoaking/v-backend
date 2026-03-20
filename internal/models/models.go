@@ -88,6 +88,10 @@ type OAuthClient struct {
 	UpdatedAt       time.Time      `json:"updated_at"`
 }
 
+func (OAuthClient) TableName() string {
+	return "oauth_clients"
+}
+
 // Organization 组织/租户表
 type Organization struct {
 	ID               string         `gorm:"primaryKey" json:"id"`

@@ -120,6 +120,23 @@ func executeSecurityAuditMigration(db *gorm.DB) error {
 func Run(db *gorm.DB) error {
 	log := logger.GetLogger()
 
+	err := db.AutoMigrate(
+		&models.Organization{},
+		&models.User{},
+		&models.OrganizationMember{},
+		&models.RolePermission{},
+		&models.APIKey{},
+		&models.OAuthClient{},
+		&models.GlobalConfig{},
+		&models.AuditLog{},
+		&models.OrganizationInvitation{},
+		&models.OrganizationQuotas{},
+		&models.Notification{},
+	)
+	if err != nil {
+		return fmt.Errorf("GORM 自动迁移失败: %v", err)
+	}
+
 	// 执行安全审计数据库迁移
 	log.Info("执行安全审计数据库迁移...")
 	// 确保pgcrypto扩展可用以支持gen_random_uuid()
@@ -426,6 +443,29 @@ func Run(db *gorm.DB) error {
 	}
 	if err := db.Exec(`ALTER TABLE api_request_logs ADD COLUMN IF NOT EXISTS api_key_owner_id UUID`).Error; err != nil {
 		log.Warnf("api_request_logs.api_key_owner_id 列创建失败: %v", err)
+	}
+
+	// Create oauth_clients if it completely doesn't exist
+	if err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS oauth_clients (
+			id TEXT PRIMARY KEY,
+			secret TEXT NOT NULL,
+			name TEXT NOT NULL,
+			description TEXT,
+			redirect_uri TEXT,
+			scopes TEXT,
+			status TEXT DEFAULT 'active',
+			org_id TEXT,
+			owner_id TEXT,
+			token_ttl_seconds INT DEFAULT 3600,
+			ip_whitelist TEXT[] DEFAULT '{}'::text[],
+			rate_limit_per_sec INTEGER DEFAULT 0,
+			is_system BOOLEAN DEFAULT false,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+		);
+	`).Error; err != nil {
+		log.Warnf("创建oauth_clients表失败: %v", err)
 	}
 
 	// 扩展 oauth_clients 表以支持IP白名单与速率限制
