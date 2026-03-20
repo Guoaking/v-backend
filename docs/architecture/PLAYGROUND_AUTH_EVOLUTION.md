@@ -131,6 +131,31 @@
    - 如果是正常的 Web 模式或扫描生成的 Demo 二维码（无外部 Token），在进入页面时自动调用后端的 STS 端点换取短效 JWT。
 3. **代码生成器更新**: 右侧的 Code Snippet 不再展示具体的 API Key，而是展示示例代码，引导用户使用正式的 Client ID/Secret 进行初始化。
 4. **权限降级 UI (OAuth/API Keys 页面)**:
-   - 引入 `PermissionContext` 校验。
-   - 针对 Viewer 展示“锁定/无权限”的 Empty State。
+   - 引入 `PermissionContext` 校验 (`can('oauth.read')` / `can('keys.read')`)。
+   - 针对无权限角色展示“锁定/无权限”的 Empty State。
    - 实现 Secret 的“Create-Once Display”弹窗逻辑，列表仅渲染 `mask_secret`。
+
+## 5. 关于设计的取舍与释疑
+
+### 5.1 为什么一定要新增 `/api/v1/console/sandbox/token`？能复用已有的 OAuth 接口吗？
+
+**不能复用，两者在本质上是互斥的。**
+
+- 现有的 `/oauth/token` 是标准的 OAuth 2.0 接口，它要求客户端在请求头中传入 `Basic Base64(ClientID:ClientSecret)`。前端在浏览器中**绝对不能**持有 `sys_web_console_playground` 的 Secret。
+- 如果我们让前端发请求给后端，后端再去调自己的 `/oauth/token`，这在微服务内部叫做“自己调自己”，会产生不必要的 HTTP 网络开销和回环。
+- **最佳实践 (STS 模式)**：新增一个专用于 Console 环境的 `sandbox/token` 接口。这个接口**依赖用户的 Cookie/Session 鉴权**，在后端内存中直接使用系统 Secret 签发 JWT 返回给前端。这既保证了 Secret 不泄露，又保证了架构的纯粹性。
+
+### 5.2 RBAC 权限控制是写死的还是可配置的？
+
+**是完全动态可配置的。**
+
+在前面的落地方案中，我们提到针对 Viewer 和 Editor 做判断。但在实际的底层实现中，这**并不是硬编码 (`if role == "viewer"`)**。
+
+基于我们已有的 `RBAC_DESIGN.md` 和数据库表结构（`roles`, `permissions`, `role_permissions`）：
+
+1. 数据库中定义了 `oauth.read`, `oauth.write`, `keys.read`, `keys.write` 等细粒度 Permission 节点。
+2. 系统初始化时（`migration.go`），将这些节点动态绑定到 `owner`, `admin`, `developer`, `viewer` 等角色上。例如，`viewer` 角色并没有绑定 `keys.read` 权限。
+3. 当用户登录时，后端会将用户所拥有的 Permissions 列表打包进 JWT 或 Session 中返回给前端。
+4. **前端判断**：前端使用 `PermissionContext` (如 `can('keys.read')`) 来判断是否渲染列表或渲染 Empty State，而不是判断 `role === 'viewer'`。
+5. **后端判断**：后端使用 `RequirePermission("keys.read")` 中间件拦截请求。
+6. **未来演进**：如果未来大客户要求自定义角色（比如创建一个“安全审计员”角色），只需要在数据库中给这个新角色勾选 `keys.read`，无需修改任何前后端代码，他就能看到凭证列表了。

@@ -194,15 +194,27 @@ func (h *ClientHandler) ListClients(c *gin.Context) {
 		q = q.Where("org_id = ?", orgID)
 	}
 	
+	// Check dynamic permissions
+	perms, _ := c.Get("permissions")
+	permList, _ := perms.([]string)
+	canRead := false
+	for _, p := range permList {
+		if p == "oauth.read" || p == "*" {
+			canRead = true
+			break
+		}
+	}
+	
+	if !canRead {
+		c.JSON(http.StatusOK, []ClientListResponse{})
+		return
+	}
+
 	role := c.GetString("orgRole")
 	if role == "editor" || role == "developer" {
 		// Editors can only see their own clients
 		userID := c.GetString("userID")
 		q = q.Where("owner_id = ?", userID)
-	} else if role == "viewer" || role == "member" {
-		// Viewers cannot see any clients
-		c.JSON(http.StatusOK, []ClientListResponse{})
-		return
 	}
 
 	if search != "" {
