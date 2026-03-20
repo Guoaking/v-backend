@@ -1,20 +1,13 @@
 package middleware
 
 import (
-	"net/http"
-	"time"
+	"kyc-service/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
 
 func forbiddenJSON(c *gin.Context, err string) {
-	c.JSON(http.StatusForbidden, gin.H{
-		"code":       1002,
-		"message":    "权限不足",
-		"error":      err,
-		"timestamp":  time.Now().UnixMilli(),
-		"request_id": c.GetString("request_id"),
-	})
+	response.JSONError(c, response.CodeForbidden, err)
 }
 
 // RequireRole 要求特定角色权限的中间件

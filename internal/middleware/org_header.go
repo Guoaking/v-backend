@@ -2,11 +2,11 @@ package middleware
 
 import (
 	"context"
-	"net/http"
 	"time"
 
 	"kyc-service/internal/models"
 	"kyc-service/internal/service"
+	"kyc-service/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -15,39 +15,21 @@ func RequireOrganizationHeader(svc *service.KYCService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		orgID := c.GetHeader("X-Organization-ID")
 		if orgID == "" {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"code":       1007,
-				"message":    "缺少必要参数",
-				"error":      "Missing X-Organization-ID header",
-				"timestamp":  time.Now().UnixMilli(),
-				"request_id": c.GetString("request_id"),
-			})
+			response.JSONError(c, response.CodeMissingParameter, "Missing X-Organization-ID header")
 			c.Abort()
 			return
 		}
 
 		userID := c.GetString("userID")
 		if userID == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"code":       1001,
-				"message":    "未授权访问",
-				"error":      "Missing user context",
-				"timestamp":  time.Now().UnixMilli(),
-				"request_id": c.GetString("request_id"),
-			})
+			response.JSONError(c, response.CodeUnauthorized, "Missing user context")
 			c.Abort()
 			return
 		}
 
 		var user models.User
 		if err := svc.DB.Where("id = ?", userID).First(&user).Error; err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"code":       1001,
-				"message":    "未授权访问",
-				"error":      "User not found",
-				"timestamp":  time.Now().UnixMilli(),
-				"request_id": c.GetString("request_id"),
-			})
+			response.JSONError(c, response.CodeUnauthorized, "User not found")
 			c.Abort()
 			return
 		}
@@ -55,13 +37,7 @@ func RequireOrganizationHeader(svc *service.KYCService) gin.HandlerFunc {
 		var member models.OrganizationMember
 		if !user.IsPlatformAdmin {
 			if err := svc.DB.Where("organization_id = ? AND user_id = ?", orgID, userID).First(&member).Error; err != nil {
-				c.JSON(http.StatusForbidden, gin.H{
-					"code":       1002,
-					"message":    "权限不足",
-					"error":      "User is not a member of this organization",
-					"timestamp":  time.Now().UnixMilli(),
-					"request_id": c.GetString("request_id"),
-				})
+				response.JSONError(c, response.CodeForbidden, "Not a member of this organization")
 				c.Abort()
 				return
 			}
@@ -70,21 +46,13 @@ func RequireOrganizationHeader(svc *service.KYCService) gin.HandlerFunc {
 		if svc.Redis != nil {
 			_ = svc.Redis.Del(context.Background(), "").Err() // noop to ensure client usable
 			if res := svc.Redis.Get(context.Background(), "suspended:"+orgID+":"+userID).Val(); res != "" {
-				c.JSON(403, gin.H{"code": 1002, "message": "权限不足", "error": "Account Suspended", "timestamp": time.Now().UnixMilli(), "request_id": c.GetString("request_id"), "path": c.Request.URL.Path, "method": c.Request.Method})
+				response.JSONError(c, response.CodeForbidden, "Account Suspended")
 				c.Abort()
 				return
 			}
 		}
 		if !user.IsPlatformAdmin && member.Status != "active" {
-			c.JSON(403, gin.H{
-				"code":       1002,
-				"message":    "权限不足",
-				"error":      "Account Suspended",
-				"timestamp":  time.Now().UnixMilli(),
-				"request_id": c.GetString("request_id"),
-				"path":       c.Request.URL.Path,
-				"method":     c.Request.Method,
-			})
+			response.JSONError(c, response.CodeForbidden, "Organization membership is inactive")
 			c.Abort()
 			return
 		}

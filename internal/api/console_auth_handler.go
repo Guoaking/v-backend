@@ -242,6 +242,7 @@ func (h *ConsoleAuthHandler) Login(c *gin.Context) { // ignore_security_alert
 		Permissions:     permIDs,
 	}
 
+	//JSONSuccess(c, userProfile)
 	JSONSuccess(c, ConsoleLoginResponse{AccessToken: accessToken, User: userProfile})
 }
 

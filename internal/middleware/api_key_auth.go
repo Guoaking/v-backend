@@ -2,13 +2,13 @@ package middleware
 
 import (
 	"net"
-	"net/http"
 	"strings"
 	"time"
 
 	"kyc-service/internal/service"
 	"kyc-service/pkg/crypto"
 	"kyc-service/pkg/logger"
+	"kyc-service/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -19,11 +19,7 @@ func APIKeyAuth(service *service.KYCService) gin.HandlerFunc {
 		// 获取Authorization头
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			c.JSON(401, gin.H{
-				"success": false,
-				"error":   "Missing authorization header",
-				"code":    "AUTH_MISSING",
-			})
+			response.JSONError(c, response.CodeUnauthorized, "Missing authorization header")
 			c.Abort()
 			return
 		}
@@ -31,11 +27,7 @@ func APIKeyAuth(service *service.KYCService) gin.HandlerFunc {
 		// 检查Bearer格式
 		parts := strings.Split(authHeader, " ")
 		if len(parts) != 2 || parts[0] != "Bearer" {
-			c.JSON(401, gin.H{
-				"success": false,
-				"error":   "Invalid authorization header format",
-				"code":    "AUTH_INVALID_FORMAT",
-			})
+			response.JSONError(c, response.CodeUnauthorized, "Invalid authorization header format")
 			c.Abort()
 			return
 		}
@@ -48,13 +40,7 @@ func APIKeyAuth(service *service.KYCService) gin.HandlerFunc {
 
 		if err != nil {
 			logger.GetLogger().WithError(err).Error("API key查询失败")
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"code":       1001,
-				"message":    "Unauthorized",
-				"error":      "Invalid API key",
-				"timestamp":  time.Now().UnixMilli(),
-				"request_id": c.GetString("request_id"),
-			})
+			response.JSONError(c, response.CodeUnauthorized, "Invalid API key")
 			c.Abort()
 			return
 		}
@@ -64,34 +50,16 @@ func APIKeyAuth(service *service.KYCService) gin.HandlerFunc {
 		case "active":
 			// ok
 		case "rate_limited":
-			c.JSON(http.StatusTooManyRequests, gin.H{
-				"code":       1005,
-				"message":    "Too Many Requests",
-				"error":      "Rate limit exceeded",
-				"timestamp":  time.Now().UnixMilli(),
-				"request_id": c.GetString("request_id"),
-			})
+			response.JSONError(c, response.CodeTooManyRequests, "Rate limit exceeded")
 			c.Abort()
 			return
 		case "quota_exceeded":
-			c.JSON(http.StatusTooManyRequests, gin.H{
-				"code":       1005,
-				"message":    "Too Many Requests",
-				"error":      "Quota exceeded",
-				"timestamp":  time.Now().UnixMilli(),
-				"request_id": c.GetString("request_id"),
-			})
+			response.JSONError(c, response.CodeTooManyRequests, "Quota exceeded")
 			c.Abort()
 			return
 		default:
 			// revoked or unknown
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"code":       1001,
-				"message":    "Unauthorized",
-				"error":      "API key is revoked",
-				"timestamp":  time.Now().UnixMilli(),
-				"request_id": c.GetString("request_id"),
-			})
+			response.JSONError(c, response.CodeForbidden, "API key is not active")
 			c.Abort()
 			return
 		}
@@ -100,13 +68,7 @@ func APIKeyAuth(service *service.KYCService) gin.HandlerFunc {
 		if len(key.IPWhitelist) > 0 {
 			clientIP := c.ClientIP()
 			if !isIPAllowed(clientIP, key.IPWhitelist) {
-				c.JSON(http.StatusForbidden, gin.H{
-					"code":       1002,
-					"message":    "Forbidden",
-					"error":      "IP not allowed",
-					"timestamp":  time.Now().UnixMilli(),
-					"request_id": c.GetString("request_id"),
-				})
+				response.JSONError(c, response.CodeForbidden, "IP not allowed")
 				c.Abort()
 				return
 			}
@@ -126,13 +88,7 @@ func APIKeyAuth(service *service.KYCService) gin.HandlerFunc {
 		// 获取用户信息
 		user, err := service.GetUserByID(key.UserID)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"code":       1001,
-				"message":    "Unauthorized",
-				"error":      "User not found",
-				"timestamp":  time.Now().UnixMilli(),
-				"request_id": c.GetString("request_id"),
-			})
+			response.JSONError(c, response.CodeUnauthorized, "User not found")
 			c.Abort()
 			return
 		}
@@ -151,13 +107,7 @@ func APIKeyAuth(service *service.KYCService) gin.HandlerFunc {
 				orgID = user.OrgID
 			}
 			if orgID == "" {
-				c.JSON(http.StatusUnauthorized, gin.H{
-					"code":       1001,
-					"message":    "Unauthorized",
-					"error":      "Organization not found",
-					"timestamp":  time.Now().UnixMilli(),
-					"request_id": c.GetString("request_id"),
-				})
+				response.JSONError(c, response.CodeUnauthorized, "Organization not found")
 				c.Abort()
 				return
 			}

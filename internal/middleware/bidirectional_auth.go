@@ -10,6 +10,7 @@ import (
 
 	"kyc-service/pkg/logger"
 	"kyc-service/pkg/metrics"
+	"kyc-service/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -47,37 +48,28 @@ func (b *BidirectionalAuth) KongAuthMiddleware() gin.HandlerFunc {
 		if kongSignature == "" || kongTimestamp == "" || kongService == "" {
 			logger.GetLogger().Error("缺少Kong网关认证信息")
 			metrics.RecordServiceAuthFailure()
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "缺少网关认证信息",
-				"code":  "KONG_AUTH_MISSING",
-			})
+			response.JSONError(c, response.CodeUnauthorized, "缺少网关认证信息")
 			c.Abort()
 			return
 		}
 
-		// 验证时间戳（防止重放攻击）
+		// 验证时间戳 (防止重放攻击)
 		timestamp, err := time.Parse(time.RFC3339, kongTimestamp)
 		if err != nil {
 			logger.GetLogger().WithError(err).Error("Kong时间戳格式错误")
 			metrics.RecordServiceAuthFailure()
 			metrics.RecordTimestampExpired()
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "网关时间戳格式错误",
-				"code":  "KONG_TIMESTAMP_INVALID",
-			})
+			response.JSONError(c, response.CodeUnauthorized, "网关时间戳格式错误")
 			c.Abort()
 			return
 		}
 
-		// 检查时间戳是否在有效范围内（5分钟）
+		// 检查时间戳是否在有效范围内 (5分钟)
 		if time.Since(timestamp) > 5*time.Minute || time.Since(timestamp) < -5*time.Minute {
 			logger.GetLogger().Error("Kong时间戳超出有效范围")
 			metrics.RecordServiceAuthFailure()
 			metrics.RecordTimestampExpired()
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "网关时间戳超出有效范围",
-				"code":  "KONG_TIMESTAMP_EXPIRED",
-			})
+			response.JSONError(c, response.CodeUnauthorized, "网关时间戳超出有效范围")
 			c.Abort()
 			return
 		}
@@ -87,10 +79,7 @@ func (b *BidirectionalAuth) KongAuthMiddleware() gin.HandlerFunc {
 			logger.GetLogger().Error("Kong网关签名验证失败")
 			metrics.RecordServiceAuthFailure()
 			metrics.RecordInvalidSignature()
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "网关签名验证失败",
-				"code":  "KONG_SIGNATURE_INVALID",
-			})
+			response.JSONError(c, response.CodeUnauthorized, "网关签名验证失败")
 			c.Abort()
 			return
 		}

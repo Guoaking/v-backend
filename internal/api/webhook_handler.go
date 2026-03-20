@@ -13,3 +13,6 @@ func NewWebhookHandler(s *service.KYCService) *WebhookHandler { return &WebhookH
 func (h *WebhookHandler) ListWebhooks(c *gin.Context) {
 	JSONSuccess(c, gin.H{"items": []gin.H{}})
 }
+
+func (h *WebhookHandler) VerifySignature(c *gin.Context) {
+}

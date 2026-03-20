@@ -3,13 +3,13 @@ package middleware
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"strings"
 	"time"
 
 	"kyc-service/internal/models"
 	"kyc-service/pkg/crypto"
 	"kyc-service/pkg/logger"
+	"kyc-service/pkg/response"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -106,8 +106,8 @@ func (s *SecurityMiddleware) PIIProtection() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 检查请求中是否包含敏感信息
 		if err := s.checkSensitiveData(c); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "请求包含非法敏感信息"})
-			c.Abort()
+			response.JSONError(c, response.CodeInvalidParameter, "请求包含非法敏感信息")
+			c.Abort() // 终止请求
 			return
 		}
 

@@ -10,7 +10,7 @@ func NewDiscoveryHandler() *DiscoveryHandler { return &DiscoveryHandler{} }
 
 func (h *DiscoveryHandler) WellKnown(c *gin.Context) {
 	base := "/api/v1"
-	c.JSON(200, gin.H{
+	JSONSuccess(c, gin.H{
 		"issuer":                   "kyc-service",
 		"token_endpoint":           base + "/oauth/token",
 		"revocation_endpoint":      base + "/oauth/revoke",
@@ -23,5 +23,5 @@ func (h *DiscoveryHandler) WellKnown(c *gin.Context) {
 }
 
 func (h *DiscoveryHandler) JWKS(c *gin.Context) {
-	c.JSON(200, gin.H{"keys": []interface{}{}})
+	JSONSuccess(c, gin.H{"keys": []interface{}{}})
 }

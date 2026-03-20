@@ -187,13 +187,13 @@ func (h *ClientHandler) ListClients(c *gin.Context) {
 		}
 	}
 	search := strings.TrimSpace(c.Query("q"))
-	
+
 	// Hide system clients and apply role-based filtering
 	q := h.service.DB.Where("status = ? AND is_system = ?", "active", false)
 	if orgID != "" {
 		q = q.Where("org_id = ?", orgID)
 	}
-	
+
 	// Check dynamic permissions
 	perms, _ := c.Get("permissions")
 	permList, _ := perms.([]string)
@@ -204,7 +204,7 @@ func (h *ClientHandler) ListClients(c *gin.Context) {
 			break
 		}
 	}
-	
+
 	if !canRead {
 		c.JSON(http.StatusOK, []ClientListResponse{})
 		return
@@ -222,7 +222,7 @@ func (h *ClientHandler) ListClients(c *gin.Context) {
 	}
 	if err := q.Order("created_at DESC").Limit(pageSize).Offset((page - 1) * pageSize).Find(&clients).Error; err != nil {
 		logger.GetLogger().WithError(err).Error("list clients failed")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to list clients"})
+		JSONError(c, CodeInternalError, "Failed to list clients")
 		return
 	}
 
@@ -239,7 +239,7 @@ func (h *ClientHandler) ListClients(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, response)
+	JSONSuccess(c, response)
 }
 
 // DeleteClient

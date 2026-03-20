@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"kyc-service/pkg/logger"
+	"kyc-service/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -30,13 +31,15 @@ func ErrorHandler() gin.HandlerFunc {
 
 			// 如果还没有响应，返回统一的错误响应
 			if !c.Writer.Written() {
-				// 转换为标准响应结构
-				c.JSON(-1, gin.H{
+				// 使用通用的JSON响应，避免循环导入
+				c.JSON(c.Writer.Status(), gin.H{
 					"code":       getErrorCode(c.Writer.Status()),
 					"message":    getErrorMessage(c.Writer.Status()),
 					"error":      err.Error(),
 					"timestamp":  time.Now().UnixMilli(),
 					"request_id": c.GetString("request_id"),
+					"path":       c.Request.URL.Path,
+					"method":     c.Request.Method,
 				})
 			}
 		}
@@ -58,15 +61,7 @@ func Recovery() gin.HandlerFunc {
 				}).Error("系统发生panic")
 
 				// 返回统一的错误响应
-				c.JSON(500, gin.H{
-					"code":       5000,
-					"message":    "系统内部错误",
-					"error":      "系统内部错误，请联系管理员",
-					"timestamp":  time.Now().UnixMilli(),
-					"request_id": c.GetString("request_id"),
-					"path":       c.Request.URL.Path,
-					"method":     c.Request.Method,
-				})
+				response.JSONError(c, response.CodeInternalError, "系统内部错误，请联系管理员")
 				c.Abort()
 			}
 		}()

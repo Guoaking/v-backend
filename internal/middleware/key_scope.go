@@ -2,9 +2,9 @@ package middleware
 
 import (
 	"encoding/json"
-	"net/http"
 	"strings"
-	"time"
+
+	"kyc-service/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -27,13 +27,7 @@ func RequireKeyScope(required string) gin.HandlerFunc {
 			}
 		}
 		if !has {
-			c.JSON(http.StatusForbidden, gin.H{
-				"code":       1002,
-				"message":    "权限不足",
-				"error":      "API key lacks required scope",
-				"timestamp":  time.Now().UnixMilli(),
-				"request_id": c.GetString("request_id"),
-			})
+			response.JSONError(c, response.CodeForbidden, "API key lacks required scope")
 			c.Abort()
 			return
 		}

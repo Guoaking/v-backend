@@ -125,7 +125,7 @@ func (h *DocsHandler) ErrorCodesDoc(c *gin.Context) {
 			name = "CodeEncryptionError"
 		}
 		entry := ErrorCodeEntry{Code: code, Name: name, Message: response.ResponseMessage[code], HTTPStatus: response.GetHTTPStatusCode(code)}
-	switch {
+		switch {
 		case code >= 1000 && code < 2000:
 			out.Client = append(out.Client, entry)
 		case code >= 2000 && code < 3000:

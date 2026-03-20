@@ -6,6 +6,7 @@ import (
 
 	"kyc-service/internal/models"
 	"kyc-service/internal/service"
+	"kyc-service/pkg/response"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -17,13 +18,7 @@ func JWTAuth(service *service.KYCService) gin.HandlerFunc {
 		// 获取Authorization头
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			c.JSON(401, gin.H{
-				"code":       1001,
-				"message":    "未授权访问",
-				"error":      "Missing authorization header",
-				"timestamp":  time.Now().UnixMilli(),
-				"request_id": c.GetString("request_id"),
-			})
+			response.JSONError(c, response.CodeUnauthorized, "Missing authorization header")
 			c.Abort()
 			return
 		}
@@ -31,13 +26,7 @@ func JWTAuth(service *service.KYCService) gin.HandlerFunc {
 		// 检查Bearer格式
 		parts := strings.Split(authHeader, " ")
 		if len(parts) != 2 || parts[0] != "Bearer" {
-			c.JSON(401, gin.H{
-				"code":       1001,
-				"message":    "未授权访问",
-				"error":      "Invalid authorization header format",
-				"timestamp":  time.Now().UnixMilli(),
-				"request_id": c.GetString("request_id"),
-			})
+			response.JSONError(c, response.CodeUnauthorized, "Invalid authorization header format")
 			c.Abort()
 			return
 		}
@@ -61,6 +50,8 @@ func JWTAuth(service *service.KYCService) gin.HandlerFunc {
 				"error":      "Invalid or expired token",
 				"timestamp":  time.Now().UnixMilli(),
 				"request_id": c.GetString("request_id"),
+				"path":       c.Request.URL.Path,
+				"method":     c.Request.Method,
 			})
 			c.Abort()
 			return
@@ -75,6 +66,8 @@ func JWTAuth(service *service.KYCService) gin.HandlerFunc {
 				"error":      "Invalid token claims",
 				"timestamp":  time.Now().UnixMilli(),
 				"request_id": c.GetString("request_id"),
+				"path":       c.Request.URL.Path,
+				"method":     c.Request.Method,
 			})
 			c.Abort()
 			return
@@ -89,6 +82,8 @@ func JWTAuth(service *service.KYCService) gin.HandlerFunc {
 					"error":      "Token has expired",
 					"timestamp":  time.Now().UnixMilli(),
 					"request_id": c.GetString("request_id"),
+					"path":       c.Request.URL.Path,
+					"method":     c.Request.Method,
 				})
 				c.Abort()
 				return
@@ -104,6 +99,8 @@ func JWTAuth(service *service.KYCService) gin.HandlerFunc {
 				"error":      "Invalid user ID in token",
 				"timestamp":  time.Now().UnixMilli(),
 				"request_id": c.GetString("request_id"),
+				"path":       c.Request.URL.Path,
+				"method":     c.Request.Method,
 			})
 			c.Abort()
 			return
@@ -118,6 +115,8 @@ func JWTAuth(service *service.KYCService) gin.HandlerFunc {
 				"error":      "User not found or inactive",
 				"timestamp":  time.Now().UnixMilli(),
 				"request_id": c.GetString("request_id"),
+				"path":       c.Request.URL.Path,
+				"method":     c.Request.Method,
 			})
 			c.Abort()
 			return
