@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -48,15 +49,24 @@ type ClientRegistrationResponse struct {
 	OwnerID      string    `json:"owner_id"`
 }
 
+// ClientOwnerInfo 客户端负责人信息
+type ClientOwnerInfo struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Email     string `json:"email"`
+	AvatarURL string `json:"avatar"`
+}
+
 // ClientListResponse 客户端列表响应
 type ClientListResponse struct {
-	ID          string    `json:"client_id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	RedirectURI string    `json:"redirect_uri"`
-	Scopes      string    `json:"scopes"`
-	Status      string    `json:"status"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID          string           `json:"client_id"`
+	Name        string           `json:"name"`
+	Description string           `json:"description"`
+	RedirectURI string           `json:"redirect_uri"`
+	Scopes      string           `json:"scopes"`
+	Status      string           `json:"status"`
+	CreatedAt   time.Time        `json:"created_at"`
+	Owner       *ClientOwnerInfo `json:"owner,omitempty"`
 }
 
 // RegisterClient 注册OAuth客户端
@@ -172,7 +182,6 @@ func (h *ClientHandler) RegisterClient(c *gin.Context) {
 // @Failure 500 {object} map[string]string
 // @Router /clients [get]
 func (h *ClientHandler) ListClients(c *gin.Context) {
-	var clients []models.OAuthClient
 	orgID := c.GetString("orgID")
 	page := 1
 	pageSize := 20
@@ -189,9 +198,13 @@ func (h *ClientHandler) ListClients(c *gin.Context) {
 	search := strings.TrimSpace(c.Query("q"))
 
 	// Hide system clients and apply role-based filtering
-	q := h.service.DB.Where("status = ? AND is_system = ?", "active", false)
+	q := h.service.DB.Table("oauth_clients").
+		Select("oauth_clients.*, users.id as user_id, users.full_name as user_name, users.email as user_email, users.avatar_url as user_avatar").
+		Joins("LEFT JOIN users ON users.id = oauth_clients.owner_id").
+		Where("oauth_clients.status = ? AND oauth_clients.is_system = ?", "active", false)
+
 	if orgID != "" {
-		q = q.Where("org_id = ?", orgID)
+		q = q.Where("oauth_clients.org_id = ?", orgID)
 	}
 
 	// Check dynamic permissions
@@ -206,7 +219,7 @@ func (h *ClientHandler) ListClients(c *gin.Context) {
 	}
 
 	if !canRead {
-		c.JSON(http.StatusOK, []ClientListResponse{})
+		JSONSuccess(c, []ClientListResponse{})
 		return
 	}
 
@@ -214,28 +227,47 @@ func (h *ClientHandler) ListClients(c *gin.Context) {
 	if role == "editor" || role == "developer" {
 		// Editors can only see their own clients
 		userID := c.GetString("userID")
-		q = q.Where("owner_id = ?", userID)
+		q = q.Where("oauth_clients.owner_id = ?", userID)
 	}
 
 	if search != "" {
-		q = q.Where("name ILIKE ? OR redirect_uri ILIKE ?", "%"+search+"%", "%"+search+"%")
+		q = q.Where("oauth_clients.name ILIKE ? OR oauth_clients.redirect_uri ILIKE ?", "%"+search+"%", "%"+search+"%")
 	}
-	if err := q.Order("created_at DESC").Limit(pageSize).Offset((page - 1) * pageSize).Find(&clients).Error; err != nil {
+
+	// Define a custom struct to scan JOIN results
+	type ClientWithUser struct {
+		models.OAuthClient
+		UserID     string
+		UserName   string
+		UserEmail  string
+		UserAvatar string
+	}
+
+	var results []ClientWithUser
+	if err := q.Order("oauth_clients.created_at DESC").Limit(pageSize).Offset((page - 1) * pageSize).Find(&results).Error; err != nil {
 		logger.GetLogger().WithError(err).Error("list clients failed")
 		JSONError(c, CodeInternalError, "Failed to list clients")
 		return
 	}
 
-	response := make([]ClientListResponse, len(clients))
-	for i, client := range clients {
+	response := make([]ClientListResponse, len(results))
+	for i, r := range results {
 		response[i] = ClientListResponse{
-			ID:          client.ID,
-			Name:        client.Name,
-			Description: client.Description,
-			RedirectURI: client.RedirectURI,
-			Scopes:      client.Scopes,
-			Status:      client.Status,
-			CreatedAt:   client.CreatedAt,
+			ID:          r.ID,
+			Name:        r.Name,
+			Description: r.Description,
+			RedirectURI: r.RedirectURI,
+			Scopes:      r.Scopes,
+			Status:      r.Status,
+			CreatedAt:   r.CreatedAt,
+		}
+		if r.UserID != "" {
+			response[i].Owner = &ClientOwnerInfo{
+				ID:        r.UserID,
+				Name:      r.UserName,
+				Email:     r.UserEmail,
+				AvatarURL: r.UserAvatar,
+			}
 		}
 	}
 
@@ -256,25 +288,38 @@ func (h *ClientHandler) ListClients(c *gin.Context) {
 func (h *ClientHandler) DeleteClient(c *gin.Context) {
 	clientID := c.Param("client_id")
 	if clientID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Client ID must not be empty"})
+		JSONError(c, CodeInvalidParameter, "Client ID must not be empty")
 		return
 	}
 
 	// 删除客户端
 	orgID := c.GetString("orgID")
-	q := h.service.DB.Where("id = ?", clientID)
+	q := h.service.DB.Where("id = ? AND is_system = ?", clientID, false)
 	if orgID != "" {
 		q = q.Where("org_id = ?", orgID)
 	}
-	if err := q.Delete(&models.OAuthClient{}).Error; err != nil {
-		logger.GetLogger().WithError(err).Error("delete client failed")
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete client"})
+
+	// RBAC Check: Developer/Editor can only delete their own clients
+	role := c.GetString("orgRole")
+	if role == "editor" || role == "developer" {
+		userID := c.GetString("userID")
+		q = q.Where("owner_id = ?", userID)
+	}
+
+	result := q.Delete(&models.OAuthClient{})
+	if result.Error != nil {
+		logger.GetLogger().WithError(result.Error).Error("delete client failed")
+		JSONError(c, CodeInternalError, "Failed to delete client")
+		return
+	}
+	if result.RowsAffected == 0 {
+		JSONError(c, CodeNotFound, "Client not found or you don't have permission to delete it")
 		return
 	}
 
 	// 记录删除审计日志
 	h.service.RecordAuditLog(c, "client.delete", "client", clientID, "success", "client deleted")
-	c.JSON(http.StatusOK, gin.H{"message": "Client deleted"})
+	JSONSuccess(c, gin.H{"message": "Client deleted"})
 }
 
 type RotateSecretResponse struct {
@@ -282,30 +327,194 @@ type RotateSecretResponse struct {
 	ClientSecret string `json:"client_secret"`
 }
 
+type TransferClientRequest struct {
+	NewOwnerID string `json:"new_owner_id" binding:"required"`
+}
+
+func (h *ClientHandler) TransferClientOwnership(c *gin.Context) {
+	clientID := c.Param("id")
+	if clientID == "" {
+		JSONError(c, CodeInvalidParameter, "Client ID must not be empty")
+		return
+	}
+
+	var req TransferClientRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		JSONError(c, CodeInvalidParameter, "Invalid request body")
+		return
+	}
+
+	orgID := c.GetString("orgID")
+
+	// Only Admin or Owner can transfer clients
+	role := c.GetString("orgRole")
+	if role != "admin" && role != "owner" {
+		JSONError(c, CodeForbidden, "Only administrators can transfer client ownership")
+		return
+	}
+
+	// 1. Verify that the new owner is an active member of this organization
+	var member models.OrganizationMember
+	if err := h.service.DB.Where("organization_id = ? AND user_id = ? AND status = ?", orgID, req.NewOwnerID, "active").First(&member).Error; err != nil {
+		JSONError(c, CodeInvalidParameter, "The new owner must be an active member of this organization")
+		return
+	}
+
+	// 2. Perform the transfer
+	result := h.service.DB.Model(&models.OAuthClient{}).
+		Where("id = ? AND org_id = ? AND is_system = ?", clientID, orgID, false).
+		Update("owner_id", req.NewOwnerID)
+
+	if result.Error != nil {
+		logger.GetLogger().WithError(result.Error).Error("transfer client failed")
+		JSONError(c, CodeInternalError, "Failed to transfer client ownership")
+		return
+	}
+
+	if result.RowsAffected == 0 {
+		JSONError(c, CodeNotFound, "Client not found in this organization")
+		return
+	}
+
+	h.service.RecordAuditLog(c, "client.transfer", "client", clientID, "success", fmt.Sprintf("transferred to user %s", req.NewOwnerID))
+	JSONSuccess(c, gin.H{"message": "Client ownership transferred successfully"})
+}
+
+// RotateClientSecret
+// @Summary Rotate OAuth client secret
+// @Description Generate a new client secret and optionally invalidate the old one immediately
+// @Tags Client Management
+// @Accept json
+// @Produce json
+// @Param id path string true "Client ID"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /clients/{id}/rotate [post]
 func (h *ClientHandler) RotateClientSecret(c *gin.Context) {
 	clientID := c.Param("id")
 	if clientID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Client ID must not be empty"})
+		JSONError(c, CodeInvalidParameter, "Client ID must not be empty")
 		return
 	}
+
 	orgID := c.GetString("orgID")
-	var client models.OAuthClient
-	q := h.service.DB.Where("id = ?", clientID)
+	q := h.service.DB.Model(&models.OAuthClient{}).Where("id = ? AND is_system = ?", clientID, false)
 	if orgID != "" {
 		q = q.Where("org_id = ?", orgID)
 	}
+
+	// RBAC Check: Developer/Editor can only rotate their own clients
+	role := c.GetString("orgRole")
+	if role == "editor" || role == "developer" {
+		userID := c.GetString("userID")
+		q = q.Where("owner_id = ?", userID)
+	}
+
+	// check if client exists
+	var client models.OAuthClient
 	if err := q.First(&client).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Client not found"})
+		JSONError(c, CodeNotFound, "Client not found or you don't have permission to modify it")
 		return
 	}
+
 	newSecret := uuid.New().String()
-	client.Secret = newSecret
-	if err := h.service.DB.Save(&client).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Secret rotation failed"})
+	if err := h.service.DB.Model(&client).Update("secret", newSecret).Error; err != nil {
+		logger.GetLogger().WithError(err).Error("rotate client secret failed")
+		JSONError(c, CodeInternalError, "Failed to rotate client secret")
 		return
 	}
-	h.service.RecordAuditLog(c, "client.rotate_secret", "client", clientID, "success", "")
-	c.JSON(http.StatusOK, RotateSecretResponse{ClientID: clientID, ClientSecret: newSecret})
+
+	h.service.RecordAuditLog(c, "client.rotate_secret", "client", clientID, "success", "client secret rotated")
+	JSONSuccess(c, gin.H{
+		"client_id":     clientID,
+		"client_secret": newSecret,
+		"message":       "Client secret rotated successfully",
+	})
+}
+
+type UpdateClientRequest struct {
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	RedirectURI string   `json:"redirect_uri"`
+	Scopes      string   `json:"scopes"`
+	IPWhitelist []string `json:"ip_whitelist"`
+}
+
+func (h *ClientHandler) UpdateClient(c *gin.Context) {
+	clientID := c.Param("id")
+	if clientID == "" {
+		JSONError(c, CodeInvalidParameter, "Client ID must not be empty")
+		return
+	}
+
+	var req UpdateClientRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		JSONError(c, CodeInvalidParameter, "Invalid request body")
+		return
+	}
+
+	orgID := c.GetString("orgID")
+	q := h.service.DB.Model(&models.OAuthClient{}).Where("id = ? AND is_system = ?", clientID, false)
+
+	if orgID != "" {
+		q = q.Where("org_id = ?", orgID)
+	}
+
+	// RBAC Check: Developer/Editor can only update their own clients
+	role := c.GetString("orgRole")
+	if role == "editor" || role == "developer" {
+		userID := c.GetString("userID")
+		q = q.Where("owner_id = ?", userID)
+	}
+
+	updates := map[string]interface{}{}
+	if req.Name != "" {
+		updates["name"] = req.Name
+	}
+	if req.Description != "" {
+		updates["description"] = req.Description
+	}
+	if req.RedirectURI != "" {
+		updates["redirect_uri"] = req.RedirectURI
+	}
+	if req.Scopes != "" {
+		// Verify scopes against org policy
+		policy := h.service.GetOrgPolicy(orgID)
+		scopesArr := strings.Fields(strings.TrimSpace(req.Scopes))
+		if !h.service.ValidateScopesSubset(policy.AllowedScopes, scopesArr) {
+			JSONError(c, CodeForbidden, "Scopes not allowed by organization policy")
+			return
+		}
+		updates["scopes"] = req.Scopes
+	}
+	if req.IPWhitelist != nil {
+		policy := h.service.GetOrgPolicy(orgID)
+		if !h.service.ValidateIPWhitelistSubset(policy.IPWhitelist, req.IPWhitelist) {
+			JSONError(c, CodeForbidden, "IP whitelist not allowed by organization policy")
+			return
+		}
+		updates["ip_whitelist"] = pq.StringArray(req.IPWhitelist)
+	}
+
+	if len(updates) == 0 {
+		JSONSuccess(c, gin.H{"message": "no changes provided"})
+		return
+	}
+
+	result := q.Updates(updates)
+	if result.Error != nil {
+		logger.GetLogger().WithError(result.Error).Error("update client failed")
+		JSONError(c, CodeInternalError, "Failed to update client")
+		return
+	}
+	if result.RowsAffected == 0 {
+		JSONError(c, CodeNotFound, "Client not found or you don't have permission to update it")
+		return
+	}
+
+	h.service.RecordAuditLog(c, "client.update", "client", clientID, "success", "client metadata updated")
+	JSONSuccess(c, gin.H{"message": "Client updated successfully"})
 }
 
 type UpdateStatusRequest struct {
@@ -315,25 +524,46 @@ type UpdateStatusRequest struct {
 func (h *ClientHandler) UpdateClientStatus(c *gin.Context) {
 	clientID := c.Param("id")
 	if clientID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Client ID must not be empty"})
+		JSONError(c, CodeInvalidParameter, "Client ID must not be empty")
 		return
 	}
+
 	var req UpdateStatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		JSONError(c, CodeInvalidParameter, "Invalid request body")
 		return
 	}
+	if req.Status != "active" && req.Status != "disabled" {
+		JSONError(c, CodeInvalidParameter, "Status must be active or disabled")
+		return
+	}
+
 	orgID := c.GetString("orgID")
-	q := h.service.DB.Model(&models.OAuthClient{}).Where("id = ?", clientID)
+	q := h.service.DB.Model(&models.OAuthClient{}).Where("id = ? AND is_system = ?", clientID, false)
 	if orgID != "" {
 		q = q.Where("org_id = ?", orgID)
 	}
-	if err := q.Update("status", req.Status).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update status"})
+
+	// RBAC Check: Developer/Editor can only update their own clients
+	role := c.GetString("orgRole")
+	if role == "editor" || role == "developer" {
+		userID := c.GetString("userID")
+		q = q.Where("owner_id = ?", userID)
+	}
+
+	result := q.Update("status", req.Status)
+	if result.Error != nil {
+		logger.GetLogger().WithError(result.Error).Error("update client status failed")
+		JSONError(c, CodeInternalError, "Failed to update client status")
 		return
 	}
-	h.service.RecordAuditLog(c, "client.update_status", "client", clientID, "success", req.Status)
-	c.JSON(http.StatusOK, gin.H{"client_id": clientID, "status": req.Status})
+	if result.RowsAffected == 0 {
+		JSONError(c, CodeNotFound, "Client not found or you don't have permission to modify it")
+		return
+	}
+
+	h.service.RecordAuditLog(c, "client.update_status", "client", clientID, "success", fmt.Sprintf("status changed to %s", req.Status))
+	JSONSuccess(c, gin.H{"message": "Client status updated successfully"})
 }
 
 func (h *ClientHandler) GetClientSecret(c *gin.Context) {

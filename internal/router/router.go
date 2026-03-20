@@ -141,8 +141,10 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 			clients.Use(middleware.RequireOrganizationHeader(kycService))
 			clients.POST("/register", middleware.RequirePermission(models.PermOAuthWrite), clientHandler.RegisterClient)
 			clients.GET("", middleware.RequirePermission(models.PermOAuthRead), clientHandler.ListClients)
+			clients.PUT(":id", middleware.RequirePermission(models.PermOAuthWrite), clientHandler.UpdateClient)
 			clients.DELETE(":client_id", middleware.RequirePermission(models.PermOAuthWrite), clientHandler.DeleteClient)
 			clients.POST(":id/rotate", middleware.RequirePermission(models.PermOAuthWrite), clientHandler.RotateClientSecret)
+			clients.POST(":id/transfer", middleware.RequirePermission(models.PermOAuthWrite), clientHandler.TransferClientOwnership)
 			clients.PATCH(":id/status", middleware.RequirePermission(models.PermOAuthWrite), clientHandler.UpdateClientStatus)
 			clients.GET(":id/secret", middleware.JWTAuth(kycService), middleware.RequireOrganizationHeader(kycService), middleware.InjectOrgContext(), clientHandler.GetClientSecret)
 
