@@ -608,8 +608,8 @@ func Run(db *gorm.DB) error {
 				{"billing.read", "Billing", "View Billing", "View billing"},
 				{"org.billing.read", "Billing", "View Organization Billing", "View org billing"},
 				{"billing.write", "Billing", "Modify Billing", "Modify payment/subscription"},
-				{"keys.read", "API Keys", "View API Keys", "View API keys"},
-				{"keys.write", "API Keys", "Manage API Keys", "Create/Revoke API keys"},
+				{"oauth.read", "OAuth Apps", "View OAuth Apps", "View OAuth applications"},
+				{"oauth.write", "OAuth Apps", "Manage OAuth Apps", "Create/Revoke OAuth applications"},
 				{"logs.read", "Logs", "View Audit Logs", "View audit logs"},
 				{"org.usage.read", "Logs", "View Usage", "View organization usage"},
 				{"org.audit", "Logs", "Export Audit Logs", "Export organization audit logs"},
@@ -639,11 +639,11 @@ func Run(db *gorm.DB) error {
 		}
 		seedRole("owner", "Owner", "系统所有者", allIDs)
 		// admin
-		seedRole("admin", "Administrator", "组织管理员", []string{"org.read", "team.read", "team.invite", "team.write", "keys.read", "keys.write", "billing.read", "logs.read", "org.audit"})
+		seedRole("admin", "Administrator", "组织管理员", []string{"org.read", "team.read", "team.invite", "team.write", "oauth.read", "oauth.write", "billing.read", "logs.read", "org.audit"})
 		// developer
-		seedRole("developer", "Developer", "开发者", []string{"keys.read", "keys.write", "logs.read"})
+		seedRole("developer", "Developer", "开发者", []string{"oauth.read", "oauth.write", "logs.read"})
 		// viewer
-		seedRole("viewer", "Viewer", "只读观察者", []string{"org.read", "team.read", "keys.read", "billing.read", "logs.read"})
+		seedRole("viewer", "Viewer", "只读观察者", []string{"org.read", "team.read", "oauth.read", "billing.read", "logs.read"})
 	}
 
 	// 平台管理员种子（仅当不存在时创建）
