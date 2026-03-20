@@ -589,6 +589,12 @@ func Run(db *gorm.DB) error {
 	}
 	_ = db.Exec("INSERT INTO global_configs(key,value) VALUES('daily_registration_cap','1000') ON CONFLICT (key) DO NOTHING").Error
 
+	// 自动更新旧的 keys.read/keys.write 为 oauth.read/oauth.write
+	_ = db.Exec("UPDATE permissions SET id = 'oauth.read', category = 'OAuth Apps', name = 'View OAuth Apps' WHERE id = 'keys.read'").Error
+	_ = db.Exec("UPDATE permissions SET id = 'oauth.write', category = 'OAuth Apps', name = 'Manage OAuth Apps' WHERE id = 'keys.write'").Error
+	_ = db.Exec("UPDATE role_permissions SET permission_id = 'oauth.read' WHERE permission_id = 'keys.read'").Error
+	_ = db.Exec("UPDATE role_permissions SET permission_id = 'oauth.write' WHERE permission_id = 'keys.write'").Error
+
 	// 权限与角色种子
 	{
 		var permCount int64
