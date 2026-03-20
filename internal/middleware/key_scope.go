@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"encoding/json"
+	"net/http"
 	"strings"
 	"time"
 
@@ -26,14 +27,12 @@ func RequireKeyScope(required string) gin.HandlerFunc {
 			}
 		}
 		if !has {
-			c.JSON(403, gin.H{
+			c.JSON(http.StatusForbidden, gin.H{
 				"code":       1002,
 				"message":    "权限不足",
 				"error":      "API key lacks required scope",
 				"timestamp":  time.Now().UnixMilli(),
 				"request_id": c.GetString("request_id"),
-				"path":       c.Request.URL.Path,
-				"method":     c.Request.Method,
 			})
 			c.Abort()
 			return

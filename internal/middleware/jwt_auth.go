@@ -23,8 +23,6 @@ func JWTAuth(service *service.KYCService) gin.HandlerFunc {
 				"error":      "Missing authorization header",
 				"timestamp":  time.Now().UnixMilli(),
 				"request_id": c.GetString("request_id"),
-				"path":       c.Request.URL.Path,
-				"method":     c.Request.Method,
 			})
 			c.Abort()
 			return
@@ -39,8 +37,6 @@ func JWTAuth(service *service.KYCService) gin.HandlerFunc {
 				"error":      "Invalid authorization header format",
 				"timestamp":  time.Now().UnixMilli(),
 				"request_id": c.GetString("request_id"),
-				"path":       c.Request.URL.Path,
-				"method":     c.Request.Method,
 			})
 			c.Abort()
 			return
@@ -65,8 +61,6 @@ func JWTAuth(service *service.KYCService) gin.HandlerFunc {
 				"error":      "Invalid or expired token",
 				"timestamp":  time.Now().UnixMilli(),
 				"request_id": c.GetString("request_id"),
-				"path":       c.Request.URL.Path,
-				"method":     c.Request.Method,
 			})
 			c.Abort()
 			return
@@ -81,8 +75,6 @@ func JWTAuth(service *service.KYCService) gin.HandlerFunc {
 				"error":      "Invalid token claims",
 				"timestamp":  time.Now().UnixMilli(),
 				"request_id": c.GetString("request_id"),
-				"path":       c.Request.URL.Path,
-				"method":     c.Request.Method,
 			})
 			c.Abort()
 			return
@@ -97,8 +89,6 @@ func JWTAuth(service *service.KYCService) gin.HandlerFunc {
 					"error":      "Token has expired",
 					"timestamp":  time.Now().UnixMilli(),
 					"request_id": c.GetString("request_id"),
-					"path":       c.Request.URL.Path,
-					"method":     c.Request.Method,
 				})
 				c.Abort()
 				return
@@ -114,8 +104,6 @@ func JWTAuth(service *service.KYCService) gin.HandlerFunc {
 				"error":      "Invalid user ID in token",
 				"timestamp":  time.Now().UnixMilli(),
 				"request_id": c.GetString("request_id"),
-				"path":       c.Request.URL.Path,
-				"method":     c.Request.Method,
 			})
 			c.Abort()
 			return
@@ -130,8 +118,6 @@ func JWTAuth(service *service.KYCService) gin.HandlerFunc {
 				"error":      "User not found or inactive",
 				"timestamp":  time.Now().UnixMilli(),
 				"request_id": c.GetString("request_id"),
-				"path":       c.Request.URL.Path,
-				"method":     c.Request.Method,
 			})
 			c.Abort()
 			return

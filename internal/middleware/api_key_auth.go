@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"net"
+	"net/http"
 	"strings"
 	"time"
 
@@ -47,10 +48,12 @@ func APIKeyAuth(service *service.KYCService) gin.HandlerFunc {
 
 		if err != nil {
 			logger.GetLogger().WithError(err).Error("API key查询失败")
-			c.JSON(401, gin.H{
-				"success": false,
-				"error":   "Invalid API key",
-				"code":    "AUTH_INVALID_KEY",
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"code":       1001,
+				"message":    "Unauthorized",
+				"error":      "Invalid API key",
+				"timestamp":  time.Now().UnixMilli(),
+				"request_id": c.GetString("request_id"),
 			})
 			c.Abort()
 			return
@@ -61,27 +64,33 @@ func APIKeyAuth(service *service.KYCService) gin.HandlerFunc {
 		case "active":
 			// ok
 		case "rate_limited":
-			c.JSON(429, gin.H{
-				"success": false,
-				"error":   "Rate limit exceeded",
-				"code":    "RATE_LIMITED",
+			c.JSON(http.StatusTooManyRequests, gin.H{
+				"code":       1005,
+				"message":    "Too Many Requests",
+				"error":      "Rate limit exceeded",
+				"timestamp":  time.Now().UnixMilli(),
+				"request_id": c.GetString("request_id"),
 			})
 			c.Abort()
 			return
 		case "quota_exceeded":
-			c.JSON(429, gin.H{
-				"success": false,
-				"error":   "Quota exceeded",
-				"code":    "QUOTA_EXCEEDED",
+			c.JSON(http.StatusTooManyRequests, gin.H{
+				"code":       1005,
+				"message":    "Too Many Requests",
+				"error":      "Quota exceeded",
+				"timestamp":  time.Now().UnixMilli(),
+				"request_id": c.GetString("request_id"),
 			})
 			c.Abort()
 			return
 		default:
 			// revoked or unknown
-			c.JSON(401, gin.H{
-				"success": false,
-				"error":   "API key is revoked",
-				"code":    "AUTH_REVOKED_KEY",
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"code":       1001,
+				"message":    "Unauthorized",
+				"error":      "API key is revoked",
+				"timestamp":  time.Now().UnixMilli(),
+				"request_id": c.GetString("request_id"),
 			})
 			c.Abort()
 			return
@@ -91,14 +100,12 @@ func APIKeyAuth(service *service.KYCService) gin.HandlerFunc {
 		if len(key.IPWhitelist) > 0 {
 			clientIP := c.ClientIP()
 			if !isIPAllowed(clientIP, key.IPWhitelist) {
-				c.JSON(403, gin.H{
-					"success": false,
-					"error":   "IP not allowed",
-					"code":    "IP_NOT_ALLOWED",
-					"details": gin.H{
-						"client_ip":   clientIP,
-						"allowed_ips": key.IPWhitelist,
-					},
+				c.JSON(http.StatusForbidden, gin.H{
+					"code":       1002,
+					"message":    "Forbidden",
+					"error":      "IP not allowed",
+					"timestamp":  time.Now().UnixMilli(),
+					"request_id": c.GetString("request_id"),
 				})
 				c.Abort()
 				return
@@ -119,10 +126,12 @@ func APIKeyAuth(service *service.KYCService) gin.HandlerFunc {
 		// 获取用户信息
 		user, err := service.GetUserByID(key.UserID)
 		if err != nil {
-			c.JSON(401, gin.H{
-				"success": false,
-				"error":   "User not found",
-				"code":    "AUTH_USER_NOT_FOUND",
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"code":       1001,
+				"message":    "Unauthorized",
+				"error":      "User not found",
+				"timestamp":  time.Now().UnixMilli(),
+				"request_id": c.GetString("request_id"),
 			})
 			c.Abort()
 			return
@@ -142,10 +151,12 @@ func APIKeyAuth(service *service.KYCService) gin.HandlerFunc {
 				orgID = user.OrgID
 			}
 			if orgID == "" {
-				c.JSON(401, gin.H{
-					"success": false,
-					"error":   "Organization not found",
-					"code":    "AUTH_ORG_NOT_FOUND",
+				c.JSON(http.StatusUnauthorized, gin.H{
+					"code":       1001,
+					"message":    "Unauthorized",
+					"error":      "Organization not found",
+					"timestamp":  time.Now().UnixMilli(),
+					"request_id": c.GetString("request_id"),
 				})
 				c.Abort()
 				return

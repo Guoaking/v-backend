@@ -12,6 +12,7 @@ import (
 	"kyc-service/internal/storage"
 	"kyc-service/pkg/logger"
 	"kyc-service/pkg/metrics"
+	"kyc-service/pkg/response"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
@@ -70,7 +71,7 @@ func Auth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "缺少认证信息"})
+			response.JSONError(c, response.CodeUnauthorized, "缺少认证信息")
 			c.Abort()
 			return
 		}
@@ -78,7 +79,7 @@ func Auth() gin.HandlerFunc {
 		// 验证Bearer Token
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || parts[0] != "Bearer" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "认证格式错误"})
+			response.JSONError(c, response.CodeUnauthorized, "认证格式错误")
 			c.Abort()
 			return
 		}

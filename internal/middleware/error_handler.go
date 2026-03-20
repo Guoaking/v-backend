@@ -30,15 +30,13 @@ func ErrorHandler() gin.HandlerFunc {
 
 			// 如果还没有响应，返回统一的错误响应
 			if !c.Writer.Written() {
-				// 使用通用的JSON响应，避免循环导入
+				// 转换为标准响应结构
 				c.JSON(-1, gin.H{
 					"code":       getErrorCode(c.Writer.Status()),
 					"message":    getErrorMessage(c.Writer.Status()),
 					"error":      err.Error(),
 					"timestamp":  time.Now().UnixMilli(),
 					"request_id": c.GetString("request_id"),
-					"path":       c.Request.URL.Path,
-					"method":     c.Request.Method,
 				})
 			}
 		}

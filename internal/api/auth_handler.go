@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"fmt"
 	"strings"
 	"time"
 
@@ -133,7 +132,6 @@ func (h *AuthHandler) GetToken(c *gin.Context) {
 		remain := int(time.Until(existing.ExpiresAt).Seconds())
 		if remain > int((5 * time.Minute).Seconds()) {
 			middleware.RecordBusinessOperation("token_request", true, time.Since(start), "cache_hit_db")
-			fmt.Printf("output: %v\n", "db query")
 			if h.service.Redis != nil {
 				key := "oauth:token:" + req.ClientID + ":" + scopeStr
 				payload, _ := json.Marshal(map[string]interface{}{"AccessToken": existing.AccessToken, "RefreshToken": existing.RefreshToken, "ExpiresAt": existing.ExpiresAt.Unix()})

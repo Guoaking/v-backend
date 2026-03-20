@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	"kyc-service/internal/models"
@@ -14,14 +15,12 @@ func RequireOrganizationHeader(svc *service.KYCService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		orgID := c.GetHeader("X-Organization-ID")
 		if orgID == "" {
-			c.JSON(400, gin.H{
+			c.JSON(http.StatusBadRequest, gin.H{
 				"code":       1007,
 				"message":    "缺少必要参数",
 				"error":      "Missing X-Organization-ID header",
 				"timestamp":  time.Now().UnixMilli(),
 				"request_id": c.GetString("request_id"),
-				"path":       c.Request.URL.Path,
-				"method":     c.Request.Method,
 			})
 			c.Abort()
 			return
@@ -29,14 +28,12 @@ func RequireOrganizationHeader(svc *service.KYCService) gin.HandlerFunc {
 
 		userID := c.GetString("userID")
 		if userID == "" {
-			c.JSON(401, gin.H{
+			c.JSON(http.StatusUnauthorized, gin.H{
 				"code":       1001,
 				"message":    "未授权访问",
 				"error":      "Missing user context",
 				"timestamp":  time.Now().UnixMilli(),
 				"request_id": c.GetString("request_id"),
-				"path":       c.Request.URL.Path,
-				"method":     c.Request.Method,
 			})
 			c.Abort()
 			return
@@ -44,14 +41,12 @@ func RequireOrganizationHeader(svc *service.KYCService) gin.HandlerFunc {
 
 		var user models.User
 		if err := svc.DB.Where("id = ?", userID).First(&user).Error; err != nil {
-			c.JSON(401, gin.H{
+			c.JSON(http.StatusUnauthorized, gin.H{
 				"code":       1001,
 				"message":    "未授权访问",
 				"error":      "User not found",
 				"timestamp":  time.Now().UnixMilli(),
 				"request_id": c.GetString("request_id"),
-				"path":       c.Request.URL.Path,
-				"method":     c.Request.Method,
 			})
 			c.Abort()
 			return
@@ -60,14 +55,12 @@ func RequireOrganizationHeader(svc *service.KYCService) gin.HandlerFunc {
 		var member models.OrganizationMember
 		if !user.IsPlatformAdmin {
 			if err := svc.DB.Where("organization_id = ? AND user_id = ?", orgID, userID).First(&member).Error; err != nil {
-				c.JSON(403, gin.H{
+				c.JSON(http.StatusForbidden, gin.H{
 					"code":       1002,
 					"message":    "权限不足",
-					"error":      "Not a member of this organization",
+					"error":      "User is not a member of this organization",
 					"timestamp":  time.Now().UnixMilli(),
 					"request_id": c.GetString("request_id"),
-					"path":       c.Request.URL.Path,
-					"method":     c.Request.Method,
 				})
 				c.Abort()
 				return

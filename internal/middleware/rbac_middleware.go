@@ -1,20 +1,19 @@
 package middleware
 
 import (
+	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
 func forbiddenJSON(c *gin.Context, err string) {
-	c.JSON(403, gin.H{
+	c.JSON(http.StatusForbidden, gin.H{
 		"code":       1002,
 		"message":    "权限不足",
 		"error":      err,
 		"timestamp":  time.Now().UnixMilli(),
 		"request_id": c.GetString("request_id"),
-		"path":       c.Request.URL.Path,
-		"method":     c.Request.Method,
 	})
 }
 
