@@ -108,6 +108,11 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 		{
 			consoleHandler := api.NewConsoleHandler(kycService)
 			userAuthHandler := api.NewUserAuthHandler(kycService)
+			
+			// Sandbox / STS endpoint for playground
+			consoleAuthHandler := api.NewConsoleAuthHandler(kycService)
+			console.POST("/sandbox/token", consoleAuthHandler.GenerateSandboxToken)
+
 			console.GET("/users/me", consoleHandler.GetCurrentUser)
 			console.PUT("/users/me", consoleHandler.UpdateUserProfile)
 			console.PUT("/users/me/password", userAuthHandler.UpdatePassword)

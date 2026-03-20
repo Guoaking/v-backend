@@ -187,10 +187,24 @@ func (h *ClientHandler) ListClients(c *gin.Context) {
 		}
 	}
 	search := strings.TrimSpace(c.Query("q"))
-	q := h.service.DB.Where("status = ?", "active")
+	
+	// Hide system clients and apply role-based filtering
+	q := h.service.DB.Where("status = ? AND is_system = ?", "active", false)
 	if orgID != "" {
 		q = q.Where("org_id = ?", orgID)
 	}
+	
+	role := c.GetString("orgRole")
+	if role == "editor" || role == "developer" {
+		// Editors can only see their own clients
+		userID := c.GetString("userID")
+		q = q.Where("owner_id = ?", userID)
+	} else if role == "viewer" || role == "member" {
+		// Viewers cannot see any clients
+		c.JSON(http.StatusOK, []ClientListResponse{})
+		return
+	}
+
 	if search != "" {
 		q = q.Where("name ILIKE ? OR redirect_uri ILIKE ?", "%"+search+"%", "%"+search+"%")
 	}

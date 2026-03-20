@@ -319,9 +319,13 @@ func (h *ConsoleHandler) ListAPIKeys(c *gin.Context) {
 	role := c.GetString("orgRole")
 	var keys []models.APIKey
 	qb := h.service.DB.Model(&models.APIKey{}).Where("org_id = ? AND status <> ?", orgID, "revoked").Order("created_at DESC")
-	if role != "owner" && role != "admin" {
+	if role == "editor" || role == "developer" {
 		qb = qb.Where("created_by_user_id = ?", userID)
+	} else if role == "viewer" || role == "member" {
+		JSONSuccess(c, []ConsoleAPIKeyResponse{})
+		return
 	}
+	
 	if err := qb.Find(&keys).Error; err != nil {
 		JSONError(c, CodeDatabaseError, "查询失败")
 		return

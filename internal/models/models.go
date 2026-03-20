@@ -83,6 +83,7 @@ type OAuthClient struct {
 	TokenTTLSeconds int            `json:"token_ttl_seconds"`
 	IPWhitelist     pq.StringArray `gorm:"type:text[]" json:"ip_whitelist"`
 	RateLimitPerSec int            `json:"rate_limit_per_sec"`
+	IsSystem        bool           `json:"is_system" gorm:"default:false"` // 标识是否为系统内置客户端
 	CreatedAt       time.Time      `json:"created_at"`
 	UpdatedAt       time.Time      `json:"updated_at"`
 }

@@ -723,5 +723,33 @@ func Run(db *gorm.DB) error {
 		log.Info("✅ 组织成员表已存在或创建成功")
 	}
 
+	// 注入系统内置的 OAuth Client (Playground STS 使用)
+	{
+		var sysClientCount int64
+		_ = db.Model(&models.OAuthClient{}).Where("client_id = ?", "sys_web_console_playground").Count(&sysClientCount).Error
+		if sysClientCount == 0 {
+			// 如果没有环境变量，生成一个随机的超长字符串作为兜底，反正前端也不需要知道
+			sysSecret := os.Getenv("SYS_PLAYGROUND_CLIENT_SECRET")
+			if sysSecret == "" {
+				sysSecret = utils.GenerateID() + utils.GenerateID() 
+			}
+			sysClient := models.OAuthClient{
+				ID:              "sys_web_console_playground", // 强行写入指定 ID
+				Secret:          sysSecret,
+				Name:            "System Web Console Playground",
+				Description:     "Built-in client for web console playground STS. DO NOT DELETE.",
+				Status:          "active",
+				Scopes:          "ocr:read face:read liveness:read kyc:verify",
+				TokenTTLSeconds: 900, // 15分钟
+				IsSystem:        true,
+			}
+			if err := db.Create(&sysClient).Error; err != nil {
+				log.Errorf("系统内置 OAuth Client 初始化失败: %v", err)
+			} else {
+				log.Info("系统内置 OAuth Client 初始化成功")
+			}
+		}
+	}
+
 	return nil
 }

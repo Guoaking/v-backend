@@ -293,6 +293,71 @@ func (h *ConsoleAuthHandler) Me(c *gin.Context) {
 	JSONSuccess(c, resp)
 }
 
+// SandboxTokenRequest 沙盒Token请求
+type SandboxTokenRequest struct {
+	FeatureID string `json:"feature_id"` // 可选，用于细粒度审计
+}
+
+// SandboxTokenResponse 沙盒Token响应
+type SandboxTokenResponse struct {
+	Token     string `json:"token"`
+	ExpiresIn int    `json:"expires_in"` // 单位：秒
+}
+
+// GenerateSandboxToken 为 Playground 生成短期测试 JWT (STS 机制)
+func (h *ConsoleAuthHandler) GenerateSandboxToken(c *gin.Context) {
+	userClaims, exists := c.Get("user")
+	if !exists {
+		JSONError(c, CodeUnauthorized, "未授权访问")
+		return
+	}
+	claims := userClaims.(jwt.MapClaims)
+	userID := claims["user_id"].(string)
+	orgID := c.GetString("orgID") // 依赖于前面的 InjectOrgContext 中间件
+	if orgID == "" {
+		// 降级尝试从 User JWT 中提取
+		if v, ok := claims["org_id"].(string); ok && v != "" {
+			orgID = v
+		} else {
+			JSONError(c, CodeUnauthorized, "无法确定所属组织")
+			return
+		}
+	}
+
+	// 查找系统内置客户端
+	var sysClient models.OAuthClient
+	if err := h.service.DB.Where("id = ?", "sys_web_console_playground").First(&sysClient).Error; err != nil {
+		h.service.Logger.Errorf("无法找到系统内置客户端 sys_web_console_playground: %v", err)
+		JSONError(c, CodeInternalError, "系统配置错误，无法生成测试令牌")
+		return
+	}
+
+	// 生成包含全部测试权限的短期 JWT
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"client_id": sysClient.ID,
+		"org_id":    orgID,
+		"user_id":   userID,
+		"scope":     sysClient.Scopes, // 赋予全量测试权限
+		"source":    "playground",
+		"exp":       time.Now().Add(time.Duration(sysClient.TokenTTLSeconds) * time.Second).Unix(),
+		"iat":       time.Now().Unix(),
+	})
+
+	tokenString, err := token.SignedString([]byte(h.service.Config.Security.JWTSecret))
+	if err != nil {
+		h.service.Logger.Errorf("签名 Sandbox JWT 失败: %v", err)
+		JSONError(c, CodeInternalError, "令牌生成失败")
+		return
+	}
+
+	h.service.RecordAuditLog(c, "playground.token.generate", "oauth_client", sysClient.ID, "success", "")
+
+	JSONSuccess(c, SandboxTokenResponse{
+		Token:     tokenString,
+		ExpiresIn: sysClient.TokenTTLSeconds,
+	})
+}
+
 // Register 用户注册
 // @Summary 用户注册
 // @Description 新用户注册并创建组织
