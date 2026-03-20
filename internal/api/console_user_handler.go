@@ -74,31 +74,8 @@ func (h *ConsoleHandler) GetCurrentUser(c *gin.Context) {
 		return
 	}
 
-	var apiKeys []models.APIKey
-	if err := h.service.DB.Where("user_id = ? AND status = ?", userID, "active").Order("created_at DESC").Find(&apiKeys).Error; err != nil {
-		logger.GetLogger().WithError(err).Error("查询API密钥失败")
-		apiKeys = []models.APIKey{}
-	}
-
-	// 构建API密钥响应
-	apiKeyResponses := make([]ConsoleAPIKeyResponse, len(apiKeys))
-	for i, key := range apiKeys {
-		scopes := []string{""}
-		if key.Scopes != "" {
-			// 解析scopes JSON
-			scopes = strings.Split(strings.Trim(key.Scopes, "[]\""), ",")
-		}
-
-		apiKeyResponses[i] = ConsoleAPIKeyResponse{
-			ID:        key.ID,
-			Name:      key.Name,
-			Secret:    key.SecretHash,
-			Scopes:    scopes,
-			Status:    key.Status,
-			LastUsed:  key.LastUsedAt,
-			CreatedAt: key.CreatedAt,
-		}
-	}
+	// 降级：依然返回空的 APIKeys 数组以保持向后兼容
+	apiKeyResponses := make([]ConsoleAPIKeyResponse, 0)
 
 	response := UserMeResponse{
 		ID:              user.ID,
@@ -111,7 +88,7 @@ func (h *ConsoleHandler) GetCurrentUser(c *gin.Context) {
 		CurrentOrgID:    currentOrg,
 		Permissions:     perms,
 		Company:         org.Name,
-		APIKeys:         apiKeyResponses,
+		APIKeys:         apiKeyResponses, // [DEPRECATED] 保持为空数组
 		IsPlatformAdmin: user.IsPlatformAdmin,
 	}
 

@@ -42,7 +42,7 @@ type UserMeResponse struct {
 
 // GetCurrentUser 获取当前用户信息
 // @Summary 获取当前用户信息
-// @Description 获取当前登录用户的详细信息和API密钥列表
+// @Description 获取当前登录用户的详细信息
 // @Tags Console
 // @Accept json
 // @Produce json
@@ -50,7 +50,7 @@ type UserMeResponse struct {
 // @Failure 401 {object} ErrorResponse
 // @Router /api/v1/users/me [get]
 
-// UpdateAPIKeyScopes 更新API Key的权限范围
+// [DEPRECATED] API Key related methods have been moved to console_apikey_handler.go and marked for removal.
 
 // UpdateUserProfile 更新用户资料
 // @Summary 更新用户资料
@@ -78,10 +78,9 @@ type UserMeResponse struct {
 
 // GetAPIKeySecret 返回明文密钥（加密存储，按权限解密）
 
-// ListAPIKeys 控制台获取API密钥列表（含统计）
+// ListAPIKeys 控制台获取API密钥列表（含统计） [DEPRECATED]
 
-
-// RevokeAPIKey 撤销API密钥
+// RevokeAPIKey 撤销API密钥 [DEPRECATED]
 // @Summary 撤销API密钥
 // @Description 撤销指定的API密钥
 // @Tags Console

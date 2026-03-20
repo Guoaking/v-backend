@@ -49,8 +49,13 @@ type ConsoleAPIKeyResponse struct {
 	} `json:"stats,omitempty"`
 }
 
+// -----------------------------------------------------------------------------
+// DEPRECATED: The following API Key handlers are deprecated and marked for removal.
+// Please use OAuth Client endpoints instead.
+// -----------------------------------------------------------------------------
+
+// UpdateAPIKeyScopes 更新API Key的权限范围 [DEPRECATED]
 func (h *ConsoleHandler) UpdateAPIKeyScopes(c *gin.Context) {
-	// 权限由路由中间件校验 keys.write
 	keyID := c.Param("id")
 	if keyID == "" {
 		JSONError(c, CodeInvalidParameter, "缺少Key ID")

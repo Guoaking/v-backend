@@ -12,7 +12,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// APIKeyHandler API密钥管理处理器
+// APIKeyHandler 处理API密钥相关的HTTP请求 [DEPRECATED]
+// Please migrate to OAuth Client handlers.
 type APIKeyHandler struct {
 	service *service.KYCService
 }
