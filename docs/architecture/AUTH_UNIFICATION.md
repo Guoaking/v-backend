@@ -90,27 +90,45 @@ func UnifiedAuthMiddleware() gin.HandlerFunc {
 
 目前的 Console Web 登录使用的是**完全无状态的单凭证 JWT (24小时过期)**，这在纯 Web SaaS 初期是足够轻量的。但在面向未来的多端客户端（Mobile App / Desktop App）以及高安全合规要求下，存在以下不足：
 
-### 3.1 现状与隐患
+### 3.1 现状与隐患 (Current Implementation & Flaws)
 
-1. **缺少 Refresh Token 机制**: 客户端（如手机 App）要求“一次登录，永久在线”。24小时硬过期会导致移动端频繁掉线，体验极差。
-2. **缺乏会话强制注销 (Session Revocation)**: JWT 发出后无法撤回（除非改全局 Secret）。如果用户设备丢失或账号被盗，无法实现“踢人下线”或“登出所有设备”功能。
-3. **缺乏设备级管理**: 后端不知道同一个账号目前在多少台设备上登录，无法做并发登录限制（如限制单个账号最多同时在 3 台设备登录）。
+在目前的 `v-frontend` 和 `v-backend` 中，采用的是**完全无状态的单凭证 JWT**：
+
+- **存储机制**: 前端在 `AuthContext.tsx` 中拿到 Token，直接存入 `localStorage.setItem('vl_token', token)`，并在 `apiClient.ts` 中拦截放入 `Authorization` Header。
+- **过期处理**: JWT 24小时硬过期。过期后前端捕获 401 触发 `logout()` 强制踢回登录页。
+
+**这种极简模式在纯 Web SaaS 初期是足够轻量的，但存在严重隐患：**
+
+1. **XSS 攻击风险**: `localStorage` 极易受到跨站脚本攻击，一旦恶意脚本获取到 JWT，等同于接管了账号。
+2. **缺少 Refresh Token 机制**: 客户端（如手机 App）要求“一次登录，永久在线”。24小时硬过期会导致移动端频繁掉线，体验极差。
+3. **缺乏会话强制注销 (Session Revocation)**: JWT 发出后无法撤回（除非改全局 Secret）。如果用户设备丢失或账号被盗，无法实现“踢人下线”或“登出所有设备”功能。
+4. **缺乏设备级管理**: 后端不知道同一个账号目前在多少台设备上登录，无法做并发登录限制（如限制单个账号最多同时在 3 台设备登录）。
 
 ### 3.2 演进目标：状态化会话管理 (Stateful Session via OIDC/OAuth2)
 
-为了支持未来的多端生态，用户鉴权需要向标准 OAuth2 授权码流程（或带有设备管理的 OIDC 扩展）演进：
+为了支持未来的多端生态和极高的安全性，用户鉴权需要向标准 OAuth2 授权码流程（或带有设备管理的 OIDC 扩展）演进。主流 B2B SaaS (如 Stripe, AWS, Vercel) 通常采用**混合双 Token 机制**：
 
 1. **双 Token 机制 (Short-lived Access + Long-lived Refresh)**
-   - 颁发短效 `access_token` (如 1 小时，完全无状态，用于高频 API 校验)。
+   - 颁发短效 `access_token` (如 15分钟 - 1小时，完全无状态，用于高频 API 校验)。
    - 颁发长效 `refresh_token` (如 30 天，记录在数据库中，用于静默续期)。
 
-2. **设备指纹与会话表 (Device & Session Registry)**
-   - 建立 `user_sessions` 表，记录 `(user_id, device_id, refresh_token, last_active_ip, platform)`。
+2. **存储策略演进 (Storage Strategy)**
+   - **Access Token**: 存在前端内存 (JS 变量) 或 `localStorage` 中（寿命短，风险可控）。
+   - **Refresh Token**: **必须存放在 `HttpOnly` + `Secure` 的 Cookie 中**，绝对免疫 XSS 攻击。前端无法读取，但在发送 `/api/v1/auth/refresh` 请求时浏览器会自动带上。
+
+3. **前端静默续期 (Silent Refresh)**
+   - 改造 `apiClient.ts` 的响应拦截器 (Response Interceptor)。
+   - 当收到 `401 Unauthorized` 报错时，不要立刻 `logout`。
+   - 挂起当前请求，静默调用一次 `POST /api/v1/auth/refresh`。
+   - 如果续期成功，拿到新 Token 替换旧 Token，然后重试刚才失败的请求；如果续期失败，才真正踢回登录页。
+
+4. **设备指纹与会话表 (Device & Session Registry)**
+   - 建立 `user_sessions` 表，记录 `(session_id, user_id, device_id, refresh_token_hash, last_active_ip, platform, expires_at)`。
    - 提供 `/api/v1/users/me/sessions` 接口，允许用户在 Console 中查看所有活跃设备，并提供“注销指定设备”的入口。
 
-3. **吊销机制 (Revocation via Redis)**
-   - 当用户主动登出、修改密码或被管理员封禁时：
-     1. 从 `user_sessions` 删除对应的 `refresh_token`。
+5. **吊销与踢人机制 (Revocation & Kick-out)**
+   - 当管理员点击“强制下线”或用户主动登出时：
+     1. 从 `user_sessions` 删除或标记对应的 `refresh_token_hash`。
      2. 将当前未过期的 `access_token` (或者其 `jti` 唯一标识) 存入 Redis 黑名单，直至其自然过期。
    - `JWTAuth` 中间件增加一层极轻量的 Redis 黑名单查验。
 

@@ -34,7 +34,6 @@ type UserMeResponse struct {
 	CurrentOrgID    string                  `json:"currentOrgId"`
 	Permissions     []string                `json:"permissions"`
 	Company         string                  `json:"company"`
-	APIKeys         []ConsoleAPIKeyResponse `json:"apiKeys"`
 	IsPlatformAdmin bool                    `json:"is_platform_admin"`
 }
 

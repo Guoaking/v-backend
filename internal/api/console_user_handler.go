@@ -74,9 +74,6 @@ func (h *ConsoleHandler) GetCurrentUser(c *gin.Context) {
 		return
 	}
 
-	// 降级：依然返回空的 APIKeys 数组以保持向后兼容
-	apiKeyResponses := make([]ConsoleAPIKeyResponse, 0)
-
 	response := UserMeResponse{
 		ID:              user.ID,
 		Email:           user.Email,
@@ -88,7 +85,6 @@ func (h *ConsoleHandler) GetCurrentUser(c *gin.Context) {
 		CurrentOrgID:    currentOrg,
 		Permissions:     perms,
 		Company:         org.Name,
-		APIKeys:         apiKeyResponses, // [DEPRECATED] 保持为空数组
 		IsPlatformAdmin: user.IsPlatformAdmin,
 	}
 
