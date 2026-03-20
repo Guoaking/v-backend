@@ -81,7 +81,19 @@
 | **Developer / Editor** | 仅限 **自己创建** 的 Clients | 只能管理 **自己创建** 的 Clients   | 过滤后的列表。顶部提示：“您只能管理由您创建的凭证。如需查看全局凭证，请联系管理员。”                          |
 | **Viewer / Member**    | **不可见** (空状态)          | **无权限**                         | 页面中间展示锁图标 (Empty State)。提示：“您的权限级别 (Viewer) 无法访问 API 凭证。请联系管理员进行系统集成。” |
 
-### 3.2 敏感数据展示原则 (Secret Display Policy)
+### 3.2 高级安全与风控策略 (Advanced Security Policies)
+
+在将 API Key 迁移至 OAuth Client 时，必须继承并强化原有的网络与并发控制能力，这也是企业级客户的刚需：
+
+1. **IP 白名单控制 (IP Whitelisting)**：
+   - Client 模型应支持配置 `IPWhitelist`（支持单个 IP 或 CIDR 网段）。
+   - **执行点**：网关层 `UnifiedAuthMiddleware` 在解析 JWT 后，需校验当前请求的 `ClientIP` 是否在允许的网段内（可将 IP 白名单注入 JWT Claims 或基于 ClientID 查 Redis 缓存以保持无状态）。
+2. **凭证级限流 (Client-level Rate Limiting)**：
+   - 除了基于 OrgID 的总并发限流外，支持为特定的 OAuth Client 设置独立的 `RateLimitPerSec`（例如外包团队的 Client 被限制为 5 QPS）。
+3. **Webhook 与安全事件通知**：
+   - 当检测到某个 Client ID 的异常使用（如连续 10 次密码错误、异常 IP 请求拦截、或者短时间内触及限流阈值）时，系统应生成安全事件（Audit Log），并可通过 Webhook 推送给租户管理员。
+
+### 3.3 敏感数据展示原则 (Secret Display Policy)
 
 针对 `Client Secret` 或 `API Key` 的明文展示，必须遵循严格的业界标准：
 
