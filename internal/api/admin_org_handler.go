@@ -329,7 +329,7 @@ func (h *AdminHandler) UpdateOrganizationPlan(c *gin.Context) {
 	details := map[string]interface{}{"org_id": orgID, "plan_id": req.PlanID, "immediate": imm, "reset_usage": reset}
 	b, _ := json.Marshal(details)
 	al := &models.AuditLog{UserID: c.GetString("userID"), OrgID: orgID, Action: "admin.update_org_plan", Resource: "organizations", Details: datatypes.JSON(b), IP: c.ClientIP(), UserAgent: c.Request.UserAgent(), Status: "success", Message: "Update organization plan"}
-	_ = h.service.DB.Create(al).Error
+	h.service.LogWorker.RecordAuditLog(al)
 	JSONSuccess(c, gin.H{"org_id": orgID, "new_plan": req.PlanID, "quotas": resp})
 }
 

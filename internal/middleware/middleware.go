@@ -278,7 +278,8 @@ func Audit() gin.HandlerFunc {
 			Message:   fmt.Sprintf("耗时: %v", duration),
 		}
 
-		// 异步保存审计日志
+		// 使用全局 logger 或者 metrics 记录，如果是中间件层面的，最好有 service 实例注入，
+		// 暂保持原来的 goroutine DB写入，但在实际重构中应移至 LogWorker
 		go func() {
 			if err := storage.GetDB().Create(auditLog).Error; err != nil {
 				logger.GetLogger().WithError(err).Error("审计日志保存失败")

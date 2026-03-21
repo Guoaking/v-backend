@@ -236,17 +236,15 @@ func (h *APIKeyHandler) DeleteAPIKey(c *gin.Context) {
 
 // recordAuditLog 记录审计日志
 func (h *APIKeyHandler) recordAuditLog(c *gin.Context, userID, action, status, message string) {
-	go func() {
-		auditLog := &models.AuditLog{
-			RequestID: c.GetString("requestID"),
-			UserID:    userID,
-			Action:    action,
-			Resource:  "api_key",
-			IP:        c.ClientIP(),
-			UserAgent: c.GetHeader("User-Agent"),
-			Status:    status,
-			Message:   message,
-		}
-		h.service.CreateAuditLog(auditLog)
-	}()
+	auditLog := &models.AuditLog{
+		RequestID: c.GetString("requestID"),
+		UserID:    userID,
+		Action:    action,
+		Resource:  "api_key",
+		IP:        c.ClientIP(),
+		UserAgent: c.GetHeader("User-Agent"),
+		Status:    status,
+		Message:   message,
+	}
+	h.service.LogWorker.RecordAuditLog(auditLog)
 }

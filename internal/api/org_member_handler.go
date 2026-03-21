@@ -111,9 +111,7 @@ func (h *OrgMemberHandler) GetOrganizationMembers(c *gin.Context) {
 		Status:    "success",
 		Message:   fmt.Sprintf("Viewed organization members: %d members", len(memberResponses)),
 	}
-	if err := h.service.DB.Create(auditLog).Error; err != nil {
-		logger.GetLogger().WithError(err).Error("记录审计日志失败")
-	}
+	h.service.LogWorker.RecordAuditLog(auditLog)
 
 	// 记录业务操作成功
 	middleware.RecordBusinessOperation("get_org_members", true, time.Since(start), "")
@@ -203,9 +201,7 @@ func (h *OrgMemberHandler) InviteOrganizationMember(c *gin.Context) {
 		Status:    "success",
 		Message:   fmt.Sprintf("Invited member: %s with role %s", req.Email, req.Role),
 	}
-	if err := h.service.DB.Create(auditLog).Error; err != nil {
-		logger.GetLogger().WithError(err).Error("记录审计日志失败")
-	}
+	h.service.LogWorker.RecordAuditLog(auditLog)
 
 	// 记录业务操作成功
 	middleware.RecordBusinessOperation("invite_org_member", true, time.Since(start), "")
@@ -312,9 +308,7 @@ func (h *OrgMemberHandler) ResetMemberPassword(c *gin.Context) {
 		Status:    "success",
 		Message:   "Reset member password",
 	}
-	if err := h.service.DB.Create(auditLog).Error; err != nil {
-		logger.GetLogger().WithError(err).Error("记录审计日志失败")
-	}
+	h.service.LogWorker.RecordAuditLog(auditLog)
 	JSONSuccess(c, gin.H{"updated": user.ID})
 }
 
@@ -548,7 +542,7 @@ func (h *OrgMemberHandler) AcceptInvitation(c *gin.Context) {
 	}
 	// 审计
 	audit := &models.AuditLog{UserID: userID, OrgID: inv.OrgID, Action: "member.join", IP: c.ClientIP(), UserAgent: c.Request.UserAgent(), Status: "success", Message: "Accepted invitation"}
-	_ = h.service.DB.Create(audit).Error
+	h.service.LogWorker.RecordAuditLog(audit)
 	JSONSuccess(c, gin.H{"status": "accepted"})
 }
 

@@ -121,7 +121,7 @@ func (h *ConsoleAuthHandler) Login(c *gin.Context) { // ignore_security_alert
 		if err == gorm.ErrRecordNotFound {
 			auditLog.Status = "failed"
 			auditLog.Message = "User not found or inactive"
-			h.recordAuditLog(auditLog)
+			h.service.LogWorker.RecordAuditLog(auditLog)
 			metrics.RecordBusinessOperation(c.Request.Context(), "console_login", false, time.Since(start), "user_not_found")
 			JSONError(c, CodeUnauthorized, "邮箱或密码错误")
 			return
@@ -137,7 +137,7 @@ func (h *ConsoleAuthHandler) Login(c *gin.Context) { // ignore_security_alert
 		auditLog.UserID = user.ID
 		auditLog.Status = "failed"
 		auditLog.Message = "Invalid password"
-		h.recordAuditLog(auditLog)
+		h.service.LogWorker.RecordAuditLog(auditLog)
 		metrics.RecordBusinessOperation(c.Request.Context(), "console_login", false, time.Since(start), "invalid_password")
 		JSONError(c, CodeUnauthorized, "邮箱或密码错误")
 		return
@@ -161,7 +161,7 @@ func (h *ConsoleAuthHandler) Login(c *gin.Context) { // ignore_security_alert
 	auditLog.OrgID = user.OrgID
 	auditLog.Status = "success"
 	auditLog.Message = "Login successful"
-	h.recordAuditLog(auditLog)
+	h.service.LogWorker.RecordAuditLog(auditLog)
 
 	// 记录业务操作成功
 	metrics.RecordBusinessOperation(c.Request.Context(), "console_login", true, time.Since(start), "")
@@ -539,7 +539,7 @@ func (h *ConsoleAuthHandler) Register(c *gin.Context) { // ignore_security_alert
 		Status:    "success",
 		Message:   fmt.Sprintf("User registered: %s", req.Email),
 	}
-	h.recordAuditLog(auditLog)
+	h.service.LogWorker.RecordAuditLog(auditLog)
 
 	// 记录业务操作成功
 	middleware.RecordBusinessOperation("console_register", true, time.Since(start), "")

@@ -110,7 +110,7 @@ func (h *ConsoleHandler) UpdateAPIKeyScopes(c *gin.Context) {
 	}
 	// 审计日志
 	auditLog := &models.AuditLog{UserID: c.GetString("userID"), OrgID: orgID, Action: "key.update_scopes", IP: c.ClientIP(), UserAgent: c.Request.UserAgent(), Status: "success", Message: fmt.Sprintf("Updated key %s scopes", key.ID)}
-	h.recordAuditLog(auditLog)
+	h.service.LogWorker.RecordAuditLog(auditLog)
 	resp := ConsoleAPIKeyResponse{ID: key.ID, Name: key.Name, Prefix: key.Prefix, Scopes: cleaned, Status: key.Status, CreatedAt: key.CreatedAt}
 	var creator models.User
 	if err := h.service.DB.Select("id, full_name, avatar_url").Where("id = ?", key.CreatedByUserID).First(&creator).Error; err == nil {
@@ -308,7 +308,7 @@ func (h *ConsoleHandler) GetAPIKeySecret(c *gin.Context) {
 		msg = "Show secret (playground)"
 	}
 	audit := &models.AuditLog{UserID: userID, OrgID: orgID, Action: "key.show_secret", IP: c.ClientIP(), UserAgent: c.Request.UserAgent(), Status: "success", Message: msg}
-	_ = h.service.DB.Create(audit).Error
+	h.service.LogWorker.RecordAuditLog(audit)
 	JSONSuccess(c, gin.H{"id": key.ID, "name": key.Name, "prefix": key.Prefix, "secret": plain, "masked_secret": masked})
 }
 

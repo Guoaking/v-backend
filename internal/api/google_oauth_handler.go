@@ -148,9 +148,7 @@ func (h *GoogleOAuthHandler) GoogleLogin(c *gin.Context) {
 		Status:    "success",
 		Message:   fmt.Sprintf("Google OAuth login successful for: %s", user.Email),
 	}
-	if err := h.service.DB.Create(auditLog).Error; err != nil {
-		logger.GetLogger().WithError(err).Error("记录审计日志失败")
-	}
+	h.service.LogWorker.RecordAuditLog(auditLog)
 
 	// 记录业务操作成功
 	middleware.RecordBusinessOperation("google_oauth", true, time.Since(start), "")

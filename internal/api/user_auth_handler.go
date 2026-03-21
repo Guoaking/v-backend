@@ -135,18 +135,15 @@ func (h *UserAuthHandler) generateJWT(user *models.User) (string, error) {
 
 // recordAuditLog 记录审计日志
 func (h *UserAuthHandler) recordAuditLog(c *gin.Context, userID, action, status, message string) {
-	// 延迟记录审计日志，避免阻塞主流程
-	go func() {
-		auditLog := &models.AuditLog{
-			RequestID: c.GetString("requestID"),
-			UserID:    userID,
-			Action:    action,
-			Resource:  "auth",
-			IP:        c.ClientIP(),
-			UserAgent: c.GetHeader("User-Agent"),
-			Status:    status,
-			Message:   message,
-		}
-		h.service.CreateAuditLog(auditLog)
-	}()
+	auditLog := &models.AuditLog{
+		RequestID: c.GetString("requestID"),
+		UserID:    userID,
+		Action:    action,
+		Resource:  "auth",
+		IP:        c.ClientIP(),
+		UserAgent: c.GetHeader("User-Agent"),
+		Status:    status,
+		Message:   message,
+	}
+	h.service.LogWorker.RecordAuditLog(auditLog)
 }

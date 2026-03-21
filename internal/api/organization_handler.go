@@ -252,12 +252,22 @@ func (h *OrganizationHandler) GetCurrentOrganization(c *gin.Context) {
 		Status:    "success",
 		Message:   fmt.Sprintf("Viewed organization: %s", org.Name),
 	}
-	if err := h.service.DB.Create(auditLog).Error; err != nil {
-		logger.GetLogger().WithError(err).Error("记录审计日志失败")
+	h.service.LogWorker.RecordAuditLog(auditLog)
+
+	// 记录审计日志
+	auditLog = &models.AuditLog{
+		UserID:    c.GetString("userID"),
+		OrgID:     org.ID,
+		Action:    "create_organization",
+		IP:        c.ClientIP(),
+		UserAgent: c.Request.UserAgent(),
+		Status:    "success",
+		Message:   fmt.Sprintf("Created organization: %s", org.Name),
 	}
+	h.service.LogWorker.RecordAuditLog(auditLog)
 
 	// 记录业务操作成功
-	middleware.RecordBusinessOperation("get_org_info", true, time.Since(start), "")
+	middleware.RecordBusinessOperation("create_org", true, time.Since(start), "")
 
 	JSONSuccess(c, OrganizationResponse{
 		ID:           org.ID,
@@ -323,9 +333,7 @@ func (h *OrganizationHandler) UpdatePlan(c *gin.Context) {
 		Status:    "success",
 		Message:   fmt.Sprintf("Updated organization plan to: %s", req.PlanID),
 	}
-	if err := h.service.DB.Create(auditLog).Error; err != nil {
-		logger.GetLogger().WithError(err).Error("记录审计日志失败")
-	}
+	h.service.LogWorker.RecordAuditLog(auditLog)
 
 	// 记录业务操作成功
 	middleware.RecordBusinessOperation("update_org_plan", true, time.Since(start), "")
