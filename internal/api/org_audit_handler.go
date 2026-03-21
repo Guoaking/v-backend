@@ -31,7 +31,7 @@ func (h *OrgAuditHandler) GetOrgAuditLogs(c *gin.Context) {
 		return
 	}
 	page := 1
-	pageSize := 20
+	pageSize := 50
 	if v := c.Query("page"); v != "" {
 		fmt.Sscanf(v, "%d", &page)
 	}
@@ -44,12 +44,16 @@ func (h *OrgAuditHandler) GetOrgAuditLogs(c *gin.Context) {
 		page = 1
 	}
 	if pageSize < 1 || pageSize > 100 {
-		pageSize = 20
+		pageSize = 50
 	}
 	offset := (page - 1) * pageSize
 	action := c.Query("action")
 	startDate := c.Query("start_date")
 	endDate := c.Query("end_date")
+	userID := c.Query("user_id")
+	ip := c.Query("ip")
+	logID := c.Query("log_id")
+
 	type Row struct {
 		ID        uint      `json:"id"`
 		OrgID     string    `json:"org_id"`
@@ -63,7 +67,7 @@ func (h *OrgAuditHandler) GetOrgAuditLogs(c *gin.Context) {
 		CreatedAt time.Time `json:"created_at"`
 	}
 	qb := h.service.DB.Table("audit_logs al").Select("al.id, al.org_id, al.user_id, COALESCE(u.full_name,u.name) as user_name, al.action, al.message, al.resource, al.ip, al.status, al.created_at").Joins("LEFT JOIN users u ON u.id = al.user_id").Where("al.org_id = ?", orgID)
-	if action != "" {
+	if action != "" && action != "all" {
 		qb = qb.Where("al.action = ?", action)
 	}
 	if startDate != "" {
@@ -71,6 +75,15 @@ func (h *OrgAuditHandler) GetOrgAuditLogs(c *gin.Context) {
 	}
 	if endDate != "" {
 		qb = qb.Where("al.created_at < ?::date + interval '1 day'", endDate)
+	}
+	if userID != "" {
+		qb = qb.Where("al.user_id = ?", userID)
+	}
+	if ip != "" {
+		qb = qb.Where("al.ip LIKE ?", "%"+ip+"%")
+	}
+	if logID != "" {
+		qb = qb.Where("al.id = ?", logID)
 	}
 	var total int64
 	if err := qb.Count(&total).Error; err != nil {
