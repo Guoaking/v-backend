@@ -117,15 +117,6 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 			console.GET("/users/me", consoleHandler.GetCurrentUser)
 			console.PUT("/users/me", consoleHandler.UpdateUserProfile)
 			console.PUT("/users/me/password", userAuthHandler.UpdatePassword)
-			// --- [DEPRECATED] API Keys Endpoints ---
-			// These endpoints are preserved for backward compatibility but will be removed in future versions.
-			// Clients should migrate to the /oauth/clients endpoints.
-			console.GET("/keys", middleware.RequireOrganizationHeader(kycService), middleware.RequirePermission("keys.read"), consoleHandler.ListAPIKeys)
-			console.POST("/keys", middleware.RequireOrganizationHeader(kycService), middleware.RequirePermission("keys.write"), consoleHandler.CreateAPIKey)
-			console.DELETE("/keys/:id", middleware.RequireOrganizationHeader(kycService), middleware.RequirePermission("keys.write"), consoleHandler.RevokeAPIKey)
-			console.PATCH("/keys/:id", middleware.RequireOrganizationHeader(kycService), middleware.RequirePermission("keys.write"), consoleHandler.UpdateAPIKeyScopes)
-			console.GET("/keys/:id/secret", middleware.RequireOrganizationHeader(kycService), middleware.RequirePermission("keys.read"), consoleHandler.GetAPIKeySecret)
-			// ----------------------------------------
 
 			console.GET("/usage", middleware.RequireOrganizationHeader(kycService), middleware.RequirePermission(models.PermLogsRead), consoleHandler.GetUsage)
 			console.GET("/usage/stats", middleware.RequireOrganizationHeader(kycService), middleware.RequirePermission(models.PermLogsRead), consoleHandler.GetUsageStats)

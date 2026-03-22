@@ -15,9 +15,7 @@ import (
 type usageEvent struct {
 	ID            string    `json:"id"`
 	OrgID         string    `json:"org_id"`
-	APIKeyID      string    `json:"api_key_id"`
 	UserID        string    `json:"user_id"`
-	APIKeyOwnerID string    `json:"api_key_owner_id"`
 	ActorUserID   string    `json:"actor_user_id"`
 	OAuthClientID string    `json:"oauth_client_id"`
 	Endpoint      string    `json:"endpoint"`
@@ -35,11 +33,9 @@ func KYCUsageMeter(svc *service.KYCService) gin.HandlerFunc {
 			latency := time.Since(start)
 
 			orgID := c.GetString("orgID")
-			apiKeyID := c.GetString("apiKeyID")
 			userID := c.GetString("userID")
-			apiKeyOwnerID := c.GetString("apiKeyOwnerID")
 			oauthClientID := c.GetString("oauthClientID")
-			// actor: 若 userID 非当前组织活跃成员，则回退到 apiKeyOwnerID
+			// actor: 若 userID 非当前组织活跃成员
 			actorUserID := userID
 			if actorUserID != "" && orgID != "" {
 				var cnt int64
@@ -49,25 +45,17 @@ func KYCUsageMeter(svc *service.KYCService) gin.HandlerFunc {
 				}
 			}
 			if actorUserID == "" {
-				actorUserID = apiKeyOwnerID
-			}
-			if actorUserID == "" {
 				actorUserID = c.GetString("clientOwnerID")
 			}
 
 			// 如果发生 panic，Gin 的 Recovery 中间件会写入 500，但可能在 defer 之后执行
-			// 因此这里只能获取当前状态。如果 c.Writer.Status() 还是 200 但发生了 panic，
-			// 通常意味着 Recovery 还没跑。但在 Gin 中，Recovery 是最外层，
-			// 所以当这个 defer 执行时，panic 已经向上冒泡了，这里拿到的状态码可能不准。
-			// 但我们依靠 "billable" 逻辑兜底。
+			// 因此这里只能获取当前状态。
 			statusCode := c.Writer.Status()
 
 			ev := usageEvent{
 				ID:            utils.GenerateID(),
 				OrgID:         orgID,
-				APIKeyID:      apiKeyID,
 				UserID:        userID,
-				APIKeyOwnerID: apiKeyOwnerID,
 				ActorUserID:   actorUserID,
 				OAuthClientID: oauthClientID,
 				Endpoint:      c.FullPath(),
@@ -92,17 +80,13 @@ func KYCUsageMeter(svc *service.KYCService) gin.HandlerFunc {
 			}
 
 			// 获取计费单位，默认为 1 (次)。
-			// 某些业务可能一次调用算多次（例如批量处理），下游 Handler 可设置此值
 			usageUnits := c.GetInt("usage_units")
 			if usageUnits == 0 {
 				usageUnits = 1
 			}
 
-			// 默认非 500 的都算作有效计费 (业务可自定义覆盖)
+			// 默认非 500 的都算作有效计费
 			billable := true
-			// 5xx: 服务端错误 -> 免单
-			// 429: 限流/配额超限 -> 免单 (虽然占用了网关资源，但通常不计费)
-			// 402: 欠费/需要付费 -> 免单
 			if statusCode >= 500 || statusCode == http.StatusTooManyRequests || statusCode == http.StatusPaymentRequired {
 				billable = false
 			}
@@ -110,13 +94,13 @@ func KYCUsageMeter(svc *service.KYCService) gin.HandlerFunc {
 				billable = b.(bool)
 			}
 
-			// 获取 SessionID (TraceID 或 自定义 SessionID)
+			// 获取 SessionID
 			sessionID := c.GetString("session_id")
 			if sessionID == "" {
-				sessionID = ev.RequestID // 默认使用 RequestID 作为 SessionID
+				sessionID = ev.RequestID
 			}
 
-			// 获取 Metadata (支持业务层传递结构化的附加信息)
+			// 获取 Metadata
 			var metadata map[string]interface{}
 			if md, exists := c.Get("metadata"); exists {
 				if m, ok := md.(map[string]interface{}); ok {
@@ -127,8 +111,6 @@ func KYCUsageMeter(svc *service.KYCService) gin.HandlerFunc {
 			// 构建强类型 Payload
 			payload := models.BillingPayload{
 				ID:            ev.ID,
-				APIKeyID:      ev.APIKeyID,
-				APIKeyOwnerID: ev.APIKeyOwnerID,
 				ActorUserID:   ev.ActorUserID,
 				OAuthClientID: ev.OAuthClientID,
 				Endpoint:      ev.Endpoint,

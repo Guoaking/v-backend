@@ -27,7 +27,7 @@ func RequireKeyScope(required string) gin.HandlerFunc {
 			}
 		}
 		if !has {
-			response.JSONError(c, response.CodeForbidden, "API key lacks required scope")
+			response.JSONError(c, response.CodeForbidden, "Missing required scope")
 			c.Abort()
 			return
 		}

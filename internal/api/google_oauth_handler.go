@@ -5,13 +5,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 
 	"kyc-service/internal/middleware"
 	"kyc-service/internal/models"
 	"kyc-service/internal/service"
-	"kyc-service/pkg/crypto"
 	"kyc-service/pkg/logger"
 	"kyc-service/pkg/metrics"
 	"kyc-service/pkg/utils"
@@ -265,44 +263,6 @@ func (h *GoogleOAuthHandler) createUserFromGoogle(googleUser *GoogleUserInfo) (m
 	if err := tx.Create(&member).Error; err != nil {
 		tx.Rollback()
 		return models.User{}, fmt.Errorf("添加用户到组织失败: %v", err)
-	}
-
-	// 创建默认API密钥
-	// 创建默认API密钥
-	defaultSecret := "sk_live_" + utils.GenerateID()
-	// 计算前缀
-	prefix := ""
-	if idx := strings.Index(defaultSecret, "_"); idx != -1 {
-		if j := strings.Index(defaultSecret[idx+1:], "_"); j != -1 {
-			prefix = defaultSecret[:idx+1+j+1]
-			if k := strings.LastIndex(prefix, "_"); k != -1 {
-				prefix = prefix[:k]
-			}
-		}
-	}
-
-	apiKey := models.APIKey{
-		ID:         utils.GenerateID(),
-		UserID:     user.ID,
-		OrgID:      org.ID,
-		Name:       "Default Key",
-		SecretHash: "", // 将在下面设置
-		Prefix:     prefix,
-		Scopes:     `["ocr:read"]`,
-		Status:     "active",
-	}
-
-	// 生成密钥哈希
-	secretHash, err := crypto.HashString(defaultSecret)
-	if err != nil {
-		tx.Rollback()
-		return models.User{}, fmt.Errorf("密钥哈希失败: %v", err)
-	}
-	apiKey.SecretHash = secretHash
-
-	if err := tx.Create(&apiKey).Error; err != nil {
-		tx.Rollback()
-		return models.User{}, fmt.Errorf("创建默认API密钥失败: %v", err)
 	}
 
 	if err := tx.Commit().Error; err != nil {

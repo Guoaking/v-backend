@@ -36,18 +36,18 @@ func (h *ConsoleHandler) GetLogs(c *gin.Context) {
 	orgID := c.GetString("orgID")
 	var logs []models.UsageLog
 	q := h.service.DB.Where("org_id = ?", orgID).Order("created_at DESC").Offset(offset).Limit(limit)
-	// key_id 过滤与权限校验
-	if kid := c.Query("key_id"); kid != "" {
-		var key models.APIKey
-		if err := h.service.DB.First(&key, "id = ?", kid).Error; err != nil {
-			JSONError(c, CodeNotFound, "Key不存在")
+	// client_id 过滤与权限校验
+	if cid := c.Query("client_id"); cid != "" {
+		var client models.OAuthClient
+		if err := h.service.DB.First(&client, "id = ?", cid).Error; err != nil {
+			JSONError(c, CodeNotFound, "OAuth Client不存在")
 			return
 		}
-		if role != "owner" && role != "admin" && key.CreatedByUserID != userID {
-			JSONError(c, CodeForbidden, "无权查看该Key日志")
+		if role != "owner" && role != "admin" && client.OwnerID != userID {
+			JSONError(c, CodeForbidden, "无权查看该Client日志")
 			return
 		}
-		q = q.Where("api_key_id = ?", kid)
+		q = q.Where("oauth_client_id = ?", cid)
 	}
 	// TODO: UsageLog 目前没有 api_key_owner_id，暂不限制普通用户查看自己Key的逻辑
 	// else if role != "owner" && role != "admin" {
@@ -93,8 +93,8 @@ func (h *ConsoleHandler) GetLogs(c *gin.Context) {
 	}
 	var total int64
 	cq := h.service.DB.Model(&models.UsageLog{}).Where("org_id = ?", orgID)
-	if kid := c.Query("key_id"); kid != "" {
-		cq = cq.Where("api_key_id = ?", kid)
+	if cid := c.Query("client_id"); cid != "" {
+		cq = cq.Where("oauth_client_id = ?", cid)
 	}
 	// TODO: UsageLog 目前没有 api_key_owner_id
 	// else if role != "owner" && role != "admin" {
@@ -147,9 +147,6 @@ func (h *ConsoleHandler) GetLogs(c *gin.Context) {
 			TimeStamp:    utils.FormatTimeUnix(lg.CreatedAt),
 			RequestBody:  "{}", // 计费日志不存 Body
 			ResponseBody: "{}", // 计费日志不存 Body
-			KeyID:        lg.APIKeyID,
-			KeyName:      "N/A",     // 需要关联查询 APIKey 表
-			KeyOwnerID:   lg.UserID, // UserID 在这里相当于 OwnerID 的语义
 		}
 	}
 	JSONSuccess(c, gin.H{"page": page, "limit": limit, "total": total, "items": items})

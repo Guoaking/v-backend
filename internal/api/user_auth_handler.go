@@ -53,12 +53,11 @@ type AuthResponse struct {
 
 // UserProfile 用户档案
 type UserProfile struct {
-	ID        string                  `json:"id"`
-	Email     string                  `json:"email"`
-	Name      string                  `json:"name"`
-	AvatarURL string                  `json:"avatar_url"`
-	Role      string                  `json:"role"`
-	APIKeys   []ConsoleAPIKeyResponse `json:"api_keys"`
+	ID        string `json:"id"`
+	Email     string `json:"email"`
+	Name      string `json:"name"`
+	AvatarURL string `json:"avatar_url"`
+	Role      string `json:"role"`
 }
 
 // @Summary 修改用户密码

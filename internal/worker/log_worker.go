@@ -122,7 +122,6 @@ func (w *AsyncLogWorker) processLogs() {
 						ID:            payload.ID,
 						OrgID:         log.Identity.TenantID,
 						UserID:        log.Identity.UserID,
-						APIKeyID:      payload.APIKeyID,
 						OAuthClientID: payload.OAuthClientID,
 						Endpoint:      payload.Endpoint,
 						StatusCode:    payload.StatusCode,

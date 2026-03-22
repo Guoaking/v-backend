@@ -226,7 +226,6 @@ func (h *OrgUsageHandler) TriggerUsageAggregation(c *gin.Context) {
 			jsonb_build_object(
 				'service_type', COALESCE(service_type, 'unknown'),
 				'endpoint', endpoint,
-				'api_key_id', COALESCE(api_key_id, ''),
 				'user_id', COALESCE(user_id, '')
 			) AS dimensions,
 			COUNT(*) AS total_requests,
@@ -234,7 +233,7 @@ func (h *OrgUsageHandler) TriggerUsageAggregation(c *gin.Context) {
 			COALESCE(SUM(usage_units), 0) AS usage_units
 		FROM usage_logs
 		WHERE org_id = ?
-		GROUP BY org_id, DATE_TRUNC('day', created_at), service_type, endpoint, api_key_id, user_id
+		GROUP BY org_id, DATE_TRUNC('day', created_at), service_type, endpoint, user_id
 		ON CONFLICT (org_id, metric_name, time_unit, stat_time, dimensions) 
 		DO UPDATE SET 
 			total_requests = EXCLUDED.total_requests,
@@ -533,36 +532,6 @@ func (h *OrgUsageHandler) GetUsageDetailedV2(c *gin.Context) {
 		})
 	}
 
-	// 7. API Key breakdown from usage_metric_aggs
-	var keyRows []struct {
-		ID  string
-		Cnt int64
-	}
-
-	keyQuery := h.service.DB.Model(&models.UsageMetricAgg{}).
-		Select("dimensions->>'api_key_id' as id, SUM(usage_units) as cnt").
-		Where("org_id = ? AND stat_time >= ? AND time_unit = 'day' AND dimensions->>'api_key_id' IS NOT NULL", orgID, sinceDate).
-		Group("dimensions->>'api_key_id'").
-		Order("cnt DESC").
-		Limit(10)
-
-	if scope == "personal" {
-		keyQuery = keyQuery.Where("dimensions->>'user_id' = ?", c.GetString("userID"))
-	}
-
-	if err := keyQuery.Scan(&keyRows).Error; err != nil {
-		JSONError(c, CodeDatabaseError, "查询密钥聚合失败")
-		return
-	}
-	byKey := make([]byItem, 0, len(keyRows))
-	for _, r := range keyRows {
-		pct := 0.0
-		if totalForPct > 0 {
-			pct = math.Round((float64(r.Cnt)/float64(totalForPct))*1000) / 10
-		}
-		byKey = append(byKey, byItem{ID: r.ID, Label: r.ID, Count: r.Cnt, Percentage: pct})
-	}
-
 	data := gin.H{
 		"totalRequests": totalRequests,
 		"totalErrors":   totalErrors,
@@ -577,7 +546,6 @@ func (h *OrgUsageHandler) GetUsageDetailedV2(c *gin.Context) {
 		"timeline":   timeline,
 		"byService":  byService,
 		"byEndpoint": byEndpoint,
-		"byKey":      byKey,
 	}
 	respBytes, _ := json.Marshal(gin.H{"success": true, "data": data})
 	c.Data(200, "application/json", respBytes)

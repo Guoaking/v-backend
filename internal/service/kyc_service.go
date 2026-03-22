@@ -601,45 +601,6 @@ func (s *KYCService) UpdateOrganizationMember(member *models.OrganizationMember)
 	return s.DB.Save(member).Error
 }
 
-// API密钥管理相关方法
-
-// GetAPIKeysByUserID 根据用户ID获取API密钥列表
-func (s *KYCService) GetAPIKeysByUserID(userID string) ([]models.APIKey, error) {
-	var keys []models.APIKey
-	if err := s.DB.Where("user_id = ? AND status = ?", userID, "active").Find(&keys).Error; err != nil {
-		return nil, err
-	}
-	return keys, nil
-}
-
-// GetAPIKeyByID 根据ID获取API密钥
-func (s *KYCService) GetAPIKeyByID(id string) (*models.APIKey, error) {
-	var key models.APIKey
-	if err := s.DB.Where("id = ?", id).First(&key).Error; err != nil {
-		return nil, err
-	}
-	return &key, nil
-}
-
-// CreateAPIKey 创建API密钥
-func (s *KYCService) CreateAPIKey(key *models.APIKey) error {
-	return s.DB.Create(key).Error
-}
-
-// UpdateAPIKey 更新API密钥
-func (s *KYCService) UpdateAPIKey(key *models.APIKey) error {
-	return s.DB.Save(key).Error
-}
-
-// GetAPIKeyBySecretHash 根据密钥哈希获取API密钥
-func (s *KYCService) GetAPIKeyBySecretHash(hash string) (*models.APIKey, error) {
-	var key models.APIKey
-	if err := s.DB.Where("secret_hash = ?", hash).First(&key).Error; err != nil {
-		return nil, err
-	}
-	return &key, nil
-}
-
 // LivenessVideo migrated to liveness_service.go
 
 // LivenessSilent migrated to liveness_service.go

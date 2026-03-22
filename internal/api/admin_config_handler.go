@@ -11,11 +11,11 @@ import (
 func (h *AdminHandler) GetOverviewStats(c *gin.Context) {
 	var totalUsers int64
 	_ = h.service.DB.Model(&models.User{}).Count(&totalUsers).Error
-	var activeKeys int64
-	_ = h.service.DB.Model(&models.APIKey{}).Where("status = ?", "active").Count(&activeKeys).Error
+	var activeClients int64
+	_ = h.service.DB.Model(&models.OAuthClient{}).Where("status = ?", "active").Count(&activeClients).Error
 	var todayRequests int64
-	_ = h.service.DB.Model(&models.APIRequestLog{}).Where("DATE(created_at) = CURRENT_DATE").Count(&todayRequests).Error
-	JSONSuccess(c, AdminOverviewStats{TotalUsers: totalUsers, ActiveKeys: activeKeys, TodayRequests: todayRequests})
+	_ = h.service.DB.Model(&models.UsageLog{}).Where("DATE(created_at) = CURRENT_DATE").Count(&todayRequests).Error
+	JSONSuccess(c, AdminOverviewStats{TotalUsers: totalUsers, ActiveClients: activeClients, TodayRequests: todayRequests})
 }
 
 func (h *AdminHandler) UpdateGlobalConfig(c *gin.Context) {

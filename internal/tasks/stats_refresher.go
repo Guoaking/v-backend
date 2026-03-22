@@ -12,28 +12,6 @@ func StartStatsRefresher(svc *service.KYCService, interval time.Duration) {
 		for {
 			now := time.Now()
 			since := now.Add(-24 * time.Hour)
-			var rows []struct {
-				APIKeyID         string
-				Total            int64
-				Success          int64
-				LastErrorMessage string
-				LastErrorAt      *time.Time
-			}
-			svc.DB.Raw(`SELECT api_key_id AS api_key_id, COUNT(*) AS total, SUM(CASE WHEN status_code < 400 THEN 1 ELSE 0 END) AS success, MAX(CASE WHEN status_code >= 400 THEN endpoint END) AS last_error_message, MAX(CASE WHEN status_code >= 400 THEN created_at END) AS last_error_at FROM usage_logs WHERE created_at >= ? GROUP BY api_key_id`, since).Scan(&rows)
-			for _, r := range rows {
-				var key models.APIKey
-				if err := svc.DB.First(&key, "id = ?", r.APIKeyID).Error; err == nil {
-					rate := float64(0)
-					if r.Total > 0 {
-						rate = float64(r.Success) / float64(r.Total) * 100
-					}
-					key.TotalRequests24h = int(r.Total)
-					key.SuccessRate24h = rate
-					key.LastErrorMessage = r.LastErrorMessage
-					key.LastErrorAt = r.LastErrorAt
-					_ = svc.DB.Save(&key).Error
-				}
-			}
 			var orgRows []struct {
 				OrgID string
 				Total int64

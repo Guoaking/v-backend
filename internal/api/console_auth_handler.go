@@ -2,17 +2,13 @@ package api
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"kyc-service/internal/middleware"
 	"kyc-service/internal/models"
 	"kyc-service/internal/service"
-	"kyc-service/pkg/crypto"
 	"kyc-service/pkg/logger"
 	"kyc-service/pkg/metrics"
 	"kyc-service/pkg/utils"
@@ -511,16 +507,6 @@ func (h *ConsoleAuthHandler) Register(c *gin.Context) { // ignore_security_alert
 		return
 	}
 
-	// 创建默认API密钥
-	_, err = h.createDefaultAPIKey(tx, &user, &org)
-	if err != nil {
-		tx.Rollback()
-		logger.GetLogger().WithError(err).Error("创建默认API密钥失败")
-		middleware.RecordBusinessOperation("console_register", false, time.Since(start), "api_key_creation_failed")
-		JSONError(c, CodeConflict, "API密钥创建失败")
-		return
-	}
-
 	// 提交事务
 	if err := tx.Commit().Error; err != nil {
 		logger.GetLogger().WithError(err).Error("提交事务失败")
@@ -567,71 +553,6 @@ func (h *ConsoleAuthHandler) generateUserJWT(user *models.User, org *models.Orga
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(h.service.Config.Security.JWTSecret))
-}
-
-// createDefaultAPIKey 创建默认API密钥
-func (h *ConsoleAuthHandler) createDefaultAPIKey(tx *gorm.DB, user *models.User, org *models.Organization) (*models.APIKey, error) {
-	// 生成密钥
-	secretKey := h.generateAPIKeySecret()
-	// 计算前缀
-	prefix := ""
-	if idx := strings.Index(secretKey, "_"); idx != -1 {
-		if j := strings.Index(secretKey[idx+1:], "_"); j != -1 {
-			prefix = secretKey[:idx+1+j+1]
-			if k := strings.LastIndex(prefix, "_"); k != -1 {
-				prefix = prefix[:k]
-			}
-		}
-	}
-
-	// 哈希密钥用于存储
-	secretHash, err := crypto.HashString(secretKey)
-	if err != nil {
-		return nil, err
-	}
-
-	encSecret := ""
-	if h.service.Encryptor != nil {
-		if es, err := h.service.Encryptor.Encrypt(secretKey); err == nil {
-			encSecret = es
-		} else {
-			logger.GetLogger().WithError(err).Warn("加密API密钥失败，改为不保存明文密钥")
-		}
-	} else {
-		logger.GetLogger().Warn("未配置加密密钥（EncryptionKey），不保存明文密钥副本")
-	}
-
-	apiKey := models.APIKey{
-		ID:              utils.GenerateID(),
-		UserID:          user.ID,
-		OrgID:           org.ID,
-		Name:            "Default Key",
-		SecretHash:      secretHash,
-		SecretEnc:       encSecret,
-		Prefix:          prefix,
-		Scopes:          `["ocr:read", "face:read", "liveness:read"]`,
-		Status:          "active",
-		CreatedByUserID: user.ID,
-	}
-
-	if err := tx.Create(&apiKey).Error; err != nil {
-		return nil, err
-	}
-
-	return &apiKey, nil
-}
-
-// generateAPIKeySecret 生成API密钥
-func (h *ConsoleAuthHandler) generateAPIKeySecret() string {
-	// 生成32字节的随机数据
-	bytes := make([]byte, 32)
-	rand.Read(bytes)
-
-	// 编码为base64
-	encoded := base64.URLEncoding.EncodeToString(bytes)
-
-	// 添加前缀并返回
-	return "sk_live_" + strings.ToLower(encoded)
 }
 
 // recordAuditLog 记录审计日志

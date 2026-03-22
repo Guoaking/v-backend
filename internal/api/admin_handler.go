@@ -168,7 +168,7 @@ type AdminUpdateUserRequest struct {
 
 type AdminOverviewStats struct {
 	TotalUsers    int64 `json:"total_users"`
-	ActiveKeys    int64 `json:"active_keys"`
+	ActiveClients int64 `json:"active_clients"`
 	TodayRequests int64 `json:"today_requests"`
 }
 

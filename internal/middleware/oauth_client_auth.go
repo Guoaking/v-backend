@@ -7,8 +7,6 @@ import (
 
 	"kyc-service/internal/models"
 	"kyc-service/internal/service"
-	"kyc-service/pkg/crypto"
-	"kyc-service/pkg/logger"
 	"kyc-service/pkg/response"
 
 	"github.com/gin-gonic/gin"
@@ -187,36 +185,8 @@ func APIOrOAuthAuth(svc *service.KYCService) gin.HandlerFunc {
 			}
 		}
 
-		// 回退：按API Key处理
-		hash, _ := crypto.HashString(credential)
-		key, err := svc.GetAPIKeyBySecretHash(hash)
-		if err != nil {
-			logger.GetLogger().WithError(err).Error("API key查询失败")
-			response.JSONError(c, response.CodeUnauthorized, "Invalid API key")
-			c.Abort()
-			return
-		}
-		if key.Status != "active" {
-			response.JSONError(c, response.CodeUnauthorized, "API key is revoked")
-			c.Abort()
-			return
-		}
-		// IP白名单
-		if len(key.IPWhitelist) > 0 {
-			clientIP := c.ClientIP()
-			if !isIPAllowed(clientIP, key.IPWhitelist) {
-				response.JSONError(c, response.CodeForbidden, "IP not allowed")
-				c.Abort()
-				return
-			}
-		}
-		// 注入上下文
-		c.Set("userID", key.UserID)
-		c.Set("orgID", key.OrgID)
-		c.Set("apiKeyID", key.ID)
-		c.Set("apiKeyOwnerID", key.UserID)
-		c.Set("scopes", key.Scopes)
-		c.Next()
+		response.JSONError(c, response.CodeUnauthorized, "Invalid or expired token. Note: API Keys are deprecated, please use OAuth2 Client Credentials.")
+		c.Abort()
 	}
 }
 

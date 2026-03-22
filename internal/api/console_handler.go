@@ -14,10 +14,7 @@ func NewConsoleHandler(svc *service.KYCService) *ConsoleHandler {
 	return &ConsoleHandler{service: svc}
 }
 
-// ConsoleCreateAPIKeyRequest 创建API密钥请求
-
-// ConsoleAPIKeyResponse API密钥响应
-
+// PaginationRequest 通用分页请求参数
 type UpdateKeyScopesRequest struct {
 	Scopes []string `json:"scopes" binding:"required,min=1"`
 }
@@ -49,7 +46,7 @@ type UserMeResponse struct {
 // @Failure 401 {object} ErrorResponse
 // @Router /api/v1/users/me [get]
 
-// [DEPRECATED] API Key related methods have been moved to console_apikey_handler.go and marked for removal.
+// [DEPRECATED] API Key related methods have been removed. Use OAuth Client instead.
 
 // UpdateUserProfile 更新用户资料
 // @Summary 更新用户资料
@@ -62,39 +59,6 @@ type UserMeResponse struct {
 // @Failure 400 {object} ErrorResponse
 // @Failure 401 {object} ErrorResponse
 // @Router /api/v1/users/me [put]
-
-// CreateAPIKey 创建API密钥
-// @Summary 创建API密钥
-// @Description 创建新的API密钥
-// @Tags Console
-// @Accept json
-// @Produce json
-// @Param request body ConsoleCreateAPIKeyRequest true "创建API密钥请求"
-// @Success 200 {object} SuccessResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 401 {object} ErrorResponse
-// @Router /api/v1/keys [post]
-
-// GetAPIKeySecret 返回明文密钥（加密存储，按权限解密）
-
-// ListAPIKeys 控制台获取API密钥列表（含统计） [DEPRECATED]
-
-// RevokeAPIKey 撤销API密钥 [DEPRECATED]
-// @Summary 撤销API密钥
-// @Description 撤销指定的API密钥
-// @Tags Console
-// @Accept json
-// @Produce json
-// @Param id path string true "API密钥ID"
-// @Success 200 {object} SuccessResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 401 {object} ErrorResponse
-// @Failure 404 {object} ErrorResponse
-// @Router /api/v1/keys/{id} [delete]
-
-// generateAPIKeySecret 生成API密钥
-
-// recordAuditLog 记录审计日志
 
 // UsageItem 用量聚合项
 type UsageItem struct {
@@ -115,9 +79,6 @@ type LogItem struct {
 	TimeStamp    string `json:"timestamp"`
 	RequestBody  string `json:"requestBody"`
 	ResponseBody string `json:"responseBody"`
-	KeyID        string `json:"key_id,omitempty"`
-	KeyName      string `json:"key_name,omitempty"`
-	KeyOwnerID   string `json:"keyOwner,omitempty"`
 }
 
 // GetUsage 聚合用量

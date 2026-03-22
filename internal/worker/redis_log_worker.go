@@ -266,7 +266,6 @@ func (w *RedisLogWorker) processBillingBatch(messages []redis.XMessage) {
 			ID:            payload.ID,
 			OrgID:         env.Identity.TenantID,
 			UserID:        env.Identity.UserID,
-			APIKeyID:      payload.APIKeyID,
 			OAuthClientID: payload.OAuthClientID,
 			Endpoint:      payload.Endpoint,
 			StatusCode:    payload.StatusCode,
@@ -348,7 +347,6 @@ func (w *RedisLogWorker) aggregateAndUpsert(tx *gorm.DB, logs []models.UsageLog)
 		StatTime    time.Time
 		ServiceType string
 		Endpoint    string
-		APIKeyID    string
 		UserID      string
 	}
 
@@ -368,7 +366,6 @@ func (w *RedisLogWorker) aggregateAndUpsert(tx *gorm.DB, logs []models.UsageLog)
 			StatTime:    statTime,
 			ServiceType: logItem.ServiceType,
 			Endpoint:    logItem.Endpoint,
-			APIKeyID:    logItem.APIKeyID,
 			UserID:      logItem.UserID,
 		}
 
@@ -393,7 +390,6 @@ func (w *RedisLogWorker) aggregateAndUpsert(tx *gorm.DB, logs []models.UsageLog)
 		dimensions := map[string]string{
 			"service_type": key.ServiceType,
 			"endpoint":     key.Endpoint,
-			"api_key_id":   key.APIKeyID,
 			"user_id":      key.UserID,
 		}
 

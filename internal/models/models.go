@@ -161,7 +161,7 @@ type UsageLog struct {
 
 // UsageMetricAgg 统一维度聚合表 (Hybrid Model for B2B SaaS)
 type UsageMetricAgg struct {
-	ID         string    `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
+	ID         string    `gorm:"primaryKey" json:"id"`
 	OrgID      string    `gorm:"index;not null" json:"org_id"`      // 核心维度: 租户隔离
 	MetricName string    `gorm:"index;not null" json:"metric_name"` // 核心维度: 指标名称 (e.g., api_call, liveness_check)
 	TimeUnit   string    `gorm:"index;not null" json:"time_unit"`   // 核心维度: 聚合粒度 (hour, day, month)
@@ -240,7 +240,7 @@ type RolePermission struct {
 
 // APIRequestLog API请求日志表
 type APIRequestLog struct {
-	ID            string         `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
+	ID            string         `gorm:"primaryKey" json:"id"`
 	OrgID         string         `gorm:"index" json:"org_id"`
 	UserID        *string        `gorm:"index" json:"user_id,omitempty"`
 	APIKeyID      *string        `gorm:"index" json:"api_key_id,omitempty"`

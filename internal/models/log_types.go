@@ -49,8 +49,6 @@ type IdentityInfo struct {
 // BillingPayload 强类型的计费负载
 type BillingPayload struct {
 	ID            string                 `json:"id"`
-	APIKeyID      string                 `json:"api_key_id,omitempty"`
-	APIKeyOwnerID string                 `json:"api_key_owner_id,omitempty"`
 	ActorUserID   string                 `json:"actor_user_id,omitempty"`
 	OAuthClientID string                 `json:"oauth_client_id,omitempty"`
 	Endpoint      string                 `json:"endpoint"`
