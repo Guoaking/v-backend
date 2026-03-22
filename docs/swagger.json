@@ -888,6 +888,59 @@
                 }
             }
         },
+        "/clients/{id}/rotate": {
+            "post": {
+                "description": "Generate a new client secret and optionally invalidate the old one immediately",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Client Management"
+                ],
+                "summary": "Rotate OAuth client secret",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Client ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/docs/error-codes": {
             "get": {
                 "description": "Client, business, payment and server error codes with messages and HTTP status mapping",
@@ -1453,6 +1506,9 @@
                 "name": {
                     "type": "string"
                 },
+                "owner": {
+                    "$ref": "#/definitions/api.ClientOwnerInfo"
+                },
                 "redirect_uri": {
                     "type": "string"
                 },
@@ -1460,6 +1516,23 @@
                     "type": "string"
                 },
                 "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.ClientOwnerInfo": {
+            "type": "object",
+            "properties": {
+                "avatar": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
                     "type": "string"
                 }
             }

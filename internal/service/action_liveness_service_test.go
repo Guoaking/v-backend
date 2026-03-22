@@ -108,6 +108,7 @@ func TestActionLivenessFlow(t *testing.T) {
 		Storage:    &MockStorage{},
 		ThirdParty: NewThirdPartyService(cfg),
 		Redis:      nil, // Use DB fallback for quotas
+		LogWorker:  &SyncLogWorker{db: db},
 	}
 
 	// 5. Seed Data (Org, Plan, Quota)

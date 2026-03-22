@@ -101,15 +101,8 @@ func TestOrganizationHandler_GetUsageDetailedV2(t *testing.T) {
 
 	orgID := "org1"
 	db.Create(&models.Organization{ID: orgID})
-	// Seed Usage Data (using raw SQL because models might not match table exactly or simplified)
-	// We need 'usage_daily' table which GORM auto migrate might not handle if it's a view or manual table.
-	// In setupTestService, we didn't migrate Usage tables. Let's create dummy table for test.
-	db.Exec("CREATE TABLE IF NOT EXISTS usage_daily (org_id text, date timestamp, total bigint, failed bigint)")
-	db.Exec("INSERT INTO usage_daily (org_id, date, total, failed) VALUES (?, ?, ?, ?)", orgID, time.Now(), 100, 5)
-
-	db.Exec("CREATE TABLE IF NOT EXISTS usage_daily_service (org_id text, date timestamp, service_id text, total bigint)")
-	db.Exec("CREATE TABLE IF NOT EXISTS usage_daily_endpoint (org_id text, date timestamp, endpoint text, total bigint)")
-	db.Exec("CREATE TABLE IF NOT EXISTS usage_daily_key (org_id text, date timestamp, api_key_id text, total bigint)")
+	db.AutoMigrate(&models.UsageMetricAgg{})
+	db.Exec("INSERT INTO usage_metric_aggs (org_id, stat_time, time_unit, metric_name, dimensions, total_requests, total_errors, usage_units) VALUES (?, ?, 'day', 'api_call', '{}', ?, ?, ?)", orgID, time.Now(), 100, 5, 100)
 
 	// Also need quotas
 	db.Create(&models.OrganizationQuotas{

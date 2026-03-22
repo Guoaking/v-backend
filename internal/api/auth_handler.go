@@ -343,7 +343,7 @@ type IntrospectRequest struct {
 	ClientID string `json:"client_id"`
 }
 
-func (h *AuthHandler) Introspect(c *gin.Context) { //ignore_security_alert IDOR
+func (h *AuthHandler) Introspect(c *gin.Context) {
 	var req IntrospectRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		JSONError(c, CodeInvalidParameter, "参数绑定失败")

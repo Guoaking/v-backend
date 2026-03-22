@@ -256,6 +256,9 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 		v1.POST("/orgs/switch", middleware.JWTAuth(kycService), orgCoreHandler.SwitchOrganization)
 		v1.POST("/auth/switch-org", middleware.JWTAuth(kycService), orgCoreHandler.SwitchOrganization)
 
+		// 暴露一个全局的测试后门用于聚合数据，绕过普通鉴权 (dev 阶段使用)
+		v1.POST("/aggregate-usage/:org_id", orgUsageHandler.TriggerUsageAggregation)
+
 		orgs := v1.Group("/orgs")
 		orgs.Use(middleware.JWTAuth(kycService))
 		orgs.Use(middleware.RequireOrganizationHeader(kycService))
@@ -263,6 +266,7 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 		{
 			// 组织核心能力
 			orgs.GET("/current", middleware.RequirePermission(models.PermOrgRead), orgCoreHandler.GetCurrentOrganization)
+			orgs.PUT("/:id", middleware.RequirePermission(models.PermOrgUpdate), orgCoreHandler.UpdateOrganization)
 			orgs.PUT("/plan", middleware.RequirePermission(models.PermBillingWrite), orgCoreHandler.UpdatePlan)
 			orgs.DELETE("/:id", middleware.RequirePermission(models.PermOrgDelete), orgCoreHandler.DeleteOrganization)
 
@@ -341,7 +345,7 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 	}
 
 	faces := v1.Group("/faces")
-	faces.Use(middleware.APIKeyAuth(kycService))
+	faces.Use(middleware.APIOrOAuthAuth(kycService))
 	faces.Use(middleware.InjectOrgContext())
 	{
 		faceImageHandler := api.NewFaceImageHandler(kycService)
@@ -349,7 +353,7 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 	}
 
 	images := v1.Group("/images")
-	images.Use(middleware.APIKeyAuth(kycService))
+	images.Use(middleware.APIOrOAuthAuth(kycService))
 	images.Use(middleware.InjectOrgContext())
 	{
 		imageHandler := api.NewImageHandler(kycService)

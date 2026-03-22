@@ -18,6 +18,18 @@ import (
 	"gorm.io/gorm"
 )
 
+// SyncLogWorker is a synchronous implementation for tests
+type SyncLogWorker struct {
+	db *gorm.DB
+}
+
+func (s *SyncLogWorker) Start()                         {}
+func (s *SyncLogWorker) Stop()                          {}
+func (s *SyncLogWorker) Enqueue(log models.LogEnvelope) {}
+func (s *SyncLogWorker) RecordAuditLog(log *models.AuditLog) {
+	s.db.Create(log)
+}
+
 // Helper to setup isolated test environment
 func setupTestService(t *testing.T) (*service.KYCService, *gorm.DB) {
 	// Use distinct in-memory DB for each test to avoid conflicts
@@ -47,7 +59,7 @@ func setupTestService(t *testing.T) (*service.KYCService, *gorm.DB) {
 		},
 	}
 
-	return &service.KYCService{DB: db, Config: cfg}, db
+	return &service.KYCService{DB: db, Config: cfg, LogWorker: &SyncLogWorker{db: db}}, db
 }
 
 func setupRouter() *gin.Engine {

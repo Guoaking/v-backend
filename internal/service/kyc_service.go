@@ -34,7 +34,7 @@ type KYCService struct {
 	Encryptor  *crypto.Encryptor
 	Upgrader   websocket.Upgrader
 	HTTPClient *httpclient.Client // 新增HTTP客户端
-	LogWorker  *worker.AsyncLogWorker
+	LogWorker  worker.LogWorker
 
 	// OTel指标
 	ocrSuccessRate        metric.Float64Gauge
@@ -100,7 +100,7 @@ func (s *KYCService) ValidateIPWhitelistSubset(allowed []string, requested []str
 	return true
 }
 
-func NewKYCService(db *gorm.DB, redis *redis.Client, cfg *config.Config, logWorker *worker.AsyncLogWorker) *KYCService {
+func NewKYCService(db *gorm.DB, redis *redis.Client, cfg *config.Config, logWorker worker.LogWorker) *KYCService {
 	encryptor, _ := crypto.NewEncryptor(cfg.Security.EncryptionKey)
 
 	// 配置HTTP客户端

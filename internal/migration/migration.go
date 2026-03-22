@@ -129,6 +129,8 @@ func Run(db *gorm.DB) error {
 		&models.OAuthClient{},
 		&models.GlobalConfig{},
 		&models.AuditLog{},
+		&models.UsageLog{},       // 新增：确保 usage_logs 表字段对齐模型
+		&models.UsageMetricAgg{}, // 新增：混合维度单聚合表
 		&models.OrganizationInvitation{},
 		&models.OrganizationQuotas{},
 		&models.Notification{},
@@ -233,37 +235,6 @@ func Run(db *gorm.DB) error {
 		log.Warnf("创建usage_metrics表失败: %v", err)
 	}
 
-	// 每日聚合表（组织维度）
-	if err := db.Exec(`
-		CREATE TABLE IF NOT EXISTS usage_daily (
-			org_id UUID NOT NULL,
-			date DATE NOT NULL,
-			success INT DEFAULT 0,
-			failed INT DEFAULT 0,
-			total INT DEFAULT 0,
-			updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-			PRIMARY KEY (org_id, date)
-		);
-	`).Error; err != nil {
-		log.Warnf("创建usage_daily表失败: %v", err)
-	}
-
-	// 每日聚合表（用户维度）
-	if err := db.Exec(`
-		CREATE TABLE IF NOT EXISTS usage_daily_user (
-			org_id UUID NOT NULL,
-			user_id UUID NOT NULL,
-			date DATE NOT NULL,
-			success INT DEFAULT 0,
-			failed INT DEFAULT 0,
-			total INT DEFAULT 0,
-			updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-			PRIMARY KEY (org_id, user_id, date)
-		);
-	`).Error; err != nil {
-		log.Warnf("创建usage_daily_user表失败: %v", err)
-	}
-
 	// usage_logs 扩展以支持 OAuth 客户端统计
 	if err := db.Exec(`
 	DO $$
@@ -276,87 +247,6 @@ func Run(db *gorm.DB) error {
 		log.Warnf("usage_logs 扩展 oauth_client_id 失败: %v", err)
 	}
 
-	// 每日聚合表（OAuth客户端维度）
-	if err := db.Exec(`
-		CREATE TABLE IF NOT EXISTS usage_daily_client (
-			org_id UUID NOT NULL,
-			oauth_client_id TEXT NOT NULL,
-			date DATE NOT NULL,
-			success INT DEFAULT 0,
-			failed INT DEFAULT 0,
-			total INT DEFAULT 0,
-			updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-			PRIMARY KEY (org_id, oauth_client_id, date)
-		);
-	`).Error; err != nil {
-		log.Warnf("创建usage_daily_client表失败: %v", err)
-	}
-
-	// 每日聚合表（服务维度）
-	if err := db.Exec(`
-		CREATE TABLE IF NOT EXISTS usage_daily_service (
-			org_id UUID NOT NULL,
-			service_id TEXT NOT NULL,
-			date DATE NOT NULL,
-			success INT DEFAULT 0,
-			failed INT DEFAULT 0,
-			total INT DEFAULT 0,
-			updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-			PRIMARY KEY (org_id, service_id, date)
-		);
-	`).Error; err != nil {
-		log.Warnf("创建usage_daily_service表失败: %v", err)
-	}
-
-	// 每日聚合表（接口维度）
-	if err := db.Exec(`
-		CREATE TABLE IF NOT EXISTS usage_daily_endpoint (
-			org_id UUID NOT NULL,
-			endpoint TEXT NOT NULL,
-			date DATE NOT NULL,
-			success INT DEFAULT 0,
-			failed INT DEFAULT 0,
-			total INT DEFAULT 0,
-			updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-			PRIMARY KEY (org_id, endpoint, date)
-		);
-	`).Error; err != nil {
-		log.Warnf("创建usage_daily_endpoint表失败: %v", err)
-	}
-
-	// 每日聚合表（密钥维度）
-	if err := db.Exec(`
-		CREATE TABLE IF NOT EXISTS usage_daily_key (
-			org_id UUID NOT NULL,
-			api_key_id TEXT NOT NULL,
-			date DATE NOT NULL,
-			success INT DEFAULT 0,
-			failed INT DEFAULT 0,
-			total INT DEFAULT 0,
-			updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-			PRIMARY KEY (org_id, api_key_id, date)
-		);
-	`).Error; err != nil {
-		log.Warnf("创建usage_daily_key表失败: %v", err)
-	}
-
-	// 每日聚合表（密钥+负责人维度，供个人视角）
-	if err := db.Exec(`
-		CREATE TABLE IF NOT EXISTS usage_daily_key_user (
-			org_id UUID NOT NULL,
-			user_id UUID NOT NULL,
-			api_key_id TEXT NOT NULL,
-			date DATE NOT NULL,
-			success INT DEFAULT 0,
-			failed INT DEFAULT 0,
-			total INT DEFAULT 0,
-			updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-			PRIMARY KEY (org_id, user_id, api_key_id, date)
-		);
-	`).Error; err != nil {
-		log.Warnf("创建usage_daily_key_user表失败: %v", err)
-	}
-
 	// usage_logs 唯一约束以提升计量准确性（request_id+endpoint）
 	if err := db.Exec(`
 	DO $$
@@ -366,6 +256,20 @@ func Run(db *gorm.DB) error {
 	    END IF;
 	END $$;`).Error; err != nil {
 		log.Warnf("usage_logs 唯一约束创建失败: %v", err)
+	}
+
+	// 为 usage_metrics_agg 创建唯一约束和 GIN 索引
+	if err := db.Exec(`
+	DO $$
+	BEGIN
+	    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uni_usage_metrics_agg_dimensions') THEN
+	        ALTER TABLE usage_metric_aggs ADD CONSTRAINT uni_usage_metrics_agg_dimensions UNIQUE (org_id, metric_name, time_unit, stat_time, dimensions);
+	    END IF;
+	    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_usage_metrics_agg_dimensions_gin') THEN
+	        CREATE INDEX idx_usage_metrics_agg_dimensions_gin ON usage_metric_aggs USING GIN (dimensions);
+	    END IF;
+	END $$;`).Error; err != nil {
+		log.Warnf("usage_metric_aggs 索引/约束创建失败: %v", err)
 	}
 
 	// 修复 permissions 表缺少时间戳列
@@ -788,7 +692,7 @@ func Run(db *gorm.DB) error {
 	// 注入系统内置的 OAuth Client (Playground STS 使用)
 	{
 		var sysClientCount int64
-		_ = db.Model(&models.OAuthClient{}).Where("client_id = ?", "sys_web_console_playground").Count(&sysClientCount).Error
+		_ = db.Model(&models.OAuthClient{}).Where("id = ?", "sys_web_console_playground").Count(&sysClientCount).Error
 		if sysClientCount == 0 {
 			// 如果没有环境变量，生成一个随机的超长字符串作为兜底，反正前端也不需要知道
 			sysSecret := os.Getenv("SYS_PLAYGROUND_CLIENT_SECRET")

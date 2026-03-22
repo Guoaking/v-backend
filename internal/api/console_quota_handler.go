@@ -78,9 +78,9 @@ func (h *ConsoleHandler) GetUsageStats(c *gin.Context) {
 			to_char(created_at, 'YYYY-MM-DD') as date, 
 			count(*) as requests, 
 			sum(case when status_code >= 400 then 1 else 0 end) as errors,
-			sum(case when service_name = 'ocr' then 1 else 0 end) as ocr,
-			sum(case when service_name = 'face' then 1 else 0 end) as face,
-			sum(case when service_name = 'liveness' then 1 else 0 end) as liveness
+			sum(case when service_type = 'ocr' then 1 else 0 end) as ocr,
+			sum(case when service_type = 'face' then 1 else 0 end) as face,
+			sum(case when service_type = 'liveness' then 1 else 0 end) as liveness
 		`).
 		Where("created_at >= ? AND created_at <= ?", startDate, endDate).
 		Group("to_char(created_at, 'YYYY-MM-DD')").

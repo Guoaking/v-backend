@@ -159,6 +159,24 @@ type UsageLog struct {
 	CreatedAt     time.Time      `gorm:"index" json:"created_at"`              // 加索引优化按时间范围统计
 }
 
+// UsageMetricAgg 统一维度聚合表 (Hybrid Model for B2B SaaS)
+type UsageMetricAgg struct {
+	ID         string    `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
+	OrgID      string    `gorm:"index;not null" json:"org_id"`      // 核心维度: 租户隔离
+	MetricName string    `gorm:"index;not null" json:"metric_name"` // 核心维度: 指标名称 (e.g., api_call, liveness_check)
+	TimeUnit   string    `gorm:"index;not null" json:"time_unit"`   // 核心维度: 聚合粒度 (hour, day, month)
+	StatTime   time.Time `gorm:"index;not null" json:"stat_time"`   // 核心维度: 统计窗口时间
+
+	Dimensions datatypes.JSON `gorm:"type:jsonb;not null;default:'{}'" json:"dimensions"` // 扩展维度: JSONB 存储长尾维度 (e.g., endpoint, error_code)
+
+	TotalRequests int64 `gorm:"not null;default:0" json:"total_requests"`
+	TotalErrors   int64 `gorm:"not null;default:0" json:"total_errors"`
+	UsageUnits    int64 `gorm:"not null;default:0" json:"usage_units"` // 实际计费消耗点数
+
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 // OAuthToken OAuth令牌
 type OAuthToken struct {
 	ID           uint      `gorm:"primaryKey" json:"id"`

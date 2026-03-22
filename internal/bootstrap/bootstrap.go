@@ -24,7 +24,7 @@ type App struct {
 	DB          *gorm.DB
 	RedisClient *redis.Client
 	KYCService  *service.KYCService
-	LogWorker   *worker.AsyncLogWorker
+	LogWorker   worker.LogWorker
 }
 
 // Init initializes the application dependencies
@@ -69,10 +69,11 @@ func Init(ctx context.Context, configFile string) (*App, func(), error) {
 		log.Fatalf("Redis初始化失败: %v", err)
 	}
 
-	// 初始化异步日志Worker
-	billingStore := storage.NewPostgresBillingStorage(db)
-	auditStore := storage.NewPostgresAuditStorage(db)
-	logWorker := worker.NewAsyncLogWorker(billingStore, auditStore)
+	// 初始化异步日志Worker (带DB用于聚合)
+	// billingStore := storage.NewPostgresBillingStorage(db)
+	// auditStore := storage.NewPostgresAuditStorage(db)
+	// logWorker := worker.NewAsyncLogWorker(db, billingStore, auditStore)
+	logWorker := worker.NewRedisLogWorker(db, redisClient)
 	logWorker.Start()
 
 	// 初始化服务

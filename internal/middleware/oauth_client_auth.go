@@ -219,3 +219,13 @@ func APIOrOAuthAuth(svc *service.KYCService) gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// 简单的 IP 校验，可在此扩展为子网或正则支持
+func isIPAllowed(ip string, allowed []string) bool {
+	for _, a := range allowed {
+		if a == ip || a == "*" || a == "0.0.0.0/0" {
+			return true
+		}
+	}
+	return false
+}

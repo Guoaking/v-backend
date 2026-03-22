@@ -17,6 +17,18 @@ import (
 
 // --- Standard Mocks using testify/mock ---
 
+// SyncLogWorker is a synchronous implementation for tests
+type SyncLogWorker struct {
+	db *gorm.DB
+}
+
+func (s *SyncLogWorker) Start()                         {}
+func (s *SyncLogWorker) Stop()                          {}
+func (s *SyncLogWorker) Enqueue(log models.LogEnvelope) {}
+func (s *SyncLogWorker) RecordAuditLog(log *models.AuditLog) {
+	s.db.Create(log)
+}
+
 // MockStorageService is a mock implementation of storage.StorageService
 type MockStorageService struct {
 	mock.Mock
@@ -76,7 +88,7 @@ func initTestRedis(t *testing.T) (*miniredis.Miniredis, *redis.Client) {
 
 func TestKYCService_GetOrgPolicy(t *testing.T) {
 	db := initTestDB(t)
-	svc := &KYCService{DB: db}
+	svc := &KYCService{DB: db, LogWorker: &SyncLogWorker{db: db}}
 	orgID := "test-org"
 
 	tests := []struct {
@@ -167,7 +179,7 @@ func TestKYCService_QuotaConsumption(t *testing.T) {
 
 func TestKYCService_AuditLogging(t *testing.T) {
 	db := initTestDB(t)
-	svc := &KYCService{DB: db}
+	svc := &KYCService{DB: db, LogWorker: &SyncLogWorker{db: db}}
 	orgID := "org-audit"
 	ctx := setupTestContext(orgID)
 
@@ -175,7 +187,7 @@ func TestKYCService_AuditLogging(t *testing.T) {
 		svc.RecordAuditLog(ctx, "test.action", "test.resource", "res-123", "success", "all good")
 
 		var log models.AuditLog
-		err := db.First(&log).Error
+		err := db.Where("action = ?", "test.action").First(&log).Error
 		assert.NoError(t, err)
 		assert.Equal(t, "test.action", log.Action)
 		assert.Equal(t, "test-user-123", log.UserID)

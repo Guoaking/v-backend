@@ -71,7 +71,7 @@ func main() {
 	}
 
 	// 启动异步日志Worker
-	// logWorker 在 bootstrap.Init 中已启动
+	// logWorker (含数据库实例用于流式聚合) 在 bootstrap.Init 中已启动
 	defer app.LogWorker.Stop()
 
 	// 注册全局Worker实例到中间件（需要修改中间件以支持注入Worker，或者使用全局单例）

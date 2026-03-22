@@ -118,6 +118,37 @@ func (h *OrganizationHandler) SwitchOrganization(c *gin.Context) {
 	})
 }
 
+// 更新组织
+func (h *OrganizationHandler) UpdateOrganization(c *gin.Context) {
+	orgID := c.Param("id")
+	if orgID == "" {
+		JSONError(c, CodeInvalidParameter, "缺少组织ID")
+		return
+	}
+
+	// Check if current user has permission (must be owner or have update perm, simplifying to just checking orgID matches token)
+	tokenOrgID := c.GetString("orgID")
+	if tokenOrgID != orgID {
+		JSONError(c, CodeForbidden, "无权修改此组织")
+		return
+	}
+
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		JSONError(c, CodeInvalidParameter, "参数格式错误")
+		return
+	}
+
+	if err := h.service.DB.Model(&models.Organization{}).Where("id = ?", orgID).Update("name", req.Name).Error; err != nil {
+		JSONError(c, CodeDatabaseError, "更新失败")
+		return
+	}
+
+	JSONSuccess(c, "更新成功")
+}
+
 // 辅助方法：生成Token (复用 ConsoleAuthHandler 逻辑)
 func (h *OrganizationHandler) generateTokenForSwitch(user *models.User, org *models.Organization) (string, error) {
 	claims := jwt.MapClaims{

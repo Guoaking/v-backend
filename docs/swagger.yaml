@@ -22,11 +22,24 @@ definitions:
         type: string
       name:
         type: string
+      owner:
+        $ref: '#/definitions/api.ClientOwnerInfo'
       redirect_uri:
         type: string
       scopes:
         type: string
       status:
+        type: string
+    type: object
+  api.ClientOwnerInfo:
+    properties:
+      avatar:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      name:
         type: string
     type: object
   api.ClientRegistrationRequest:
@@ -1366,6 +1379,42 @@ paths:
               type: string
             type: object
       summary: Delete OAuth client
+      tags:
+      - Client Management
+  /clients/{id}/rotate:
+    post:
+      consumes:
+      - application/json
+      description: Generate a new client secret and optionally invalidate the old
+        one immediately
+      parameters:
+      - description: Client ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Rotate OAuth client secret
       tags:
       - Client Management
   /clients/register:

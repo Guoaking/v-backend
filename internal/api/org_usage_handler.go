@@ -21,18 +21,26 @@ func NewOrgUsageHandler(svc *service.KYCService) *OrgUsageHandler {
 	return &OrgUsageHandler{service: svc}
 }
 
+type ServiceQuota struct {
+	ServiceType string  `json:"serviceType"`
+	Used        int64   `json:"used"`
+	Limit       int     `json:"limit"`
+	PercentUsed float64 `json:"percentUsed"`
+}
+
 type BillingResponse struct {
 	Plan struct {
 		ID            string `json:"id"`
 		Name          string `json:"name"`
 		Price         int    `json:"price"`
-		RequestsLimit int    `json:"requestsLimit"`
+		RequestsLimit int    `json:"requestsLimit"` // Legacy field
 	} `json:"plan"`
 	UsageSummary struct {
-		TotalRequests int64   `json:"totalRequests"`
-		Limit         int     `json:"limit"`
-		PercentUsed   float64 `json:"percentUsed"`
-		Period        string  `json:"period"`
+		TotalRequests int64          `json:"totalRequests"`
+		Limit         int            `json:"limit"` // Legacy field
+		PercentUsed   float64        `json:"percentUsed"`
+		Period        string         `json:"period"`
+		Quotas        []ServiceQuota `json:"quotas"` // New field for separated limits
 	} `json:"usageSummary"`
 	Invoices []struct {
 		ID     string `json:"id"`
@@ -58,28 +66,126 @@ func (h *OrgUsageHandler) GetBilling(c *gin.Context) {
 	if scope == "" {
 		scope = "org"
 	}
-	planMap := map[string]struct {
-		Name  string
-		Price int
-		Limit int
-	}{
-		"starter": {Name: "Starter", Price: 0, Limit: 1000},
-		"growth":  {Name: "Growth", Price: 299, Limit: 50000},
-		"scale":   {Name: "Scale", Price: 999, Limit: 1000000},
-	}
-	pm := planMap[org.PlanID]
-	var total int64
 	monthStart := time.Date(time.Now().Year(), time.Now().Month(), 1, 0, 0, 0, 0, time.Now().Location())
-	if scope == "personal" {
-		uid := c.GetString("userID")
-		_ = h.service.DB.Raw(`SELECT COALESCE(SUM(total),0) FROM usage_daily_user WHERE org_id = ? AND user_id = ? AND date >= ?`, orgID, uid, monthStart).Scan(&total).Error
-	} else {
-		_ = h.service.DB.Raw(`SELECT COALESCE(SUM(total),0) FROM usage_daily WHERE org_id = ? AND date >= ?`, orgID, monthStart).Scan(&total).Error
+
+	// 从数据库读取 plan (包含 quota_config)
+	type planRow struct {
+		Name          string
+		Price         int
+		RequestsLimit int
+		QuotaConfig   string // json string
 	}
+	var pr planRow
+	var pm struct {
+		Name        string
+		Price       int
+		Limit       int
+		QuotaConfig map[string]struct {
+			Limit  int    `json:"limit"`
+			Period string `json:"period"`
+		}
+	}
+
+	if err := h.service.DB.Raw("SELECT name, COALESCE(price,0) as price, COALESCE(requests_limit,0) as requests_limit, COALESCE(quota_config::text, '{}') as quota_config FROM plans WHERE id = ?", org.PlanID).Scan(&pr).Error; err == nil && pr.Name != "" {
+		pm.Name = pr.Name
+		pm.Price = pr.Price
+		pm.Limit = pr.RequestsLimit
+		if pr.QuotaConfig != "" {
+			json.Unmarshal([]byte(pr.QuotaConfig), &pm.QuotaConfig)
+		}
+	} else {
+		// Fallback for missing DB plans
+		planMap := map[string]struct {
+			Name  string
+			Price int
+			Limit int
+		}{
+			"starter": {Name: "Starter", Price: 0, Limit: 1000},
+			"growth":  {Name: "Growth", Price: 299, Limit: 50000},
+			"scale":   {Name: "Scale", Price: 999, Limit: 1000000},
+		}
+		p := planMap[org.PlanID]
+		pm.Name = p.Name
+		pm.Price = p.Price
+		pm.Limit = p.Limit
+	}
+
+	// 从 organization_quotas 表读取真实配额和消耗
+	var orgQuotas []models.OrganizationQuotas
+	h.service.DB.Where("organization_id = ?", orgID).Find(&orgQuotas)
+
+	quotas := []ServiceQuota{}
+	var total int64 = 0
+
+	if len(orgQuotas) > 0 {
+		for _, q := range orgQuotas {
+			used := int64(q.Consumed)
+			total += used
+			percent := float64(0)
+			if q.Allocation > 0 {
+				percent = float64(used) / float64(q.Allocation) * 100
+			}
+			quotas = append(quotas, ServiceQuota{
+				ServiceType: q.ServiceType,
+				Used:        used,
+				Limit:       q.Allocation,
+				PercentUsed: percent,
+			})
+		}
+	} else {
+		// Fallback to aggregation if no quotas found
+		var usageData []struct {
+			ServiceType string
+			Total       int64
+		}
+
+		if scope == "personal" {
+			uid := c.GetString("userID")
+			_ = h.service.DB.Model(&models.UsageMetricAgg{}).
+				Select("dimensions->>'service_type' as service_type, COALESCE(SUM(total_requests),0) as total").
+				Where("org_id = ? AND dimensions->>'user_id' = ? AND stat_time >= ?", orgID, uid, monthStart).
+				Group("dimensions->>'service_type'").
+				Scan(&usageData).Error
+		} else {
+			_ = h.service.DB.Model(&models.UsageMetricAgg{}).
+				Select("dimensions->>'service_type' as service_type, COALESCE(SUM(total_requests),0) as total").
+				Where("org_id = ? AND stat_time >= ?", orgID, monthStart).
+				Group("dimensions->>'service_type'").
+				Scan(&usageData).Error
+		}
+
+		if len(pm.QuotaConfig) > 0 {
+			usageMap := make(map[string]int64)
+			for _, u := range usageData {
+				usageMap[u.ServiceType] = u.Total
+				total += u.Total
+			}
+
+			for svc, config := range pm.QuotaConfig {
+				used := usageMap[svc]
+				percent := float64(0)
+				if config.Limit > 0 {
+					percent = float64(used) / float64(config.Limit) * 100
+				}
+				quotas = append(quotas, ServiceQuota{
+					ServiceType: svc,
+					Used:        used,
+					Limit:       config.Limit,
+					PercentUsed: percent,
+				})
+			}
+		} else {
+			for _, u := range usageData {
+				total += u.Total
+			}
+		}
+	}
+
 	percent := float64(0)
 	if pm.Limit > 0 {
 		percent = float64(total) / float64(pm.Limit) * 100
 	}
+
 	resp := BillingResponse{}
 	resp.Plan.ID = org.PlanID
 	resp.Plan.Name = pm.Name
@@ -89,6 +195,8 @@ func (h *OrgUsageHandler) GetBilling(c *gin.Context) {
 	resp.UsageSummary.Limit = pm.Limit
 	resp.UsageSummary.PercentUsed = percent
 	resp.UsageSummary.Period = time.Now().Format("2006-01")
+	resp.UsageSummary.Quotas = quotas
+
 	resp.Invoices = []struct {
 		ID     string `json:"id"`
 		Amount int    `json:"amount"`
@@ -96,6 +204,51 @@ func (h *OrgUsageHandler) GetBilling(c *gin.Context) {
 		Date   string `json:"date"`
 	}{}
 	JSONSuccess(c, resp)
+}
+
+// 触发手动聚合日志到 metric_aggs 表 (测试/初始化用)
+func (h *OrgUsageHandler) TriggerUsageAggregation(c *gin.Context) {
+	orgID := c.Param("org_id")
+	// Check basic permissions (skip deep authorization for this maintenance endpoint)
+	if orgID == "" {
+		JSONError(c, 400, "缺少 org_id 参数")
+		return
+	}
+
+	// 1. 将明细日志按天、API Key 和 Endpoint 聚合写入 usage_metric_aggs
+	aggSQL := `
+		INSERT INTO usage_metric_aggs (org_id, metric_name, time_unit, stat_time, dimensions, total_requests, total_errors, usage_units)
+		SELECT 
+			org_id,
+			'api_call' AS metric_name,
+			'day' AS time_unit,
+			DATE_TRUNC('day', created_at) AS stat_time,
+			jsonb_build_object(
+				'service_type', COALESCE(service_type, 'unknown'),
+				'endpoint', endpoint,
+				'api_key_id', COALESCE(api_key_id, ''),
+				'user_id', COALESCE(user_id, '')
+			) AS dimensions,
+			COUNT(*) AS total_requests,
+			COALESCE(SUM(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END), 0) AS total_errors,
+			COALESCE(SUM(usage_units), 0) AS usage_units
+		FROM usage_logs
+		WHERE org_id = ?
+		GROUP BY org_id, DATE_TRUNC('day', created_at), service_type, endpoint, api_key_id, user_id
+		ON CONFLICT (org_id, metric_name, time_unit, stat_time, dimensions) 
+		DO UPDATE SET 
+			total_requests = EXCLUDED.total_requests,
+			total_errors = EXCLUDED.total_errors,
+			usage_units = EXCLUDED.usage_units,
+			updated_at = CURRENT_TIMESTAMP;
+	`
+
+	if err := h.service.DB.Exec(aggSQL, orgID).Error; err != nil {
+		JSONError(c, CodeDatabaseError, "聚合失败")
+		return
+	}
+
+	JSONSuccess(c, "聚合成功")
 }
 
 // GetUsageDetailedV2 使用预聚合表并严格错误处理
@@ -111,25 +264,38 @@ func (h *OrgUsageHandler) GetUsageDetailedV2(c *gin.Context) {
 	}
 	period := strings.ToLower(strings.TrimSpace(c.Query("period")))
 	days := 30
-	if period == "7d" {
+	if period == "today" || period == "24h" {
+		days = 1
+	} else if period == "7d" {
 		days = 7
 	} else {
 		period = "30d"
 	}
-	sinceDate := time.Now().AddDate(0, 0, -days)
 
+	// Ensure we capture today by resetting time to start of day if days=1, or relative days otherwise
+	var sinceDate time.Time
+	if days == 1 {
+		now := time.Now()
+		sinceDate = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	} else {
+		sinceDate = time.Now().AddDate(0, 0, -days)
+	}
+
+	// 1. Get overall metrics directly from usage_metric_aggs
 	var totalRequests, totalErrors int64
+
+	queryBase := h.service.DB.Model(&models.UsageMetricAgg{}).
+		Where("org_id = ? AND stat_time >= ? AND time_unit = 'day'", orgID, sinceDate)
+
 	if scope == "personal" {
 		uid := c.GetString("userID")
-		if err := h.service.DB.Raw(`SELECT COALESCE(SUM(total),0), COALESCE(SUM(failed),0) FROM usage_daily_user WHERE org_id = ? AND user_id = ? AND date >= ?`, orgID, uid, sinceDate).Row().Scan(&totalRequests, &totalErrors); err != nil {
-			JSONError(c, CodeDatabaseError, "查询用量失败")
-			return
-		}
-	} else {
-		if err := h.service.DB.Raw(`SELECT COALESCE(SUM(total),0), COALESCE(SUM(failed),0) FROM usage_daily WHERE org_id = ? AND date >= ?`, orgID, sinceDate).Row().Scan(&totalRequests, &totalErrors); err != nil {
-			JSONError(c, CodeDatabaseError, "查询用量失败")
-			return
-		}
+		queryBase = queryBase.Where("dimensions->>'user_id' = ?", uid)
+	}
+
+	// Calculate totals
+	if err := queryBase.Select("COALESCE(SUM(total_requests), 0) as total, COALESCE(SUM(total_errors), 0) as failed").Row().Scan(&totalRequests, &totalErrors); err != nil {
+		JSONError(c, CodeDatabaseError, "查询用量失败")
+		return
 	}
 
 	var org models.Organization
@@ -137,28 +303,63 @@ func (h *OrgUsageHandler) GetUsageDetailedV2(c *gin.Context) {
 		JSONError(c, CodeDatabaseError, "查询组织失败")
 		return
 	}
-	var q struct {
-		Limit   int64
-		Used    int64
-		ResetAt *time.Time
+	// 2. Quota Check (using ServiceQuota array)
+	var orgQuotas []models.OrganizationQuotas
+	h.service.DB.Where("organization_id = ?", orgID).Find(&orgQuotas)
+
+	quotas := []ServiceQuota{}
+	var totalLimit int = 0
+	var totalUsed int = 0
+	var resetAt *time.Time
+
+	if len(orgQuotas) > 0 {
+		resetAt = orgQuotas[0].ResetAt
+		for _, q := range orgQuotas {
+			used := int(q.Consumed)
+			totalUsed += used
+			totalLimit += q.Allocation
+			percent := float64(0)
+			if q.Allocation > 0 {
+				percent = float64(used) / float64(q.Allocation) * 100
+			}
+			quotas = append(quotas, ServiceQuota{
+				ServiceType: q.ServiceType,
+				Used:        int64(used),
+				Limit:       q.Allocation,
+				PercentUsed: percent,
+			})
+		}
+	} else {
+		// Fallback if no specific quotas
+		totalLimit = 100000
+		var fallbackUsed int64
+		h.service.DB.Model(&models.UsageMetricAgg{}).
+			Where("org_id = ? AND time_unit = 'day'", orgID).
+			Select("COALESCE(SUM(usage_units), 0)").Row().Scan(&fallbackUsed)
+		totalUsed = int(fallbackUsed)
+		now := time.Now()
+		nextMonth := time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, now.Location())
+		resetAt = &nextMonth
+
+		// If we still want to show something in fallback
+		quotas = append(quotas, ServiceQuota{
+			ServiceType: "global",
+			Used:        fallbackUsed,
+			Limit:       totalLimit,
+			PercentUsed: float64(fallbackUsed) / float64(totalLimit) * 100,
+		})
 	}
-	if err := h.service.DB.Raw(`SELECT COALESCE(SUM(allocation),0) AS quota_limit, COALESCE(SUM(consumed),0) AS quota_used, MIN(reset_at) AS reset_at FROM organization_quotas WHERE organization_id = ?`, orgID).Row().Scan(&q.Limit, &q.Used, &q.ResetAt); err != nil {
-		JSONError(c, CodeDatabaseError, "查询配额失败")
-		return
-	}
-	limit := int(q.Limit)
-	used := int(q.Used)
+
 	remaining := 0
 	percentUsed := 0.0
-	if limit > 0 {
-		remaining = int(math.Max(0, float64(limit-used)))
-		percentUsed = math.Round((float64(used)/float64(limit))*10000) / 100
+	if totalLimit > 0 {
+		remaining = int(math.Max(0, float64(totalLimit-totalUsed)))
+		percentUsed = math.Round((float64(totalUsed)/float64(totalLimit))*10000) / 100
 	}
-	var resetAt *time.Time
-	resetAt = q.ResetAt
+
 	var forecast *string
-	avgPerDay := float64(used) / float64(maxInt(days, 1))
-	if avgPerDay > 0 && limit > 0 {
+	avgPerDay := float64(totalUsed) / float64(maxInt(days, 1))
+	if avgPerDay > 0 && totalLimit > 0 {
 		supportDays := float64(remaining) / avgPerDay
 		if supportDays > 0 && supportDays <= float64(days) {
 			d := time.Now().Add(time.Duration(int(math.Ceil(supportDays))) * 24 * time.Hour).Format("2006-01-02")
@@ -173,51 +374,53 @@ func (h *OrgUsageHandler) GetUsageDetailedV2(c *gin.Context) {
 		Services map[string]int64 `json:"services,omitempty"`
 	}
 	timeline := make([]timelineItem, 0, days)
-	if scope == "personal" {
-		uid := c.GetString("userID")
-		var ts []struct {
-			D time.Time
-			T int64
-			F int64
-		}
-		if err := h.service.DB.Raw(`SELECT date AS d, total AS t, failed AS f FROM usage_daily_user WHERE org_id = ? AND user_id = ? AND date >= ? ORDER BY date`, orgID, uid, sinceDate).Scan(&ts).Error; err != nil {
-			JSONError(c, CodeDatabaseError, "查询时间序列失败")
-			return
-		}
-		for _, r := range ts {
-			timeline = append(timeline, timelineItem{Date: r.D.Format("2006-01-02"), Requests: r.T, Errors: r.F})
-		}
-	} else {
-		var ts []struct {
-			D time.Time
-			T int64
-			F int64
-		}
-		if err := h.service.DB.Raw(`SELECT date AS d, total AS t, failed AS f FROM usage_daily WHERE org_id = ? AND date >= ? ORDER BY date`, orgID, sinceDate).Scan(&ts).Error; err != nil {
-			JSONError(c, CodeDatabaseError, "查询时间序列失败")
-			return
-		}
-		for _, r := range ts {
-			timeline = append(timeline, timelineItem{Date: r.D.Format("2006-01-02"), Requests: r.T, Errors: r.F})
-		}
+
+	// 3. Timeline data from usage_metric_aggs
+	var ts []struct {
+		D time.Time
+		T int64
+		F int64
 	}
+
+	timelineQuery := h.service.DB.Model(&models.UsageMetricAgg{}).
+		Select("stat_time as d, SUM(total_requests) as t, SUM(total_errors) as f").
+		Where("org_id = ? AND stat_time >= ? AND time_unit = 'day'", orgID, sinceDate).
+		Group("stat_time").
+		Order("d")
+
+	if scope == "personal" {
+		timelineQuery = timelineQuery.Where("dimensions->>'user_id' = ?", c.GetString("userID"))
+	}
+
+	if err := timelineQuery.Scan(&ts).Error; err != nil {
+		JSONError(c, CodeDatabaseError, "查询时间序列失败")
+		return
+	}
+	for _, r := range ts {
+		timeline = append(timeline, timelineItem{Date: r.D.Format("2006-01-02"), Requests: r.T, Errors: r.F, Services: map[string]int64{}})
+	}
+
+	// 4. Service breakdown per day from usage_metric_aggs
 	var svcDaily []struct {
 		D         time.Time
 		ServiceID string
 		T         int64
 	}
+
+	svcDailyQuery := h.service.DB.Model(&models.UsageMetricAgg{}).
+		Select("stat_time as d, dimensions->>'service_type' as service_id, SUM(usage_units) as t").
+		Where("org_id = ? AND stat_time >= ? AND time_unit = 'day' AND dimensions->>'service_type' IS NOT NULL", orgID, sinceDate).
+		Group("stat_time, dimensions->>'service_type'")
+
 	if scope == "personal" {
-		uid := c.GetString("userID")
-		if err := h.service.DB.Raw(`SELECT s.date AS d, s.service_id AS service_id, s.total AS t FROM usage_daily_service s JOIN usage_daily_user u ON s.org_id = u.org_id AND s.date = u.date WHERE s.org_id = ? AND u.user_id = ? AND s.date >= ?`, orgID, uid, sinceDate).Scan(&svcDaily).Error; err != nil {
-			JSONError(c, CodeDatabaseError, "查询服务细分失败")
-			return
-		}
-	} else {
-		if err := h.service.DB.Raw(`SELECT date AS d, service_id AS service_id, total AS t FROM usage_daily_service WHERE org_id = ? AND date >= ?`, orgID, sinceDate).Scan(&svcDaily).Error; err != nil {
-			JSONError(c, CodeDatabaseError, "查询服务细分失败")
-			return
-		}
+		svcDailyQuery = svcDailyQuery.Where("dimensions->>'user_id' = ?", c.GetString("userID"))
 	}
+
+	if err := svcDailyQuery.Scan(&svcDaily).Error; err != nil {
+		JSONError(c, CodeDatabaseError, "查询服务细分失败")
+		return
+	}
+
 	tidx := map[string]int{}
 	for i, it := range timeline {
 		tidx[it.Date] = i
@@ -232,21 +435,24 @@ func (h *OrgUsageHandler) GetUsageDetailedV2(c *gin.Context) {
 		}
 	}
 
+	// 5. Aggregated services from usage_metric_aggs
 	var svcAgg []struct {
 		ServiceID string
 		Cnt       int64
 	}
+
+	svcAggQuery := h.service.DB.Model(&models.UsageMetricAgg{}).
+		Select("dimensions->>'service_type' as service_id, SUM(usage_units) as cnt").
+		Where("org_id = ? AND stat_time >= ? AND time_unit = 'day' AND dimensions->>'service_type' IS NOT NULL AND dimensions->>'service_type' != '' AND dimensions->>'service_type' != 'unknown'", orgID, sinceDate).
+		Group("dimensions->>'service_type'")
+
 	if scope == "personal" {
-		uid := c.GetString("userID")
-		if err := h.service.DB.Raw(`SELECT s.service_id AS service_id, SUM(s.total) AS cnt FROM usage_daily_service s JOIN usage_daily_user u ON s.org_id = u.org_id AND s.date = u.date WHERE s.org_id = ? AND u.user_id = ? AND s.date >= ? GROUP BY s.service_id`, orgID, uid, sinceDate).Scan(&svcAgg).Error; err != nil {
-			JSONError(c, CodeDatabaseError, "查询服务聚合失败")
-			return
-		}
-	} else {
-		if err := h.service.DB.Raw(`SELECT service_id AS service_id, SUM(total) AS cnt FROM usage_daily_service WHERE org_id = ? AND date >= ? GROUP BY service_id`, orgID, sinceDate).Scan(&svcAgg).Error; err != nil {
-			JSONError(c, CodeDatabaseError, "查询服务聚合失败")
-			return
-		}
+		svcAggQuery = svcAggQuery.Where("dimensions->>'user_id' = ?", c.GetString("userID"))
+	}
+
+	if err := svcAggQuery.Scan(&svcAgg).Error; err != nil {
+		JSONError(c, CodeDatabaseError, "查询服务聚合失败")
+		return
 	}
 	type byItem struct {
 		ID         string  `json:"id"`
@@ -260,7 +466,20 @@ func (h *OrgUsageHandler) GetUsageDetailedV2(c *gin.Context) {
 		totalForPct += r.Cnt
 	}
 	for _, r := range svcAgg {
-		label := map[string]string{"ocr": "OCR", "face_verify": "Face Verification", "liveness": "Liveness", "other": "Other"}[r.ServiceID]
+		// Only include items with count > 0 to prevent ghost data
+		if r.Cnt <= 0 {
+			continue
+		}
+
+		label := map[string]string{"ocr": "OCR", "face_verify": "Face Verification", "face": "Face Recognition", "liveness": "Liveness", "other": "Other"}[r.ServiceID]
+		if label == "" {
+			// fallback to capitalize the ID if it's not in the map
+			if len(r.ServiceID) > 0 {
+				label = strings.ToUpper(r.ServiceID[:1]) + r.ServiceID[1:]
+			} else {
+				label = "Unknown"
+			}
+		}
 		pct := 0.0
 		if totalForPct > 0 {
 			pct = math.Round((float64(r.Cnt)/float64(totalForPct))*1000) / 10
@@ -268,46 +487,72 @@ func (h *OrgUsageHandler) GetUsageDetailedV2(c *gin.Context) {
 		byService = append(byService, byItem{ID: r.ServiceID, Label: label, Count: r.Cnt, Percentage: pct})
 	}
 
+	// 6. Endpoint breakdown from usage_metric_aggs
 	var epRows []struct {
 		EP  string
 		Cnt int64
+		Err int64 // Added error count for endpoint
 	}
+
+	epQuery := h.service.DB.Model(&models.UsageMetricAgg{}).
+		Select("dimensions->>'endpoint' as ep, SUM(total_requests) as cnt, SUM(total_errors) as err").
+		Where("org_id = ? AND stat_time >= ? AND time_unit = 'day' AND dimensions->>'endpoint' IS NOT NULL", orgID, sinceDate).
+		Group("dimensions->>'endpoint'").
+		Order("cnt DESC").
+		Limit(10)
+
 	if scope == "personal" {
-		uid := c.GetString("userID")
-		if err := h.service.DB.Raw(`SELECT e.endpoint AS ep, SUM(e.total) AS cnt FROM usage_daily_endpoint e JOIN usage_daily_user u ON e.org_id = u.org_id AND e.date = u.date WHERE e.org_id = ? AND u.user_id = ? AND e.date >= ? GROUP BY e.endpoint ORDER BY cnt DESC LIMIT 10`, orgID, uid, sinceDate).Scan(&epRows).Error; err != nil {
-			JSONError(c, CodeDatabaseError, "查询接口聚合失败")
-			return
-		}
-	} else {
-		if err := h.service.DB.Raw(`SELECT endpoint AS ep, SUM(total) AS cnt FROM usage_daily_endpoint WHERE org_id = ? AND date >= ? GROUP BY endpoint ORDER BY cnt DESC LIMIT 10`, orgID, sinceDate).Scan(&epRows).Error; err != nil {
-			JSONError(c, CodeDatabaseError, "查询接口聚合失败")
-			return
-		}
+		epQuery = epQuery.Where("dimensions->>'user_id' = ?", c.GetString("userID"))
 	}
-	byEndpoint := make([]byItem, 0, len(epRows))
+
+	if err := epQuery.Scan(&epRows).Error; err != nil {
+		JSONError(c, CodeDatabaseError, "查询接口聚合失败")
+		return
+	}
+
+	type endpointItem struct {
+		ID         string  `json:"id"`
+		Endpoint   string  `json:"endpoint"`
+		Count      int64   `json:"count"`
+		Errors     int64   `json:"errors"`
+		Percentage float64 `json:"percentage"`
+	}
+
+	byEndpoint := make([]endpointItem, 0, len(epRows))
 	for _, r := range epRows {
 		pct := 0.0
 		if totalForPct > 0 {
 			pct = math.Round((float64(r.Cnt)/float64(totalForPct))*1000) / 10
 		}
-		byEndpoint = append(byEndpoint, byItem{ID: r.EP, Label: r.EP, Count: r.Cnt, Percentage: pct})
+		byEndpoint = append(byEndpoint, endpointItem{
+			ID:         r.EP,
+			Endpoint:   r.EP,
+			Count:      r.Cnt,
+			Errors:     r.Err,
+			Percentage: pct,
+		})
 	}
 
+	// 7. API Key breakdown from usage_metric_aggs
 	var keyRows []struct {
 		ID  string
 		Cnt int64
 	}
+
+	keyQuery := h.service.DB.Model(&models.UsageMetricAgg{}).
+		Select("dimensions->>'api_key_id' as id, SUM(usage_units) as cnt").
+		Where("org_id = ? AND stat_time >= ? AND time_unit = 'day' AND dimensions->>'api_key_id' IS NOT NULL", orgID, sinceDate).
+		Group("dimensions->>'api_key_id'").
+		Order("cnt DESC").
+		Limit(10)
+
 	if scope == "personal" {
-		uid := c.GetString("userID")
-		if err := h.service.DB.Raw(`SELECT api_key_id AS id, SUM(total) AS cnt FROM usage_daily_key_user WHERE org_id = ? AND user_id = ? AND date >= ? GROUP BY api_key_id ORDER BY cnt DESC LIMIT 10`, orgID, uid, sinceDate).Scan(&keyRows).Error; err != nil {
-			JSONError(c, CodeDatabaseError, "查询密钥聚合失败")
-			return
-		}
-	} else {
-		if err := h.service.DB.Raw(`SELECT api_key_id AS id, SUM(total) AS cnt FROM usage_daily_key WHERE org_id = ? AND date >= ? GROUP BY api_key_id ORDER BY cnt DESC LIMIT 10`, orgID, sinceDate).Scan(&keyRows).Error; err != nil {
-			JSONError(c, CodeDatabaseError, "查询密钥聚合失败")
-			return
-		}
+		keyQuery = keyQuery.Where("dimensions->>'user_id' = ?", c.GetString("userID"))
+	}
+
+	if err := keyQuery.Scan(&keyRows).Error; err != nil {
+		JSONError(c, CodeDatabaseError, "查询密钥聚合失败")
+		return
 	}
 	byKey := make([]byItem, 0, len(keyRows))
 	for _, r := range keyRows {
@@ -322,7 +567,7 @@ func (h *OrgUsageHandler) GetUsageDetailedV2(c *gin.Context) {
 		"totalRequests": totalRequests,
 		"totalErrors":   totalErrors,
 		"period":        period,
-		"quotaStatus": gin.H{"limit": limit, "used": used, "remaining": remaining, "percentUsed": percentUsed, "resetDate": func() *string {
+		"quotaStatus": gin.H{"limit": totalLimit, "used": totalUsed, "remaining": remaining, "percentUsed": percentUsed, "quotas": quotas, "resetDate": func() *string {
 			if resetAt != nil {
 				s := resetAt.UTC().Format("2006-01-02T15:04:05Z")
 				return &s
@@ -378,12 +623,22 @@ func (h *OrgUsageHandler) GetUsageDaily(c *gin.Context) {
 	}
 	if scope == "personal" {
 		uid := c.GetString("userID")
-		if err := h.service.DB.Raw(`SELECT date AS d, total AS t, failed AS f FROM usage_daily_user WHERE org_id = ? AND user_id = ? AND date >= ? ORDER BY date`, orgID, uid, since).Scan(&rows).Error; err != nil {
+		if err := h.service.DB.Model(&models.UsageMetricAgg{}).
+			Select("stat_time AS d, SUM(total_requests) AS t, SUM(total_errors) AS f").
+			Where("org_id = ? AND dimensions->>'user_id' = ? AND stat_time >= ? AND time_unit = 'day'", orgID, uid, since).
+			Group("stat_time").
+			Order("stat_time").
+			Scan(&rows).Error; err != nil {
 			JSONError(c, CodeDatabaseError, "查询失败")
 			return
 		}
 	} else {
-		if err := h.service.DB.Raw(`SELECT date AS d, total AS t, failed AS f FROM usage_daily WHERE org_id = ? AND date >= ? ORDER BY date`, orgID, since).Scan(&rows).Error; err != nil {
+		if err := h.service.DB.Model(&models.UsageMetricAgg{}).
+			Select("stat_time AS d, SUM(total_requests) AS t, SUM(total_errors) AS f").
+			Where("org_id = ? AND stat_time >= ? AND time_unit = 'day'", orgID, since).
+			Group("stat_time").
+			Order("stat_time").
+			Scan(&rows).Error; err != nil {
 			JSONError(c, CodeDatabaseError, "查询失败")
 			return
 		}
@@ -427,12 +682,34 @@ func (h *OrgUsageHandler) GetUsageSummary(c *gin.Context) {
 	now := time.Now()
 	period := now.Format("2006-01")
 	var total int64
-	if err := h.service.DB.Raw(`SELECT COUNT(*) FROM api_request_logs WHERE organization_id = ? AND created_at >= date_trunc('month', now()) AND created_at < date_trunc('month', now()) + interval '1 month'`, orgID).Scan(&total).Error; err != nil {
+
+	// Get month start and end dates in Go
+	monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	nextMonthStart := monthStart.AddDate(0, 1, 0)
+
+	if err := h.service.DB.Model(&models.UsageMetricAgg{}).
+		Select("COALESCE(SUM(total_requests),0)").
+		Where("org_id = ? AND stat_time >= ? AND stat_time < ?", orgID, monthStart, nextMonthStart).
+		Scan(&total).Error; err != nil {
 		JSONError(c, CodeDatabaseError, "查询失败")
 		return
 	}
-	planLimits := map[string]int{"starter": 50000, "growth": 200000, "scale": 1000000}
-	limit := planLimits[org.PlanID]
+
+	// Default to reading from db instead of hardcoding
+	type planRow struct {
+		RequestsLimit int
+	}
+	var pr planRow
+	var limit int
+
+	if err := h.service.DB.Raw("SELECT COALESCE(requests_limit, 0) as requests_limit FROM plans WHERE id = ?", org.PlanID).Scan(&pr).Error; err == nil && pr.RequestsLimit > 0 {
+		limit = pr.RequestsLimit
+	} else {
+		// Fallback if plan doesn't exist in DB yet
+		planLimits := map[string]int{"starter": 50000, "growth": 200000, "scale": 1000000}
+		limit = planLimits[org.PlanID]
+	}
+
 	percent := float64(0)
 	status := "healthy"
 	if limit > 0 {
