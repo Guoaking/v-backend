@@ -68,10 +68,33 @@ type SecurityConfig struct {
 }
 
 type StorageConfig struct {
-	Mode      string `mapstructure:"mode"` // "local" or "remote"
-	IngestDir string `mapstructure:"ingest_dir"`
-	ImageDir  string `mapstructure:"image_dir"` // Optional: Separate dir for images
-	BaseURL   string `mapstructure:"base_url"`
+	Upload UploadConfig `mapstructure:"upload"`
+	Access AccessConfig `mapstructure:"access"`
+}
+
+type UploadConfig struct {
+	Mode    string       `mapstructure:"mode"` // "local", "s3"
+	BaseDir string       `mapstructure:"base_dir"`
+	Rules   []UploadRule `mapstructure:"rules"`
+}
+
+type UploadRule struct {
+	Name      string `mapstructure:"name"`
+	Prefix    string `mapstructure:"prefix"`
+	TargetDir string `mapstructure:"target_dir"`
+}
+
+type AccessConfig struct {
+	DefaultStrategy string       `mapstructure:"default_strategy"` // "local_stream", "nginx_internal", "redirect"
+	Rules           []AccessRule `mapstructure:"rules"`
+}
+
+type AccessRule struct {
+	Name           string `mapstructure:"name"`
+	MatchPrefix    string `mapstructure:"match_prefix"`
+	Strategy       string `mapstructure:"strategy"` // "nginx_internal", "redirect", "local_stream"
+	InternalPrefix string `mapstructure:"internal_prefix"`
+	StripPrefix    string `mapstructure:"strip_prefix"`
 }
 
 type ThirdPartyConfig struct {
@@ -122,6 +145,10 @@ func Load(configFile string) *Config {
 	viper.AddConfigPath("./config")
 	viper.AddConfigPath("/etc/kyc-service/")
 
+	// 读取环境变量
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	viper.AutomaticEnv() // 允许环境变量覆盖配置文件
+
 	// 设置默认值
 	setDefaults()
 
@@ -131,11 +158,6 @@ func Load(configFile string) *Config {
 			panic(fmt.Errorf("配置文件读取错误: %w", err))
 		}
 	}
-
-	// 读取环境变量
-	viper.AutomaticEnv()
-	viper.SetEnvPrefix("KYC")
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	var config Config
 	if err := viper.Unmarshal(&config); err != nil {
@@ -180,12 +202,19 @@ func setDefaults() {
 	viper.SetDefault("security.rate_limit_per_second", 100)
 	viper.SetDefault("security.rate_limit_burst", 200)
 	viper.SetDefault("security.kong_shared_secret", "kong-shared-secret-key-2024")
-	viper.SetDefault("security.service_secret_key", "kyc-service-secret-key-2024")
-
-	viper.SetDefault("storage.mode", "local")
-	viper.SetDefault("storage.ingest_dir", "/data/ingest")
-	viper.SetDefault("storage.image_dir", "") // Default empty, use ingest_dir
-	viper.SetDefault("storage.base_url", "")
+	viper.SetDefault("security.service_secret_key", "kyc-service-secret-key-2024") // 存储默认值
+	viper.SetDefault("storage.upload.mode", "local")
+	viper.SetDefault("storage.upload.base_dir", "/data")
+	viper.SetDefault("storage.access.default_strategy", "local_stream")
+	viper.SetDefault("storage.access.rules", []map[string]interface{}{
+		{
+			"name":            "default_face",
+			"match_prefix":    "/data/",
+			"strategy":        "nginx_internal",
+			"internal_prefix": "/_protected/faces/",
+			"strip_prefix":    "/data/",
+		},
+	})
 
 	// 第三方服务默认值
 	viper.SetDefault("third_party.ocr_service.timeout", 30)

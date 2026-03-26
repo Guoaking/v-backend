@@ -1,12 +1,11 @@
 package api
 
 import (
-	"fmt"
-	"path/filepath"
-	"strings"
-
 	"kyc-service/internal/models"
 	"kyc-service/internal/service"
+	"net/http"
+
+	"kyc-service/pkg/logger"
 
 	"github.com/gin-gonic/gin"
 )
@@ -26,28 +25,32 @@ func (h *FaceImageHandler) GetImage(c *gin.Context) {
 		return
 	}
 
-	//name := path.Base(ref.SafeFilename)
-	name, err := subpathAfterData(ref.SafeFilename)
+	// 1. 调用存储服务解析访问路径和策略
+	resolved, err := h.service.Storage.ResolveAccess(ref.SafeFilename)
 	if err != nil {
-		JSONError(c, CodeNotFound, "图片获取错误")
+		logger.GetLogger().WithError(err).WithField("path", ref.SafeFilename).Error("访问路径解析失败")
+		JSONError(c, CodeNotFound, "图片解析错误")
 		return
 	}
-	c.Header("Content-Type", "image/jpeg")
-	c.Header("X-Accel-Redirect", fmt.Sprintf("/_protected/faces/%s", name))
-	c.Header("Cache-Control", "private, max-age=60")
-	c.Status(200)
-}
 
-func subpathAfterData(fullPath string) (string, error) {
-	base := "/root/test/vrlFaceServer/vrlFace/data"
-	full := filepath.Clean(fullPath)
-	baseClean := filepath.Clean(base)
-	rel, err := filepath.Rel(baseClean, full)
-	if err != nil {
-		return "", err
+	// 2. 环境感知降级：本地开发模式 (debug) 强制使用 local_stream 策略
+	strategy := resolved.Strategy
+	if h.service.Config.GinMode == "debug" {
+		strategy = "local_stream"
 	}
-	if strings.HasPrefix(rel, "..") {
-		return "", fmt.Errorf("path outside base")
+
+	// 3. 执行分发策略
+	switch strategy {
+	case "nginx_internal":
+		c.Header("Content-Type", "image/jpeg")
+		c.Header("X-Accel-Redirect", resolved.InternalPath)
+		c.Status(200)
+	case "redirect":
+		c.Redirect(http.StatusFound, resolved.InternalPath)
+	case "local_stream":
+		// 自动判断物理路径是否存在并输出
+		c.File(ref.SafeFilename)
+	default:
+		JSONError(c, CodeInternalError, "不支持的存储分发策略")
 	}
-	return filepath.ToSlash(rel), nil
 }

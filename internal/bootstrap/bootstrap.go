@@ -5,7 +5,10 @@ import (
 	"time"
 
 	"kyc-service/internal/config"
+	"kyc-service/internal/middleware"
+	"kyc-service/internal/migration"
 	"kyc-service/internal/models"
+	"kyc-service/internal/router"
 	"kyc-service/internal/service"
 	"kyc-service/internal/storage"
 	"kyc-service/internal/tasks"
@@ -14,17 +17,41 @@ import (
 	"kyc-service/pkg/metrics"
 	"kyc-service/pkg/tracing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 	"gorm.io/gorm"
 )
 
 // App holds the application dependencies
 type App struct {
-	Config      *config.Config
-	DB          *gorm.DB
-	RedisClient *redis.Client
-	KYCService  *service.KYCService
-	LogWorker   worker.LogWorker
+	Config           *config.Config
+	DB               *gorm.DB
+	RedisClient      *redis.Client
+	KYCService       *service.KYCService
+	LogWorker        worker.LogWorker
+	Engine           *gin.Engine
+	HeartbeatManager *middleware.HeartbeatManager
+}
+
+// SetupApp initializes the application for server or testing
+func SetupApp(ctx context.Context, configFile string) (*App, func(), error) {
+	app, tracerCleanup, err := Init(ctx, configFile)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// 2. Migration: 执行数据库迁移
+	if err := migration.Run(app.DB); err != nil {
+		tracerCleanup()
+		return nil, nil, err
+	}
+
+	// 3. Router: 初始化路由和中间件
+	r, heartbeatManager := router.New(app.Config, app.KYCService, app.RedisClient)
+	app.Engine = r
+	app.HeartbeatManager = heartbeatManager
+
+	return app, tracerCleanup, nil
 }
 
 // Init initializes the application dependencies

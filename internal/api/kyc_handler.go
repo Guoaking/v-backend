@@ -31,7 +31,7 @@ func NewKYCHandler(svc *service.KYCService) *KYCHandler {
 // @Produce json
 // @Param picture formData file true "ID card image"
 // @Param language formData string false "Language default:thai" Enums(thai,vietnamese,indonesian,chinese,english,tagalog,malay,khmer,lao,tamil) example(thai)
-// @Success 200 {object} OCRSuccessResponse
+// @Success 200 {object} response.SuccessResponse{data=service.OCRResponse}
 // @Router /kyc/ocr [post]
 // @Security ApiKeyAuth
 func (h *KYCHandler) OCR(c *gin.Context) {
@@ -138,7 +138,7 @@ func GetSupportLang(lang string) string {
 // @Accept multipart/form-data
 // @Produce json
 // @Param picture formData file true "Face image"
-// @Success 200 {object} FaceSearchSuccessResponse
+// @Success 200 {object} response.SuccessResponse{data=service.FaceSearchResponse}
 // @Router /kyc/face/search [post]
 // @Security ApiKeyAuth
 func (h *KYCHandler) FaceSearch(c *gin.Context) {
@@ -173,7 +173,7 @@ func (h *KYCHandler) FaceSearch(c *gin.Context) {
 // @Produce json
 // @Param source_image formData file true "Source image"
 // @Param target_image formData file true "Target image"
-// @Success 200 {object} FaceCompareSuccessResponse
+// @Success 200 {object} response.SuccessResponse{data=service.FaceCompareResponse}
 // @Router /kyc/face/compare [post]
 // @Security ApiKeyAuth
 func (h *KYCHandler) FaceCompare(c *gin.Context) {
@@ -209,7 +209,7 @@ func (h *KYCHandler) FaceCompare(c *gin.Context) {
 // @Produce json
 // @Param image1 formData file true "人脸图片1"
 // @Param image2 formData file true "人脸图片2 (证件照)"
-// @Success 200 {object} service.FaceCompareResponse
+// @Success 200 {object} response.SuccessResponse{data=service.FaceCompareResponse}
 // @Router /api/v1/kyc/face/id-match [post]
 func (h *KYCHandler) FaceIdMatch(c *gin.Context) {
 	file1, err := c.FormFile("image1")
@@ -239,7 +239,7 @@ func (h *KYCHandler) FaceIdMatch(c *gin.Context) {
 // @Accept multipart/form-data
 // @Produce json
 // @Param picture formData file true "Face image"
-// @Success 200 {object} FaceDetectSuccessResponse
+// @Success 200 {object} response.SuccessResponse{data=service.FaceDetectResponse}
 // @Router /kyc/face/detect [post]
 // @Security ApiKeyAuth
 func (h *KYCHandler) FaceDetect(c *gin.Context) {
@@ -274,7 +274,7 @@ func (h *KYCHandler) FaceDetect(c *gin.Context) {
 // @Produce json
 // @Param picture formData file true "Image"
 // @Param language formData string false "Language" Enums(zh,zh-CN,en,en-US) example(zh-CN)
-// @Success 200 {object} LivenessSilentSuccessResponse
+// @Success 200 {object} response.SuccessResponse{data=service.LivenessSilentResponse}
 // @Router /kyc/liveness/silent [post]
 // @Security ApiKeyAuth
 func (h *KYCHandler) LivenessSilent(c *gin.Context) {
@@ -309,7 +309,7 @@ func (h *KYCHandler) LivenessSilent(c *gin.Context) {
 // @Produce json
 // @Param video formData file true "Video"
 // @Param language formData string false "Language" Enums(zh,zh-CN,en,en-US) example(en-US)
-// @Success 200 {object} LivenessVideoSuccessResponse
+// @Success 200 {object} response.SuccessResponse{data=service.LivenessVideoResponse}
 // @Router /kyc/liveness/video [post]
 // @Security ApiKeyAuth
 func (h *KYCHandler) LivenessVideo(c *gin.Context) {
@@ -368,7 +368,7 @@ func (h *KYCHandler) LivenessWebSocket(c *gin.Context) {
 // @Param name formData string true "Name"
 // @Param idcard formData string true "ID card number"
 // @Param phone formData string false "Phone number"
-// @Success 200 {object} SuccessResponse
+// @Success 200 {object} response.SuccessResponse{data=service.CompleteKYCResponse}
 // @Router /kyc/verify [post]
 // @Security ApiKeyAuth
 func (h *KYCHandler) CompleteKYC(c *gin.Context) {
@@ -393,7 +393,7 @@ func (h *KYCHandler) CompleteKYC(c *gin.Context) {
 // @Tags KYC
 // @Produce json
 // @Param request_id path string true "请求ID"
-// @Success 200 {object} SuccessResponse
+// @Success 200 {object} response.SuccessResponse{data=models.KYCRequest}
 // @Router /kyc/status/{request_id} [get]
 // @Security ApiKeyAuth
 func (h *KYCHandler) GetKYCStatus(c *gin.Context) { //ignore_security_alert IDOR

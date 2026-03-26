@@ -38,16 +38,16 @@ type StandardFaceVerifyResponse struct {
 }
 
 type FaceSearchResponse struct {
-	Code             int    `json:"code"`
-	Msg              string `json:"msg"`
-	SearchingResults struct {
+	Code          int    `json:"code"`
+	Msg           string `json:"msg"`
+	SearchResults struct {
 		SearchedSimilarPictures []struct {
 			ID         string  `json:"id"`
 			Confidence float64 `json:"confidence"`
 			Picture    string  `json:"picture,omitempty"`
 		} `json:"searched_similar_pictures"`
 		HasSimilarPicture int `json:"has_similar_picture"`
-	} `json:"searching_results"`
+	} `json:"search_results"`
 	Filename string `json:"filename"`
 }
 
@@ -118,14 +118,14 @@ func (s *KYCService) FaceSearch(ctx context.Context, file *multipart.FileHeader)
 	}
 
 	// Persist image refs and replace IDs with internal IDs for nginx forwarding
-	for i := range out.SearchingResults.SearchedSimilarPictures {
-		pic := out.SearchingResults.SearchedSimilarPictures[i].Picture
+	for i := range out.SearchResults.SearchedSimilarPictures {
+		pic := out.SearchResults.SearchedSimilarPictures[i].Picture
 		if pic == "" {
 			continue
 		}
 		id := uuid.New().String()
 		_ = s.DB.Create(&models.FaceImageRef{ID: id, OrganizationID: orgID, FilePath: pic, SafeFilename: pic, CreatedAt: time.Now()}).Error
-		out.SearchingResults.SearchedSimilarPictures[i].ID = id
+		out.SearchResults.SearchedSimilarPictures[i].ID = id
 	}
 
 	if s.faceVerifySuccessRate != nil {

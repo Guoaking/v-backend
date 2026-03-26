@@ -28,7 +28,7 @@
 | Component      | Path                                          | Description                                                        |
 | -------------- | --------------------------------------------- | ------------------------------------------------------------------ |
 | **Entry**      | `cmd/server/main.go`                          | App initialization, middleware chain                               |
-| **Auth**       | `internal/api/auth_handler.go`                | **LEGACY** OAuth2. Moving to Unified Middleware.                   |
+| **Auth**       | `internal/api/auth_handler.go`                | **MODERN** Unified OAuth2/STS (Token, Client Credentials).       |
 | **KYC Logic**  | `internal/service/kyc_service.go`             | Core orchestration (OCR, Face)                                     |
 | **Liveness**   | `internal/service/action_liveness_service.go` | **MODERN** implementation reference (Quota, Audit, Tracing)        |
 | **Middleware** | `internal/middleware/`                        | `quota.go`, `security.go`, `oauth_client_auth.go`                  |
@@ -36,11 +36,12 @@
 
 ## 3. Architecture Highlights
 
-### Authentication (Transitioning)
+### Authentication (Unified)
 
-- **Current State**: Mixed (API Key + OAuth2 Client Credentials).
-- **Target State**: Unified Middleware handling both.
-- **Rule**: When adding new endpoints, use `UnifiedAuthMiddleware` (once available) or follow `docs/architecture/AUTH_UNIFICATION.md`.
+- **Current State**: Unified OAuth2/STS (Security Token Service).
+- **Note**: Legacy API Keys have been safely removed from business logic.
+- **Rule**: All public APIs MUST use `APIOrOAuthAuth` middleware. Use `STS` for short-lived (15 min) Playground access.
+- **Reference**: See `docs/architecture/AUTH_UNIFICATION.md`.
 
 ### Billing & Quota
 

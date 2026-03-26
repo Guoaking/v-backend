@@ -10,6 +10,7 @@ import (
 
 	"kyc-service/internal/config"
 	"kyc-service/internal/models"
+	"kyc-service/internal/storage"
 
 	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/sqlite"
@@ -18,8 +19,9 @@ import (
 
 // MockStorage implements storage.StorageService
 type MockStorage struct {
-	UploadFunc       func(ctx context.Context, filename string, content io.Reader) (string, string, error)
-	GetPublicURLFunc func(internalPath string) string
+	UploadFunc        func(ctx context.Context, filename string, content io.Reader) (string, string, error)
+	GetPublicURLFunc  func(internalPath string) string
+	ResolveAccessFunc func(fullPath string) (*storage.ResolvedPath, error)
 }
 
 func (m *MockStorage) Upload(ctx context.Context, filename string, content io.Reader) (string, string, error) {
@@ -34,6 +36,16 @@ func (m *MockStorage) GetPublicURL(internalPath string) string {
 		return m.GetPublicURLFunc(internalPath)
 	}
 	return "http://localhost/files/" + internalPath
+}
+
+func (m *MockStorage) ResolveAccess(fullPath string) (*storage.ResolvedPath, error) {
+	if m.ResolveAccessFunc != nil {
+		return m.ResolveAccessFunc(fullPath)
+	}
+	return &storage.ResolvedPath{
+		Strategy:     "local_stream",
+		InternalPath: fullPath,
+	}, nil
 }
 
 func setupTestDB() *gorm.DB {
@@ -59,7 +71,7 @@ func setupTestDB() *gorm.DB {
 
 func setupTestConfig(serverURL string) *config.Config {
 	cfg := &config.Config{}
-	cfg.Storage.Mode = "local"
+	cfg.Storage.Upload.Mode = "local"
 	cfg.ThirdParty.LivenessAction.SubmitURL = serverURL
 	cfg.ThirdParty.LivenessAction.CallbackURL = "http://localhost:8080/callback"
 	cfg.Security.ServiceSecretKey = "test-secret"

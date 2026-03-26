@@ -282,123 +282,6 @@
                 }
             }
         },
-        "/api/v1/keys": {
-            "get": {
-                "description": "获取当前用户的所有API密钥",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Credentials"
-                ],
-                "summary": "获取用户API密钥列表",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/api.SuccessResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/api.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "description": "创建新的API密钥",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Credentials"
-                ],
-                "summary": "创建API密钥",
-                "parameters": [
-                    {
-                        "description": "API密钥信息",
-                        "name": "key",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/api.CreateAPIKeyRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/api.SuccessResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/api.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/api.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/keys/{id}": {
-            "delete": {
-                "description": "删除指定的API密钥",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Credentials"
-                ],
-                "summary": "删除API密钥",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "API密钥ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/api.SuccessResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/api.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/api.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/kyc/face/id-match": {
             "post": {
                 "description": "上传两张人脸图片进行比对，验证是否为同一人（其中一张为证件照）",
@@ -432,7 +315,19 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/service.FaceCompareResponse"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/service.FaceCompareResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -1016,7 +911,19 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.FaceCompareSuccessResponse"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/service.FaceCompareResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -1053,7 +960,19 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.FaceDetectSuccessResponse"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/service.FaceDetectResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -1090,7 +1009,19 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.FaceSearchSuccessResponse"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/service.FaceSearchResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -1241,7 +1172,19 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.LivenessSilentSuccessResponse"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/service.LivenessSilentResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -1288,7 +1231,19 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.LivenessVideoSuccessResponse"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/service.LivenessVideoResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -1367,7 +1322,19 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.OCRSuccessResponse"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/service.OCRResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -1401,7 +1368,19 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.SuccessResponse"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/models.KYCRequest"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -1465,7 +1444,19 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.SuccessResponse"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.SuccessResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/service.CompleteKYCResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -1650,31 +1641,6 @@
                 }
             }
         },
-        "api.CreateAPIKeyRequest": {
-            "type": "object",
-            "required": [
-                "name",
-                "scopes"
-            ],
-            "properties": {
-                "ip_whitelist": {
-                    "description": "IP白名单，CIDR格式",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "name": {
-                    "type": "string"
-                },
-                "scopes": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
         "api.ErrorCodeEntry": {
             "type": "object",
             "properties": {
@@ -1757,234 +1723,6 @@
                 }
             }
         },
-        "api.FaceCompareDTO": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer"
-                },
-                "comparison_results": {
-                    "type": "object",
-                    "properties": {
-                        "confidence": {
-                            "type": "number"
-                        },
-                        "confidence_exist": {
-                            "type": "array",
-                            "items": {
-                                "type": "number"
-                            }
-                        },
-                        "detection_result": {
-                            "type": "string"
-                        },
-                        "is_face_exist": {
-                            "type": "integer"
-                        },
-                        "is_same_face": {
-                            "type": "integer"
-                        }
-                    }
-                },
-                "filename": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "msg": {
-                    "type": "string"
-                }
-            }
-        },
-        "api.FaceCompareSuccessResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "description": "response code",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/response.ResponseCode"
-                        }
-                    ]
-                },
-                "data": {
-                    "$ref": "#/definitions/api.FaceCompareDTO"
-                },
-                "message": {
-                    "description": "response message",
-                    "type": "string"
-                },
-                "request_id": {
-                    "description": "request id",
-                    "type": "string"
-                },
-                "timestamp": {
-                    "description": "timestamp (ms)",
-                    "type": "integer"
-                }
-            }
-        },
-        "api.FaceDetectDTO": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer"
-                },
-                "detection_results": {
-                    "type": "object",
-                    "properties": {
-                        "face_num": {
-                            "type": "integer"
-                        },
-                        "faces_detected": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "confidence": {
-                                        "type": "number"
-                                    },
-                                    "facial_area": {
-                                        "type": "object",
-                                        "properties": {
-                                            "h": {
-                                                "type": "integer"
-                                            },
-                                            "left_eye": {
-                                                "type": "array",
-                                                "items": {
-                                                    "type": "integer"
-                                                }
-                                            },
-                                            "right_eye": {
-                                                "type": "array",
-                                                "items": {
-                                                    "type": "integer"
-                                                }
-                                            },
-                                            "w": {
-                                                "type": "integer"
-                                            },
-                                            "x": {
-                                                "type": "integer"
-                                            },
-                                            "y": {
-                                                "type": "integer"
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        "is_face_exist": {
-                            "type": "integer"
-                        }
-                    }
-                },
-                "filename": {
-                    "type": "string"
-                },
-                "msg": {
-                    "type": "string"
-                }
-            }
-        },
-        "api.FaceDetectSuccessResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "description": "response code",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/response.ResponseCode"
-                        }
-                    ]
-                },
-                "data": {
-                    "$ref": "#/definitions/api.FaceDetectDTO"
-                },
-                "message": {
-                    "description": "response message",
-                    "type": "string"
-                },
-                "request_id": {
-                    "description": "request id",
-                    "type": "string"
-                },
-                "timestamp": {
-                    "description": "timestamp (ms)",
-                    "type": "integer"
-                }
-            }
-        },
-        "api.FaceSearchDTO": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer"
-                },
-                "filename": {
-                    "type": "string"
-                },
-                "msg": {
-                    "type": "string"
-                },
-                "searching_results": {
-                    "type": "object",
-                    "properties": {
-                        "has_similar_picture": {
-                            "type": "integer"
-                        },
-                        "searched_similar_pictures": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/api.FaceSearchItem"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "api.FaceSearchItem": {
-            "type": "object",
-            "properties": {
-                "confidence": {
-                    "type": "number"
-                },
-                "id": {
-                    "type": "string"
-                }
-            }
-        },
-        "api.FaceSearchSuccessResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "description": "response code",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/response.ResponseCode"
-                        }
-                    ]
-                },
-                "data": {
-                    "$ref": "#/definitions/api.FaceSearchDTO"
-                },
-                "message": {
-                    "description": "response message",
-                    "type": "string"
-                },
-                "request_id": {
-                    "description": "request id",
-                    "type": "string"
-                },
-                "timestamp": {
-                    "description": "timestamp (ms)",
-                    "type": "integer"
-                }
-            }
-        },
         "api.GoogleTokenRequest": {
             "type": "object",
             "required": [
@@ -2007,186 +1745,6 @@
                     "type": "string"
                 },
                 "role": {
-                    "type": "string"
-                }
-            }
-        },
-        "api.LivenessSilentDTO": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer"
-                },
-                "filename": {
-                    "type": "string"
-                },
-                "liveness_results": {
-                    "type": "object",
-                    "properties": {
-                        "confidence": {
-                            "type": "number"
-                        },
-                        "face_exist_confidence": {
-                            "type": "number"
-                        },
-                        "is_face_exist": {
-                            "type": "integer"
-                        },
-                        "is_liveness": {
-                            "type": "integer"
-                        }
-                    }
-                },
-                "msg": {
-                    "type": "string"
-                }
-            }
-        },
-        "api.LivenessSilentSuccessResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "description": "response code",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/response.ResponseCode"
-                        }
-                    ]
-                },
-                "data": {
-                    "$ref": "#/definitions/api.LivenessSilentDTO"
-                },
-                "message": {
-                    "description": "response message",
-                    "type": "string"
-                },
-                "request_id": {
-                    "description": "request id",
-                    "type": "string"
-                },
-                "timestamp": {
-                    "description": "timestamp (ms)",
-                    "type": "integer"
-                }
-            }
-        },
-        "api.LivenessVideoDTO": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer"
-                },
-                "filename": {
-                    "type": "string"
-                },
-                "liveness_results": {
-                    "type": "object",
-                    "properties": {
-                        "confidence": {
-                            "type": "number"
-                        },
-                        "face_exist_confidence": {
-                            "type": "number"
-                        },
-                        "is_face_exist": {
-                            "type": "integer"
-                        },
-                        "is_liveness": {
-                            "type": "integer"
-                        }
-                    }
-                },
-                "msg": {
-                    "type": "string"
-                }
-            }
-        },
-        "api.LivenessVideoSuccessResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "description": "response code",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/response.ResponseCode"
-                        }
-                    ]
-                },
-                "data": {
-                    "$ref": "#/definitions/api.LivenessVideoDTO"
-                },
-                "message": {
-                    "description": "response message",
-                    "type": "string"
-                },
-                "request_id": {
-                    "description": "request id",
-                    "type": "string"
-                },
-                "timestamp": {
-                    "description": "timestamp (ms)",
-                    "type": "integer"
-                }
-            }
-        },
-        "api.OCRPublicResult": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "integer"
-                },
-                "filename": {
-                    "type": "string"
-                },
-                "full_text": {
-                    "type": "string"
-                },
-                "msg": {
-                    "type": "string"
-                },
-                "parsing_results": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "$ref": "#/definitions/api.OCRTextItem"
-                    }
-                }
-            }
-        },
-        "api.OCRSuccessResponse": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "description": "response code",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/response.ResponseCode"
-                        }
-                    ]
-                },
-                "data": {
-                    "$ref": "#/definitions/api.OCRPublicResult"
-                },
-                "message": {
-                    "description": "response message",
-                    "type": "string"
-                },
-                "request_id": {
-                    "description": "request id",
-                    "type": "string"
-                },
-                "timestamp": {
-                    "description": "timestamp (ms)",
-                    "type": "integer"
-                }
-            }
-        },
-        "api.OCRTextItem": {
-            "type": "object",
-            "properties": {
-                "confidence": {
-                    "type": "number"
-                },
-                "text": {
                     "type": "string"
                 }
             }
@@ -2486,6 +2044,43 @@
                 }
             }
         },
+        "models.KYCRequest": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "error_message": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "ip_address": {
+                    "type": "string"
+                },
+                "request_type": {
+                    "description": "ocr, face, liveness, complete",
+                    "type": "string"
+                },
+                "result": {
+                    "type": "string"
+                },
+                "status": {
+                    "description": "pending, processing, success, failed",
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_agent": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
         "response.FieldError": {
             "type": "object",
             "properties": {
@@ -2605,6 +2200,48 @@
                 "CodeEncryptionError"
             ]
         },
+        "response.SuccessResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "response code",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/response.ResponseCode"
+                        }
+                    ]
+                },
+                "data": {
+                    "description": "response data"
+                },
+                "message": {
+                    "description": "response message",
+                    "type": "string"
+                },
+                "request_id": {
+                    "description": "request id",
+                    "type": "string"
+                },
+                "timestamp": {
+                    "description": "timestamp (ms)",
+                    "type": "integer"
+                }
+            }
+        },
+        "service.CompleteKYCResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "request_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
         "service.FaceCompareResponse": {
             "type": "object",
             "properties": {
@@ -2642,6 +2279,209 @@
                 },
                 "msg": {
                     "type": "string"
+                }
+            }
+        },
+        "service.FaceDetectResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "detection_results": {
+                    "type": "object",
+                    "properties": {
+                        "face_num": {
+                            "type": "integer"
+                        },
+                        "faces_detected": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "confidence": {
+                                        "type": "number"
+                                    },
+                                    "facial_area": {
+                                        "type": "object",
+                                        "properties": {
+                                            "h": {
+                                                "type": "integer"
+                                            },
+                                            "left_eye": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "right_eye": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "w": {
+                                                "type": "integer"
+                                            },
+                                            "x": {
+                                                "type": "integer"
+                                            },
+                                            "y": {
+                                                "type": "integer"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "is_face_exist": {
+                            "type": "integer"
+                        }
+                    }
+                },
+                "filename": {
+                    "type": "string"
+                },
+                "msg": {
+                    "type": "string"
+                }
+            }
+        },
+        "service.FaceSearchResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "filename": {
+                    "type": "string"
+                },
+                "msg": {
+                    "type": "string"
+                },
+                "search_results": {
+                    "type": "object",
+                    "properties": {
+                        "has_similar_picture": {
+                            "type": "integer"
+                        },
+                        "searched_similar_pictures": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "confidence": {
+                                        "type": "number"
+                                    },
+                                    "id": {
+                                        "type": "string"
+                                    },
+                                    "picture": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "service.LivenessSilentResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "filename": {
+                    "type": "string"
+                },
+                "liveness_results": {
+                    "type": "object",
+                    "properties": {
+                        "confidence": {
+                            "type": "number"
+                        },
+                        "face_exist_confidence": {
+                            "type": "number"
+                        },
+                        "is_face_exist": {
+                            "type": "integer"
+                        },
+                        "is_liveness": {
+                            "type": "integer"
+                        }
+                    }
+                },
+                "msg": {
+                    "type": "string"
+                }
+            }
+        },
+        "service.LivenessVideoResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "filename": {
+                    "type": "string"
+                },
+                "liveness_results": {
+                    "type": "object",
+                    "properties": {
+                        "confidence": {
+                            "type": "number"
+                        },
+                        "face_exist_confidence": {
+                            "type": "number"
+                        },
+                        "is_face_exist": {
+                            "type": "number"
+                        },
+                        "is_liveness": {
+                            "type": "integer"
+                        }
+                    }
+                },
+                "msg": {
+                    "type": "string"
+                }
+            }
+        },
+        "service.OCRItem": {
+            "type": "object",
+            "properties": {
+                "confidence": {
+                    "type": "number"
+                },
+                "text": {
+                    "type": "string"
+                }
+            }
+        },
+        "service.OCRResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "filename": {
+                    "type": "string"
+                },
+                "full_text": {
+                    "type": "string"
+                },
+                "msg": {
+                    "type": "string"
+                },
+                "parsing_results": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/service.OCRItem"
+                    }
                 }
             }
         }

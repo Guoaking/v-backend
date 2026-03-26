@@ -11,8 +11,6 @@ import (
 	"time"
 
 	"kyc-service/internal/bootstrap"
-	"kyc-service/internal/migration"
-	"kyc-service/internal/router"
 	"kyc-service/pkg/logger"
 )
 
@@ -56,35 +54,19 @@ func main() {
 	flag.StringVar(&configFile, "config", defaultConfig, "配置文件路径 (不包含 .yaml 扩展名)，也可通过环境变量 KYC_CONFIG_FILE 设置")
 	flag.Parse()
 
-	// 1. Bootstrap: 初始化配置、日志、存储、服务等
-	app, tracerCleanup, err := bootstrap.Init(ctx, configFile)
+	// 1. SetupApp: 初始化配置、日志、存储、服务、数据库迁移、路由等
+	app, cleanup, err := bootstrap.SetupApp(ctx, configFile)
 	if err != nil {
-		// bootstrap.Init 内部已经记录了日志，但为了保险起见，这里再panic
-		panic(fmt.Sprintf("Bootstrap failed: %v", err))
+		panic(fmt.Sprintf("SetupApp failed: %v", err))
 	}
-	defer tracerCleanup()
-	log := logger.GetLogger()
-
-	// 2. Migration: 执行数据库迁移
-	if err := migration.Run(app.DB); err != nil {
-		log.Fatalf("Migration failed: %v", err)
-	}
-
-	// 启动异步日志Worker
-	// logWorker (含数据库实例用于流式聚合) 在 bootstrap.Init 中已启动
+	defer cleanup()
 	defer app.LogWorker.Stop()
-
-	// 注册全局Worker实例到中间件（需要修改中间件以支持注入Worker，或者使用全局单例）
-	// 为了简单起见，这里可以将logWorker注入到Service中，或者作为全局变量
-	// 但更好的方式是在 bootstrap.App 中添加 LogWorker 字段
-
-	// 3. Router: 初始化路由和中间件
-	r, heartbeatManager := router.New(app.Config, app.KYCService, app.RedisClient)
+	log := logger.GetLogger()
 
 	// 启动HTTP服务器
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%d", app.Config.Port),
-		Handler: r,
+		Handler: app.Engine,
 	}
 
 	// 优雅关闭
@@ -96,9 +78,6 @@ func main() {
 
 	log.Infof("KYC服务启动成功，端口: %d", app.Config.Port)
 
-	// 启动心跳检测
-	//heartbeatManager.Start(ctx)
-
 	// 等待中断信号
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
@@ -107,7 +86,9 @@ func main() {
 	log.Info("正在关闭服务...")
 
 	// 停止心跳检测
-	heartbeatManager.Stop()
+	if app.HeartbeatManager != nil {
+		app.HeartbeatManager.Stop()
+	}
 
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()

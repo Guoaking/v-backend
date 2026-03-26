@@ -68,45 +68,10 @@ func (t *ThirdPartyService) CallFaceSearch(ctx context.Context, reader io.Reader
 		return nil, fmt.Errorf("读取响应失败: %w", err)
 	}
 
-	var raw map[string]interface{}
-	if err := json.Unmarshal(respBody, &raw); err != nil {
+	var out FaceSearchResponse
+	if err := json.Unmarshal(respBody, &out); err != nil {
 		return nil, fmt.Errorf("解析响应失败: %w", err)
 	}
-
-	var out FaceSearchResponse
-	if v, ok := raw["code"].(float64); ok {
-		out.Code = int(v)
-	}
-	out.Msg = fmt.Sprintf("%v", raw["msg"])
-	out.Filename = fmt.Sprintf("%v", raw["filename"])
-	srch, _ := raw["searching_results"].(map[string]interface{})
-	list, _ := srch["searched_similar_pictures"].([]interface{})
-
-	for _, p := range list {
-		m := p.(map[string]interface{})
-		pic := ""
-		if v, ok := m["picture"]; ok {
-			pic = fmt.Sprintf("%v", v)
-		} else if v, ok := m["pciture"]; ok {
-			pic = fmt.Sprintf("%v", v)
-		}
-		conf := 0.0
-		if c, ok := m["confidence"].(float64); ok {
-			conf = c
-		}
-		id := fmt.Sprintf("%v", m["id"]) // third-party id; will be remapped in service
-		out.SearchingResults.SearchedSimilarPictures = append(out.SearchingResults.SearchedSimilarPictures, struct {
-			ID         string  `json:"id"`
-			Confidence float64 `json:"confidence"`
-			Picture    string  `json:"picture,omitempty"`
-		}{ID: id, Confidence: conf, Picture: pic})
-	}
-
-	if v, ok := srch["has_similar_picture"].(float64); ok {
-		out.SearchingResults.HasSimilarPicture = int(v)
-	}
-
-	// remove duplicate DB writes; mapping handled in service layer
 
 	if out.Code != 0 {
 		status = "failed"

@@ -181,7 +181,7 @@ func (s *KYCService) SubmitThirdParty(ctx context.Context, sessionID string) (*m
 		CallBackURL: s.Config.ThirdParty.LivenessAction.CallbackURL,
 	}
 
-	if s.Config.Storage.Mode == "remote" && publicURL != "" {
+	if s.Config.Storage.Upload.Mode == "remote" && publicURL != "" {
 		// If we had a VideoURL field in request, we'd set it.
 		// But current struct reuses VideoPath or we need to add VideoURL to ActionLivenessRequest if needed.
 		// Checking ThirdPartyService.SubmitActionLivenessV2 implementation...
@@ -193,7 +193,7 @@ func (s *KYCService) SubmitThirdParty(ctx context.Context, sessionID string) (*m
 		// If remote, we might need to send URL.
 		// Let's check ActionLivenessRequest struct again. It has VideoPath.
 		// I will send publicURL if remote, else FilePath.
-		if s.Config.Storage.Mode == "remote" {
+		if s.Config.Storage.Upload.Mode == "remote" {
 			req.VideoPath = publicURL
 		}
 	}

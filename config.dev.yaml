@@ -6,6 +6,10 @@ use_mock: false
 storage:
   ingest_dir: /data/videos
   image_dir: /opt/test
+  mode: local
+  strip_prefixes:
+    - "/data/"
+  internal_prefix: "/_protected/faces/"
 
 database:
   host: database

@@ -33,7 +33,7 @@ func (t *ThirdPartyService) CallLivenessSilent(ctx context.Context, picturePath,
 	payload := make(map[string]string)
 	payload["language"] = language
 
-	if t.config.Storage.Mode == "remote" && pictureURL != "" {
+	if t.config.Storage.Upload.Mode == "remote" && pictureURL != "" {
 		// Remote mode: send URL
 		// Note: The key might need to be "picture_url" or remain "picture_path" depending on API spec.
 		// For now, assuming the API is smart enough or uses a specific field for URL.
@@ -89,7 +89,7 @@ func (t *ThirdPartyService) CallLivenessVideo(ctx context.Context, videoPath, vi
 	payload := make(map[string]string)
 	payload["language"] = language
 
-	if t.config.Storage.Mode == "remote" && videoURL != "" {
+	if t.config.Storage.Upload.Mode == "remote" && videoURL != "" {
 		payload["video_url"] = videoURL
 	} else {
 		payload["video_path"] = videoPath

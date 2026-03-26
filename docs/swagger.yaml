@@ -119,23 +119,6 @@ definitions:
     - full_name
     - password
     type: object
-  api.CreateAPIKeyRequest:
-    properties:
-      ip_whitelist:
-        description: IP白名单，CIDR格式
-        items:
-          type: string
-        type: array
-      name:
-        type: string
-      scopes:
-        items:
-          type: string
-        type: array
-    required:
-    - name
-    - scopes
-    type: object
   api.ErrorCodeEntry:
     properties:
       code:
@@ -190,153 +173,6 @@ definitions:
         description: timestamp (ms)
         type: integer
     type: object
-  api.FaceCompareDTO:
-    properties:
-      code:
-        type: integer
-      comparison_results:
-        properties:
-          confidence:
-            type: number
-          confidence_exist:
-            items:
-              type: number
-            type: array
-          detection_result:
-            type: string
-          is_face_exist:
-            type: integer
-          is_same_face:
-            type: integer
-        type: object
-      filename:
-        items:
-          type: string
-        type: array
-      msg:
-        type: string
-    type: object
-  api.FaceCompareSuccessResponse:
-    properties:
-      code:
-        allOf:
-        - $ref: '#/definitions/response.ResponseCode'
-        description: response code
-      data:
-        $ref: '#/definitions/api.FaceCompareDTO'
-      message:
-        description: response message
-        type: string
-      request_id:
-        description: request id
-        type: string
-      timestamp:
-        description: timestamp (ms)
-        type: integer
-    type: object
-  api.FaceDetectDTO:
-    properties:
-      code:
-        type: integer
-      detection_results:
-        properties:
-          face_num:
-            type: integer
-          faces_detected:
-            items:
-              properties:
-                confidence:
-                  type: number
-                facial_area:
-                  properties:
-                    h:
-                      type: integer
-                    left_eye:
-                      items:
-                        type: integer
-                      type: array
-                    right_eye:
-                      items:
-                        type: integer
-                      type: array
-                    w:
-                      type: integer
-                    x:
-                      type: integer
-                    "y":
-                      type: integer
-                  type: object
-              type: object
-            type: array
-          is_face_exist:
-            type: integer
-        type: object
-      filename:
-        type: string
-      msg:
-        type: string
-    type: object
-  api.FaceDetectSuccessResponse:
-    properties:
-      code:
-        allOf:
-        - $ref: '#/definitions/response.ResponseCode'
-        description: response code
-      data:
-        $ref: '#/definitions/api.FaceDetectDTO'
-      message:
-        description: response message
-        type: string
-      request_id:
-        description: request id
-        type: string
-      timestamp:
-        description: timestamp (ms)
-        type: integer
-    type: object
-  api.FaceSearchDTO:
-    properties:
-      code:
-        type: integer
-      filename:
-        type: string
-      msg:
-        type: string
-      searching_results:
-        properties:
-          has_similar_picture:
-            type: integer
-          searched_similar_pictures:
-            items:
-              $ref: '#/definitions/api.FaceSearchItem'
-            type: array
-        type: object
-    type: object
-  api.FaceSearchItem:
-    properties:
-      confidence:
-        type: number
-      id:
-        type: string
-    type: object
-  api.FaceSearchSuccessResponse:
-    properties:
-      code:
-        allOf:
-        - $ref: '#/definitions/response.ResponseCode'
-        description: response code
-      data:
-        $ref: '#/definitions/api.FaceSearchDTO'
-      message:
-        description: response message
-        type: string
-      request_id:
-        description: request id
-        type: string
-      timestamp:
-        description: timestamp (ms)
-        type: integer
-    type: object
   api.GoogleTokenRequest:
     properties:
       id_token:
@@ -353,122 +189,6 @@ definitions:
     required:
     - email
     - role
-    type: object
-  api.LivenessSilentDTO:
-    properties:
-      code:
-        type: integer
-      filename:
-        type: string
-      liveness_results:
-        properties:
-          confidence:
-            type: number
-          face_exist_confidence:
-            type: number
-          is_face_exist:
-            type: integer
-          is_liveness:
-            type: integer
-        type: object
-      msg:
-        type: string
-    type: object
-  api.LivenessSilentSuccessResponse:
-    properties:
-      code:
-        allOf:
-        - $ref: '#/definitions/response.ResponseCode'
-        description: response code
-      data:
-        $ref: '#/definitions/api.LivenessSilentDTO'
-      message:
-        description: response message
-        type: string
-      request_id:
-        description: request id
-        type: string
-      timestamp:
-        description: timestamp (ms)
-        type: integer
-    type: object
-  api.LivenessVideoDTO:
-    properties:
-      code:
-        type: integer
-      filename:
-        type: string
-      liveness_results:
-        properties:
-          confidence:
-            type: number
-          face_exist_confidence:
-            type: number
-          is_face_exist:
-            type: integer
-          is_liveness:
-            type: integer
-        type: object
-      msg:
-        type: string
-    type: object
-  api.LivenessVideoSuccessResponse:
-    properties:
-      code:
-        allOf:
-        - $ref: '#/definitions/response.ResponseCode'
-        description: response code
-      data:
-        $ref: '#/definitions/api.LivenessVideoDTO'
-      message:
-        description: response message
-        type: string
-      request_id:
-        description: request id
-        type: string
-      timestamp:
-        description: timestamp (ms)
-        type: integer
-    type: object
-  api.OCRPublicResult:
-    properties:
-      code:
-        type: integer
-      filename:
-        type: string
-      full_text:
-        type: string
-      msg:
-        type: string
-      parsing_results:
-        additionalProperties:
-          $ref: '#/definitions/api.OCRTextItem'
-        type: object
-    type: object
-  api.OCRSuccessResponse:
-    properties:
-      code:
-        allOf:
-        - $ref: '#/definitions/response.ResponseCode'
-        description: response code
-      data:
-        $ref: '#/definitions/api.OCRPublicResult'
-      message:
-        description: response message
-        type: string
-      request_id:
-        description: request id
-        type: string
-      timestamp:
-        description: timestamp (ms)
-        type: integer
-    type: object
-  api.OCRTextItem:
-    properties:
-      confidence:
-        type: number
-      text:
-        type: string
     type: object
   api.PasswordResetRequest:
     properties:
@@ -695,6 +415,31 @@ definitions:
     required:
     - plan_id
     type: object
+  models.KYCRequest:
+    properties:
+      created_at:
+        type: string
+      error_message:
+        type: string
+      id:
+        type: string
+      ip_address:
+        type: string
+      request_type:
+        description: ocr, face, liveness, complete
+        type: string
+      result:
+        type: string
+      status:
+        description: pending, processing, success, failed
+        type: string
+      updated_at:
+        type: string
+      user_agent:
+        type: string
+      user_id:
+        type: string
+    type: object
   response.FieldError:
     properties:
       field:
@@ -804,6 +549,33 @@ definitions:
     - CodeThirdPartyError
     - CodeServiceUnavailable
     - CodeEncryptionError
+  response.SuccessResponse:
+    properties:
+      code:
+        allOf:
+        - $ref: '#/definitions/response.ResponseCode'
+        description: response code
+      data:
+        description: response data
+      message:
+        description: response message
+        type: string
+      request_id:
+        description: request id
+        type: string
+      timestamp:
+        description: timestamp (ms)
+        type: integer
+    type: object
+  service.CompleteKYCResponse:
+    properties:
+      message:
+        type: string
+      request_id:
+        type: string
+      status:
+        type: string
+    type: object
   service.FaceCompareResponse:
     properties:
       code:
@@ -829,6 +601,137 @@ definitions:
         type: array
       msg:
         type: string
+    type: object
+  service.FaceDetectResponse:
+    properties:
+      code:
+        type: integer
+      detection_results:
+        properties:
+          face_num:
+            type: integer
+          faces_detected:
+            items:
+              properties:
+                confidence:
+                  type: number
+                facial_area:
+                  properties:
+                    h:
+                      type: integer
+                    left_eye:
+                      items:
+                        type: integer
+                      type: array
+                    right_eye:
+                      items:
+                        type: integer
+                      type: array
+                    w:
+                      type: integer
+                    x:
+                      type: integer
+                    "y":
+                      type: integer
+                  type: object
+              type: object
+            type: array
+          is_face_exist:
+            type: integer
+        type: object
+      filename:
+        type: string
+      msg:
+        type: string
+    type: object
+  service.FaceSearchResponse:
+    properties:
+      code:
+        type: integer
+      filename:
+        type: string
+      msg:
+        type: string
+      search_results:
+        properties:
+          has_similar_picture:
+            type: integer
+          searched_similar_pictures:
+            items:
+              properties:
+                confidence:
+                  type: number
+                id:
+                  type: string
+                picture:
+                  type: string
+              type: object
+            type: array
+        type: object
+    type: object
+  service.LivenessSilentResponse:
+    properties:
+      code:
+        type: integer
+      filename:
+        type: string
+      liveness_results:
+        properties:
+          confidence:
+            type: number
+          face_exist_confidence:
+            type: number
+          is_face_exist:
+            type: integer
+          is_liveness:
+            type: integer
+        type: object
+      msg:
+        type: string
+    type: object
+  service.LivenessVideoResponse:
+    properties:
+      code:
+        type: integer
+      filename:
+        type: string
+      liveness_results:
+        properties:
+          confidence:
+            type: number
+          face_exist_confidence:
+            type: number
+          is_face_exist:
+            type: number
+          is_liveness:
+            type: integer
+        type: object
+      msg:
+        type: string
+    type: object
+  service.OCRItem:
+    properties:
+      confidence:
+        type: number
+      text:
+        type: string
+    type: object
+  service.OCRResponse:
+    properties:
+      code:
+        type: integer
+      error:
+        type: string
+      filename:
+        type: string
+      full_text:
+        type: string
+      msg:
+        type: string
+      parsing_results:
+        additionalProperties:
+          $ref: '#/definitions/service.OCRItem'
+        type: object
     type: object
 host: localhost:8080
 info:
@@ -1016,83 +919,6 @@ paths:
       summary: 修改用户密码
       tags:
       - Auth
-  /api/v1/keys:
-    get:
-      consumes:
-      - application/json
-      description: 获取当前用户的所有API密钥
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/api.SuccessResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/api.ErrorResponse'
-      summary: 获取用户API密钥列表
-      tags:
-      - Credentials
-    post:
-      consumes:
-      - application/json
-      description: 创建新的API密钥
-      parameters:
-      - description: API密钥信息
-        in: body
-        name: key
-        required: true
-        schema:
-          $ref: '#/definitions/api.CreateAPIKeyRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/api.SuccessResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/api.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/api.ErrorResponse'
-      summary: 创建API密钥
-      tags:
-      - Credentials
-  /api/v1/keys/{id}:
-    delete:
-      consumes:
-      - application/json
-      description: 删除指定的API密钥
-      parameters:
-      - description: API密钥ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/api.SuccessResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/api.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/api.ErrorResponse'
-      summary: 删除API密钥
-      tags:
-      - Credentials
   /api/v1/kyc/face/id-match:
     post:
       consumes:
@@ -1115,7 +941,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/service.FaceCompareResponse'
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/service.FaceCompareResponse'
+              type: object
       summary: 人证比对
       tags:
       - KYC
@@ -1499,7 +1330,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.FaceCompareSuccessResponse'
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/service.FaceCompareResponse'
+              type: object
       security:
       - ApiKeyAuth: []
       summary: Face comparison
@@ -1522,7 +1358,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.FaceDetectSuccessResponse'
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/service.FaceDetectResponse'
+              type: object
       security:
       - ApiKeyAuth: []
       summary: Face detection
@@ -1545,7 +1386,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.FaceSearchSuccessResponse'
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/service.FaceSearchResponse'
+              type: object
       security:
       - ApiKeyAuth: []
       summary: Face search
@@ -1641,7 +1487,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.LivenessSilentSuccessResponse'
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/service.LivenessSilentResponse'
+              type: object
       security:
       - ApiKeyAuth: []
       summary: Silent liveness
@@ -1674,7 +1525,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.LivenessVideoSuccessResponse'
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/service.LivenessVideoResponse'
+              type: object
       security:
       - ApiKeyAuth: []
       summary: Video liveness
@@ -1724,7 +1580,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.OCRSuccessResponse'
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/service.OCRResponse'
+              type: object
       security:
       - ApiKeyAuth: []
       summary: OCR recognition
@@ -1746,7 +1607,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.SuccessResponse'
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.KYCRequest'
+              type: object
       security:
       - ApiKeyAuth: []
       summary: 查询KYC状态
@@ -1788,7 +1654,12 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.SuccessResponse'
+            allOf:
+            - $ref: '#/definitions/response.SuccessResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/service.CompleteKYCResponse'
+              type: object
       security:
       - ApiKeyAuth: []
       summary: Complete KYC verification
