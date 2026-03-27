@@ -77,8 +77,9 @@ type ConsoleRegisterRequest struct {
 
 // ConsoleRegisterResponse 注册响应
 type ConsoleRegisterResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
+	AccessToken string              `json:"access_token,omitempty"`
+	User        *ConsoleUserProfile `json:"user,omitempty"`
+	Message     string              `json:"message"`
 }
 
 // Login 用户登录
@@ -208,12 +209,13 @@ func (h *ConsoleAuthHandler) Login(c *gin.Context) { // ignore_security_alert
 	var orgsOut []OrganizationLite
 	var memberships []models.OrganizationMember
 	_ = h.service.DB.Where("user_id = ?", user.ID).Find(&memberships).Error
-	if len(memberships) > 1 {
-		var orgs []models.Organization
+
+	if len(memberships) > 0 {
 		var ids []string
 		for _, m := range memberships {
 			ids = append(ids, m.OrganizationID)
 		}
+		var orgs []models.Organization
 		_ = h.service.DB.Where("id IN ?", ids).Find(&orgs).Error
 		for _, o := range orgs {
 			orgsOut = append(orgsOut, OrganizationLite{ID: o.ID, Name: o.Name})
@@ -530,7 +532,38 @@ func (h *ConsoleAuthHandler) Register(c *gin.Context) { // ignore_security_alert
 	// 记录业务操作成功
 	middleware.RecordBusinessOperation("console_register", true, time.Since(start), "")
 
-	JSONSuccess(c, ConsoleRegisterResponse{Success: true, Message: "注册成功，请登录"})
+	// 生成 JWT
+	accessToken, err := h.generateUserJWT(&user, &org)
+	if err != nil {
+		logger.GetLogger().WithError(err).Error("生成JWT失败")
+		JSONSuccess(c, ConsoleRegisterResponse{Message: "注册成功，但令牌生成失败，请手动登录"})
+		return
+	}
+
+	// 构造用户档案用于自动登录
+	userProfile := &ConsoleUserProfile{
+		AccessToken:     accessToken,
+		ID:              user.ID,
+		Email:           user.Email,
+		FullName:        user.Name,
+		AvatarURL:       user.AvatarURL,
+		Company:         org.Name,
+		Role:            user.Role,
+		OrgRole:         user.OrgRole,
+		OrgID:           org.ID,
+		LastActiveOrgID: org.ID,
+		PlanID:          org.PlanID,
+		Status:          user.Status,
+		Organization:    org,
+		Orgs:            []OrganizationLite{{ID: org.ID, Name: org.Name}},
+		Permissions:     []string{"org.read", "org.update", "team.read", "team.invite", "team.write", "billing.read", "logs.read", "org.usage.read", "org.audit"}, // Owner 初始权限
+	}
+
+	JSONSuccess(c, ConsoleRegisterResponse{
+		AccessToken: accessToken,
+		User:        userProfile,
+		Message:     "注册成功",
+	})
 }
 
 func (s *ConsoleAuthHandler) SyncOrganizationQuotasWithPolicy(orgID string, planID string, resetUsage bool) error {

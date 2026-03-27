@@ -3,17 +3,20 @@ package e2e
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
+	"kyc-service/internal/bootstrap"
+	"kyc-service/internal/models"
+	"kyc-service/pkg/utils"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
-	"kyc-service/internal/bootstrap"
-	"kyc-service/internal/models"
-	"kyc-service/pkg/utils"
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/require"
@@ -47,8 +50,10 @@ type BaseSuite struct {
 
 func (s *BaseSuite) SetupSuite() {
 	ctx := context.Background()
+	_ = os.MkdirAll("./test_storage/videos", 0755)
+	_ = os.MkdirAll("./test_storage/pic", 0755)
 	// 启动应用
-	app, cleanup, err := bootstrap.SetupApp(ctx, "../../config.local")
+	app, cleanup, err := bootstrap.SetupApp(ctx, "../../config.test")
 	require.NoError(s.T(), err)
 
 	s.Ctx = &E2EContext{
@@ -80,9 +85,11 @@ func (s *BaseSuite) seedData() {
 	org := models.Organization{ID: s.Ctx.OrgID, Name: "E2E Test Org", PlanID: "starter", Status: "active"}
 	db.Save(&org)
 	// 2. 普通用户
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
 	user := models.User{
 		ID:           s.Ctx.UserID,
 		Email:        s.Ctx.Email,
+		Password:     string(hashedPassword),
 		Name:         "E2E Tester",
 		OrgID:        s.Ctx.OrgID,
 		OrgRole:      "owner",
@@ -95,6 +102,7 @@ func (s *BaseSuite) seedData() {
 		ID:              s.Ctx.AdminID,
 		Email:           "admin@test.com",
 		Name:            "E2E Admin",
+		Role:            "admin",
 		IsPlatformAdmin: true,
 		OrgID:           s.Ctx.OrgID, // 即使是管理员，也关联一个测试组织以满足约束
 		CurrentOrgID:    s.Ctx.OrgID,
@@ -119,15 +127,23 @@ func (s *BaseSuite) seedData() {
 		Status:         "active",
 	}
 	db.Save(&adminMember)
-	// 6. OAuth 客户端 (用于 AsApp)
+	// 6. 初始配额与计划 (核心计费项)
+	db.Exec("DELETE FROM organization_quotas WHERE organization_id = ?", s.Ctx.OrgID)
+	services := []string{"ocr", "face", "liveness", "kyc"}
+	for _, srv := range services {
+		db.Exec("INSERT INTO organization_quotas (id, organization_id, service_type, allocation, consumed, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+			utils.GenerateID(), s.Ctx.OrgID, srv, 1000, 0, time.Now())
+	}
+	// 7. OAuth 客户端 (用于 AsApp)
 	sysClient := models.OAuthClient{
 		ID:              "sys_web_console_playground",
+		Secret:          "sys_web_console_playground_secret",
 		Name:            "Playground",
 		Status:          "active",
 		Scopes:          `["ocr:read", "face:read", "liveness:read", "kyc:verify"]`,
 		TokenTTLSeconds: 900,
 	}
-	db.FirstOrCreate(&sysClient, models.OAuthClient{ID: "sys_web_console_playground"})
+	db.Save(&sysClient) // Use Save to ensure secret is updated if ID exists
 }
 
 // NewRequest 开始构建一个新请求
@@ -246,16 +262,53 @@ func (b *RequestBuilder) ExpectStatus(code int) *httptest.ResponseRecorder {
 // ExpectForbidden 断言 403 Forbidden (权限不足)
 func (b *RequestBuilder) ExpectForbidden() {
 	w := b.Do()
-	require.Equal(b.t, http.StatusForbidden, w.Code, "Should be forbidden, but got %d", w.Code)
+	require.Equal(b.t, http.StatusForbidden, w.Code, "Should be forbidden, but got %d. Body: %s", w.Code, w.Body.String())
 }
 
 // ExpectUnauthorized 断言 401 Unauthorized (未登录)
 func (b *RequestBuilder) ExpectUnauthorized() {
 	w := b.Do()
-	require.Equal(b.t, http.StatusUnauthorized, w.Code, "Should be unauthorized, but got %d", w.Code)
+	require.Equal(b.t, http.StatusUnauthorized, w.Code, "Should be unauthorized, but got %d. Body: %s", w.Code, w.Body.String())
+}
+
+// ExpectJSON 发送请求并断言 200 OK，然后解析 JSON 到目标对象
+func (b *RequestBuilder) ExpectJSON(target any) *httptest.ResponseRecorder {
+	return b.ExpectJSONWithStatus(http.StatusOK, target)
+}
+
+// ExpectJSONWithStatus 发送请求并断言特定状态码，然后解析 JSON 到目标对象
+func (b *RequestBuilder) ExpectJSONWithStatus(status int, target any) *httptest.ResponseRecorder {
+	w := b.ExpectStatus(status)
+	err := json.Unmarshal(w.Body.Bytes(), target)
+	require.NoError(b.t, err, "Response should be valid JSON. Body: %s", w.Body.String())
+	return w
+}
+
+// ExpectErrorCode 发送请求并断言特定的业务错误码
+func (b *RequestBuilder) ExpectErrorCode(code int) *httptest.ResponseRecorder {
+	w := b.Do()
+	var resp struct {
+		Code int `json:"code"`
+	}
+	err := json.Unmarshal(w.Body.Bytes(), &resp)
+	require.NoError(b.t, err, "Response should be valid JSON")
+	require.Equal(b.t, code, resp.Code, "Expected business error code %d, but got %d", code, resp.Code)
+	return w
 }
 
 // --- 副作用验证器 (Verifiers) ---
+
+// AssertBusinessReach 断言请求到达了业务逻辑 (即不是 401/403 等基础架构错误)
+func (s *BaseSuite) AssertBusinessReach(t *testing.T, w *httptest.ResponseRecorder) {
+	require.NotEqual(t, http.StatusUnauthorized, w.Code, "不应返回 401 Unauthorized. Body: %s", w.Body.String())
+	require.NotEqual(t, http.StatusForbidden, w.Code, "不应返回 403 Forbidden. Body: %s", w.Body.String())
+	// 即使是 404 或 400，只要返回了 JSON 且包含 request_id，说明到达了业务层
+	var resp struct {
+		RequestID string `json:"request_id"`
+	}
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
+	require.NotEmpty(t, resp.RequestID, "响应应包含 RequestID，证明到达了业务框架. Body: %s", w.Body.String())
+}
 
 // VerifyUsageLogged 验证数据库中是否产生了计费日志
 func (s *BaseSuite) VerifyUsageLogged(serviceType string) {

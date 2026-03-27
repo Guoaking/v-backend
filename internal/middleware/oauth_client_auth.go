@@ -185,7 +185,7 @@ func APIOrOAuthAuth(svc *service.KYCService) gin.HandlerFunc {
 			}
 		}
 
-		response.JSONError(c, response.CodeUnauthorized, "Invalid or expired token. Note: API Keys are deprecated, please use OAuth2 Client Credentials.")
+		response.JSONError(c, response.CodeUnauthorized, "Invalid or expired token. Note: please use refresh try again")
 		c.Abort()
 	}
 }

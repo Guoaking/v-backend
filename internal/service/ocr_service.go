@@ -13,7 +13,6 @@ import (
 	"kyc-service/pkg/logger"
 	"kyc-service/pkg/metrics"
 	"kyc-service/pkg/tracing"
-	"kyc-service/pkg/utils"
 
 	"go.opentelemetry.io/otel/attribute"
 )
@@ -188,14 +187,19 @@ func (s *KYCService) callOCRService(ctx context.Context, request *OCRRequest) (*
 
 	var respBody []byte
 	if s.Config.UseMock {
-		time.Sleep(time.Duration(utils.GenerateRandomNumbers(5)) * time.Second)
-		errmsg := "{\n  \"code\": 500,\n  \"error\": \"mock error\",\n  \"msg\": \"recognition error\"\n}"
-		succmsg := `{"code":0,"msg":"recognition success","parsing_results":{},"full_text":"","filename":"t1.jpg"}`
-		if utils.GenerateRandomBool() {
-			respBody = []byte(succmsg)
-		} else {
-			respBody = []byte(errmsg)
-		}
+		// Mock logic: Return realistic data for E2E stability
+		succmsg := `{
+			"code": 0,
+			"msg": "recognition success",
+			"parsing_results": {
+				"id_number": {"text": "1 1005 01234 56 7", "confidence": 0.99},
+				"name_en": {"text": "Mr. Sommut Namsakul", "confidence": 0.98},
+				"name_th": {"text": "นาย สมมุติ นามสกุล", "confidence": 0.97}
+			},
+			"full_text": "Sample ID Card Full Text",
+			"filename": "t1.jpg"
+		}`
+		respBody = []byte(succmsg)
 	} else {
 		ocrConfig := s.Config.ThirdParty.OCRService
 		url := ocrConfig.URL

@@ -13,6 +13,7 @@
 |                    | [architecture/OTEL_MONITORING.md](architecture/OTEL_MONITORING.md)                     | OpenTelemetry & Monitoring setup          |
 | **Specs**          | [specs/action_liveness_backend_spec.md](specs/action_liveness_backend_spec.md)         | Action Liveness logic specification       |
 | **API**            | [api/swagger.json](api/swagger.json)                                                   | OpenAPI 3.0 definition                    |
+| **Storage**        | `internal/storage/storage_service.go`                                                  | Policy-based Storage Resolver             |
 | **Guides**         | [guides/CI_SETUP.md](guides/CI_SETUP.md)                                               | CI/CD pipeline setup                      |
 | **Knowledge Base** | [kb/AI_KNOWLEDGE_BASE.md](kb/AI_KNOWLEDGE_BASE.md)                                     | Code snippets and how-tos                 |
 
@@ -20,18 +21,20 @@
 
 - **Architecture Consistency**:
   - **AuthN**: Follow [Unified Auth Plan](architecture/AUTH_UNIFICATION.md). Prefer OAuth2/JWT.
+  - **Storage**: Use `StorageService.ResolveAccess` for all file retrieval. Never hardcode `/data` or `/mnt`.
   - **Billing**: All cost-incurring ops MUST call `checkAndConsumeQuota`.
 
 - **API Contract First**:
   - Define Request/Response structs explicitly. No `map[string]any`.
   - **CRITICAL**: ALL API responses MUST use the standard wrapper functions from `pkg/response/response.go` (e.g., `response.JSONSuccess`, `response.JSONError`, `response.JSONErrorWithStatus`).
   - **PROHIBITED**: NEVER use raw `c.JSON()` or `c.AbortWithStatusJSON()` in any handlers or middleware. This breaks the unified response structure (`{code, message, timestamp, request_id, data/error}`) that frontend interceptors rely on.
-  - Use standard `Code*` error constants.
+  - **Storage Redirects**: Production environments use `X-Accel-Redirect` via Nginx. The backend should return the internal path in the header.
 
 ## 3. Feature Development Checklist
 
 - [ ] **API Spec**: Defined structs and Swagger annotations?
 - [ ] **Auth**: Protected by middleware?
+- [ ] **Storage**: Using policy-based routing for uploads and access?
 - [ ] **Quota**: `checkAndConsumeQuota` called?
 - [ ] **Audit**: `KYCRequest` and `AuditLog` recorded?
 - [ ] **Observability**: `tracing.StartSpan` and `metrics` added?

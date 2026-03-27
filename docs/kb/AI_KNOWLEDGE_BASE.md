@@ -20,6 +20,11 @@
 - KYC 业务接口示例：
   - OCR：`POST /api/v1/kyc/ocr`，实现：`internal/api/kyc_handler.go:37`
   - 人脸搜索：`POST /api/v1/kyc/face/search`，实现：`internal/api/kyc_handler.go:138`
+- 存储系统（Storage Refactor）：
+  - 接口：`StorageService` 在 `internal/storage/storage_service.go`
+  - 策略路由：基于 `AccessRule`（获取）和 `UploadRule`（上传）配置。
+  - Nginx 联动：生产环境通过 `X-Accel-Redirect` 返回 `/_protected/storage/` 开头的内部路径。
+  - 本地开发：支持 `Smart Serving`（直接流式下发），无需 Nginx。
 
 ## 2. 前端未使用的后端接口（Dead Routes Analysis）
 

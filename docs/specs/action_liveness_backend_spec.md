@@ -13,6 +13,7 @@
 - 模型校验与结果返回：调用活体模型进行动作一致性与活体判断，返回置信度与结论。
 - 安全与治理：鉴权（JWT/API Key）、速率限制、幂等性、配额、审计与指标。
 - 可观测性：Prometheus 指标与日志打点，Grafana 展示。
+- 存储重构：废弃硬编码路径，统一使用 `StorageService.ResolveAccess` 和 `UploadRule` 链。生产环境支持 `X-Accel-Redirect`。
 - 兼容性：复用现有 /api/v1/kyc/liveness/action/\* 接口并补充字段与校验逻辑。
 - 异步MVP：前端一次性上传视频，后端创建第三方任务（task_id），后台轮询第三方任务状态，前端用 task_id 查询结果。
 

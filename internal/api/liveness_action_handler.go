@@ -186,7 +186,7 @@ func (h *KYCHandler) LivenessActionCallback(c *gin.Context) {
 	if signature != "" {
 		if !h.service.ThirdParty.VerifyCallbackSignature(signature, bodyBytes) {
 			logger.GetLogger().Warn("Callback signature verification failed")
-			c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "message": "Invalid signature"})
+			JSONErrorWithStatus(c, CodeUnauthorized, "Invalid signature", http.StatusUnauthorized)
 			return
 		}
 	} else {

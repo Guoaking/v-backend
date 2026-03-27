@@ -214,18 +214,18 @@ func (h *KYCHandler) FaceCompare(c *gin.Context) {
 func (h *KYCHandler) FaceIdMatch(c *gin.Context) {
 	file1, err := c.FormFile("image1")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "image1 is required"})
+		JSONError(c, CodeInvalidParameter, "image1 is required")
 		return
 	}
 	file2, err := c.FormFile("image2")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "image2 is required"})
+		JSONError(c, CodeInvalidParameter, "image2 is required")
 		return
 	}
 
 	resp, err := h.service.FaceIdMatch(c.Request.Context(), file1, file2)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		JSONError(c, CodeInternalError, err.Error())
 		return
 	}
 

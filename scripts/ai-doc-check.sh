@@ -35,6 +35,7 @@ if [ "$HAS_CODE_CHANGES" = true ] && [ "$HAS_DOC_CHANGES" = false ]; then
     
     # Check if we are running in an interactive terminal
     if [ -t 0 ]; then
+        # Handle cross-platform tty for interactive prompts
         exec < /dev/tty
         read -p "Do you want to abort the commit to update docs? (y/N) " yn
         case $yn in
@@ -48,9 +49,16 @@ if [ "$HAS_CODE_CHANGES" = true ] && [ "$HAS_DOC_CHANGES" = false ]; then
                 ;;
         esac
     else
-        # In non-interactive mode (like some git GUIs or AI execution), just warn and let it pass
-        echo "⚠️  Non-interactive environment. Passing with warning."
-        exit 0
+        # In non-interactive mode (like AI Agent), enforce doc updates
+        echo "❌ [AGENT ERROR]: Code changes detected but no markdown documentation was updated."
+        echo "   As an AI Agent, you MUST maintain the Documentation Tree (Rooted at AGENTS.md)."
+        echo "   Please evaluate and update any relevant files in the tree:"
+        echo "   - Global Guides: docs/ (e.g., PROJECT_GUIDE.md)"
+        echo "   - Module Specs: v-backend/docs/specs/ or architecture/"
+        echo "   - Project Context: v-backend/AGENTS.md"
+        echo "   - E2E Checklist: v-backend/docs/guides/E2E_TESTING_GUIDE.md"
+        echo "   Check all referenced .md files for consistency, accuracy, and completeness."
+        exit 1
     fi
 else
     echo "✅ Agent checked: Documentation sync looks good or no code changes detected."

@@ -16,6 +16,9 @@ import (
 )
 
 func (t *ThirdPartyService) CallFaceSearch(ctx context.Context, reader io.Reader, filename string) (*FaceSearchResponse, error) {
+	if t.config.UseMock {
+		return &FaceSearchResponse{Code: 0, Msg: "mock success"}, nil
+	}
 	start := time.Now()
 	status := "success"
 	var httpCode string
@@ -82,6 +85,13 @@ func (t *ThirdPartyService) CallFaceSearch(ctx context.Context, reader io.Reader
 }
 
 func (t *ThirdPartyService) CallFaceIdMatch(ctx context.Context, src io.Reader, srcName string, dst io.Reader, dstName string) (*FaceCompareResponse, error) {
+	if t.config.UseMock {
+		out := &FaceCompareResponse{Code: 0, Msg: "mock success"}
+		out.ComparisonResults.IsSameFace = 1
+		out.ComparisonResults.Confidence = 97.5
+		out.ComparisonResults.DetectionResult = "success"
+		return out, nil
+	}
 	start := time.Now()
 	status := "success"
 	var httpCode string
@@ -153,6 +163,12 @@ func (t *ThirdPartyService) CallFaceIdMatch(ctx context.Context, src io.Reader, 
 }
 
 func (t *ThirdPartyService) CallFaceDetect(ctx context.Context, reader io.Reader, filename string) (*FaceDetectResponse, error) {
+	if t.config.UseMock {
+		out := &FaceDetectResponse{Code: 0, Msg: "mock success"}
+		out.DetectionResults.IsFaceExist = 1
+		out.DetectionResults.FaceNum = 1
+		return out, nil
+	}
 	start := time.Now()
 	status := "success"
 	var httpCode string
@@ -214,6 +230,13 @@ func (t *ThirdPartyService) CallFaceDetect(ctx context.Context, reader io.Reader
 }
 
 func (t *ThirdPartyService) CallFaceCompare(ctx context.Context, src io.Reader, srcName string, dst io.Reader, dstName string) (*FaceCompareResponse, error) {
+	if t.config.UseMock {
+		out := &FaceCompareResponse{Code: 0, Msg: "mock success"}
+		out.ComparisonResults.IsSameFace = 1
+		out.ComparisonResults.Confidence = 97.5
+		out.ComparisonResults.DetectionResult = "success"
+		return out, nil
+	}
 	start := time.Now()
 	status := "success"
 	var httpCode string

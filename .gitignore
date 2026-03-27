@@ -39,3 +39,9 @@ kyc-service-linux
 # Local-only files / binaries
 config.local.yaml
 kyc-service-new
+
+# Test storage and artifacts
+test_storage/
+tests/e2e/test_storage/
+coverage/
+*.png

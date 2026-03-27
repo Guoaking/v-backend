@@ -25,7 +25,7 @@ func (h *ImageHandler) Upload(c *gin.Context) {
 		JSONError(c, CodeBusinessError, e.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
+	JSONSuccess(c, gin.H{
 		"id":            asset.ID,
 		"hash":          asset.Hash,
 		"path":          asset.FilePath,

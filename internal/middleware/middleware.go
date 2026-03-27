@@ -245,7 +245,7 @@ func Quota(redisClient *redis.Client, svc interface {
 		c.Header("X-RateLimit-Limit", fmt.Sprintf("%d", q.Allocation))
 		c.Header("X-RateLimit-Remaining", fmt.Sprintf("%d", remaining))
 		if remaining <= 0 {
-			c.JSON(http.StatusTooManyRequests, gin.H{"error": "QUOTA_EXHAUSTED"})
+			response.JSONError(c, response.CodeTooManyRequests, "QUOTA_EXHAUSTED")
 			c.Abort()
 			return
 		}

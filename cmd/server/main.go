@@ -65,7 +65,7 @@ func main() {
 
 	// 启动HTTP服务器
 	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%d", app.Config.Port),
+		Addr:    fmt.Sprintf("%s:%d", app.Config.Host, app.Config.Port),
 		Handler: app.Engine,
 	}
 

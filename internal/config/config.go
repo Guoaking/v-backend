@@ -9,6 +9,7 @@ import (
 )
 
 type Config struct {
+	Host     string `mapstructure:"host"`
 	Port     int    `mapstructure:"port"`
 	GinMode  string `mapstructure:"gin_mode"`
 	LogLevel string `mapstructure:"log_level"`
@@ -168,6 +169,7 @@ func Load(configFile string) *Config {
 }
 
 func setDefaults() {
+	viper.SetDefault("host", "0.0.0.0")
 	viper.SetDefault("port", 8080)
 	viper.SetDefault("gin_mode", "release")
 	viper.SetDefault("log_level", "info")

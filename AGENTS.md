@@ -31,17 +31,25 @@
 | **Auth**       | `internal/api/auth_handler.go`                | **MODERN** Unified OAuth2/STS (Token, Client Credentials).       |
 | **KYC Logic**  | `internal/service/kyc_service.go`             | Core orchestration (OCR, Face)                                     |
 | **Liveness**   | `internal/service/action_liveness_service.go` | **MODERN** implementation reference (Quota, Audit, Tracing)        |
+| **Storage**    | `internal/storage/storage_service.go`         | **NEW**: Policy-based Storage Resolver with Nginx Internal Redirect |
+| **Testing**    | `tests/e2e/`                                  | [docs/guides/E2E_TESTING_GUIDE.md](docs/guides/E2E_TESTING_GUIDE.md) |
 | **Middleware** | `internal/middleware/`                        | `quota.go`, `security.go`, `oauth_client_auth.go`                  |
 | **Models**     | `internal/models/`                            | GORM structs. **Note**: `KYCRequest` is a shared monolithic table. |
 
 ## 3. Architecture Highlights
+
+### Storage & Serving (Unified)
+
+- **Mechanism**: `StorageService` resolves paths based on `AccessRule` and `UploadRule` chains.
+- **Serving**: Supports **Nginx Internal Redirect** (`X-Accel-Redirect`) for production and **Smart Streaming** for local development.
+- **Rules**: Mapped by feature prefix (e.g., `faces/` -> `/data/dataset/`).
 
 ### Authentication (Unified)
 
 - **Current State**: Unified OAuth2/STS (Security Token Service).
 - **Note**: Legacy API Keys have been safely removed from business logic.
 - **Rule**: All public APIs MUST use `APIOrOAuthAuth` middleware. Use `STS` for short-lived (15 min) Playground access.
-- **Reference**: See `docs/architecture/AUTH_UNIFICATION.md`.
+- **Reference**: See [docs/architecture/STS_AND_PLAYGROUND_AUTH.md](../docs/architecture/STS_AND_PLAYGROUND_AUTH.md) and `docs/architecture/AUTH_UNIFICATION.md`.
 
 ### Billing & Quota
 
@@ -61,11 +69,13 @@
 2.  **No Mocking in Prod Code**: Remove any `if Config.Mock` logic in production paths. Use interfaces for testing.
 3.  **Secrets**: Never log secrets. Use `Masked` fields in responses.
 4.  **Error Handling**: Use `Code*` constants (e.g., `CodeBusinessError`), never magic numbers.
+5.  **Path Resolution**: NEVER hardcode `/data` or `/mnt`. ALWAYS use `StorageService.ResolveAccess`.
 
 ## 5. Quick Commands (For Agent Execution)
 
 - **Test**: `./scripts/test-quick.sh` (Fast unit tests)
 - **Lint**: `go vet ./...`
+- **Format**: `go fmt ./...` (CRITICAL before commit)
 - **Run**: `make run` (Uses `config.local.yaml` by default)
 - **Build**: `make build`
 - **Docs**: `swag init -g cmd/server/main.go -o docs` (Update Swagger)
@@ -77,6 +87,7 @@
 1.  **Verify**: Run `./scripts/test-quick.sh` before finishing.
 2.  **Sync**: Update frontend `types.ts` if API changes.
 3.  **Style**: Mimic existing Go patterns (e.g., `if err != nil`).
-4.  **Deps**: No new Go modules without strong justification.
+4.  **Gardening**: Update this file and `docs/` after major refactors.
+5.  **Deps**: No new Go modules without strong justification.
 
 _End of Context_

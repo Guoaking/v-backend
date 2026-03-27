@@ -115,6 +115,10 @@ func (h *OrganizationHandler) SwitchOrganization(c *gin.Context) {
 		"access_token":   newToken,
 		"permissions":    permIDs,
 		"org_role":       member.Role,
+		"organization": gin.H{
+			"id":   org.ID,
+			"name": org.Name,
+		},
 	})
 }
 
@@ -182,7 +186,11 @@ func (h *OrganizationHandler) CreateOrganization(c *gin.Context) {
 	member := &models.OrganizationMember{ID: utils.GenerateID(), OrganizationID: org.ID, UserID: userID, Role: "owner", Status: "active", CreatedAt: time.Now(), UpdatedAt: time.Now()}
 	_ = h.service.DB.Create(member).Error
 	metrics.RecordAuditEvent(c.Request.Context(), "org.create", "organization", "success")
-	JSONSuccess(c, gin.H{"org_id": org.ID})
+	JSONSuccess(c, gin.H{
+		"id":     org.ID,
+		"org_id": org.ID, // Keep org_id for compatibility with old tests/clients
+		"name":   org.Name,
+	})
 }
 
 // 注销组织

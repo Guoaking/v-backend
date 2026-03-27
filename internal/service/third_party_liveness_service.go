@@ -22,6 +22,14 @@ import (
 )
 
 func (t *ThirdPartyService) CallLivenessSilent(ctx context.Context, picturePath, pictureURL, language string) (*LivenessSilentResponse, error) {
+	if t.config.UseMock {
+		out := &LivenessSilentResponse{Code: 0, Msg: "success"}
+		out.LivenessResults.IsLiveness = 1
+		out.LivenessResults.Confidence = 0.99
+		out.LivenessResults.IsFaceExist = 1
+		out.LivenessResults.FaceExistConfidence = 0.99
+		return out, nil
+	}
 	start := time.Now()
 	status := "success"
 	var httpCode string
@@ -78,6 +86,14 @@ func (t *ThirdPartyService) CallLivenessSilent(ctx context.Context, picturePath,
 }
 
 func (t *ThirdPartyService) CallLivenessVideo(ctx context.Context, videoPath, videoURL, language string) (*LivenessVideoResponse, error) {
+	if t.config.UseMock {
+		out := &LivenessVideoResponse{Code: 0, Msg: "success"}
+		out.LivenessResults.IsLiveness = 1
+		out.LivenessResults.Confidence = 0.99
+		out.LivenessResults.IsFaceExist = 1.0
+		out.LivenessResults.FaceExistConfidence = 0.99
+		return out, nil
+	}
 	start := time.Now()
 	status := "success"
 	var httpCode string

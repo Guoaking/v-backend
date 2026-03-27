@@ -36,49 +36,16 @@
 
 ### 2.2 推荐方案：Unified Gatekeeper
 
-#### 第一阶段：中间件统一 (The Gatekeeper)
+#### 第一阶段：中间件统一 (The Gatekeeper) - **已完成**
 
-重构 `APIOrOAuthAuth` 中间件，使其成为统一的鉴权入口：
+重构 `APIOrOAuthAuth` 中间件，使其成为统一的鉴权入口。
 
-```go
-func UnifiedAuthMiddleware() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        // 1. 提取凭证 (Bearer Token 或 API Key)
-        token, authType := extractCredential(c)
+#### 第二阶段：模型融合 (Model Convergence) - **进行中**
 
-        // 2. 验证凭证
-        var identity *Identity
-        if authType == "Bearer" {
-            identity = verifyJWT(token) // OAuth 路径
-        } else if authType == "APIKey" {
-            identity = verifyAPIKey(token) // API Key 路径
-        }
+- **数据层**: 考虑合并 `api_keys` 和 `oauth_clients` 表。
+- **逻辑层**: 已实现 STS (Security Token Service) 端点，Playground 已全面切到短效 JWT。
 
-        // 3. 注入统一上下文
-        // 关键：业务层不再关心是 Key 还是 Token，只认 OrgID 和 Permissions
-        c.Set("AuthContext", &AuthContext{
-            OrgID:       identity.OrgID,
-            UserID:      identity.UserID, // 或 ClientID
-            Permissions: identity.Scopes,
-            IsMachine:   true,
-        })
-
-        // 兼容遗留的 scope 校验逻辑 (如 middleware.RequireKeyScope)
-        c.Set("scopes", identity.Scopes)
-
-        c.Next()
-    }
-}
-```
-
-#### 第二阶段：模型融合 (Model Convergence)
-
-- **数据层**: 考虑合并 `api_keys` 和 `oauth_clients` 表，或者让 API Key 表作为 `oauth_clients` 的一种特例（`grant_type=api_key`）。
-- **逻辑层**:
-  - 废弃数据库中对 Access Token 的持久化存储（Stateless JWT）。
-  - 仅在需要“强制吊销”时使用 Redis 黑名单。
-
-#### 第三阶段：SDK 化 (Developer Experience)
+#### 第三阶段：SDK 化 (Developer Experience) - **计划中**
 
 - 提供官方 SDK (Go/Node/Python)，封装 OAuth `client_credentials` 流程。
 - 开发者只需配置 `ClientID` + `ClientSecret`，SDK 自动处理 Token 获取、缓存和刷新。
