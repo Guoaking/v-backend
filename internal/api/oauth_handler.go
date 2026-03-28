@@ -118,11 +118,11 @@ func (h *OAuthHandler) GoogleCallback(c *gin.Context) {
 	// 从配置中读取前端返回地址，如果未配置则降级到硬编码默认值
 	frontendRedirectURL := h.service.Config.OAuth.Google.FrontendReturnURL
 	if frontendRedirectURL == "" {
-		frontendRedirectURL = "http://localhost:3000/console"
+		frontendRedirectURL = "http://localhost:3000" // 由于我们已经移除了 HashRouter，登录成功后直接跳到 / (也就是 /console 或 /login 等路由处理的地方)，或者如果是回调带 token 的话直接跳转。
 	}
 
 	if code == "" || state == "" {
-		c.Redirect(http.StatusTemporaryRedirect, frontendRedirectURL+"?error=invalid_callback")
+		c.Redirect(http.StatusTemporaryRedirect, frontendRedirectURL+"/login?error=invalid_callback")
 		return
 	}
 
@@ -130,7 +130,7 @@ func (h *OAuthHandler) GoogleCallback(c *gin.Context) {
 	stateKey := fmt.Sprintf("oauth_state:%s", state)
 	val, err := h.service.Redis.Get(c, stateKey).Result()
 	if err != nil || !strings.HasPrefix(val, "google") {
-		c.Redirect(http.StatusTemporaryRedirect, frontendRedirectURL+"?error=invalid_state")
+		c.Redirect(http.StatusTemporaryRedirect, frontendRedirectURL+"/login?error=invalid_state")
 		return
 	}
 	h.service.Redis.Del(c, stateKey) // 验证通过后删除
@@ -206,7 +206,10 @@ func (h *OAuthHandler) GoogleCallback(c *gin.Context) {
 	}
 
 	// 5. 重定向回前端带上 Token
-	finalRedirectURL := fmt.Sprintf("%s?token=%s", frontendRedirectURL, token)
+	// 因为现在前端已经使用了 BrowserRouter，不再有 #，我们可以直接将 token 放在 search params 里
+	// 确保 frontendRedirectURL 末尾没有多余的斜杠
+	baseURL := strings.TrimRight(frontendRedirectURL, "/")
+	finalRedirectURL := fmt.Sprintf("%s/login?token=%s", baseURL, token)
 	c.Redirect(http.StatusTemporaryRedirect, finalRedirectURL)
 }
 
