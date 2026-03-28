@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"kyc-service/internal/models"
 	"kyc-service/internal/service"
 	"kyc-service/pkg/logger"
@@ -44,12 +45,46 @@ func (h *OAuthHandler) GoogleLoginRedirect(c *gin.Context) {
 
 	// 如果是绑定操作，需要从当前会话(JWT)中获取 user_id
 	if action == "bind" {
-		userIDStr, exists := c.Get("user_id")
-		if exists {
-			userID = userIDStr.(string)
+		// 因为这个接口在 router.go 中是没有挂载 JWTAuth middleware 的 (属于 /auth 组)
+		// 所以 c.Get("user_id") 会失败。我们需要手动解析 header 中的 Token
+		tokenString := c.GetHeader("Authorization")
+		if tokenString == "" {
+			// 尝试从 URL 参数中获取 token (因为 window.location.href 不容易带 Header)
+			tokenString = c.Query("token")
 		} else {
-			// 如果没登录却要求 bind，直接拒绝
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized for binding"})
+			// Bearer token
+			if len(tokenString) > 7 && strings.HasPrefix(tokenString, "Bearer ") {
+				tokenString = tokenString[7:]
+			}
+		}
+
+		if tokenString == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized for binding (missing token)"})
+			return
+		}
+
+		// 解析 Token
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
+			return []byte(h.service.Config.Security.JWTSecret), nil
+		})
+
+		if err != nil || !token.Valid {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized for binding (invalid token)"})
+			return
+		}
+
+		if claims, ok := token.Claims.(jwt.MapClaims); ok {
+			if uid, ok := claims["user_id"].(string); ok {
+				userID = uid
+			} else {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized for binding (invalid user_id in token)"})
+				return
+			}
+		} else {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized for binding (invalid claims format)"})
 			return
 		}
 	}
@@ -140,7 +175,11 @@ func (h *OAuthHandler) GoogleCallback(c *gin.Context) {
 
 	// 如果是单纯绑定操作，不需要重新签发 JWT，直接重定向回安全设置页
 	if bindUserID != "" {
-		c.Redirect(http.StatusTemporaryRedirect, "http://localhost:5173/account/security?bind_success=true")
+		// 为了防止写死 localhost:5173，这里也使用配置的 frontendRedirectURL 来拼接
+		// 假设 frontendRedirectURL 是 "http://localhost:3000/console"
+		// 我们需要把它替换成 "/account/security" 路径
+		baseFrontendURL := strings.Split(frontendRedirectURL, "/console")[0]
+		c.Redirect(http.StatusTemporaryRedirect, baseFrontendURL+"/account/security?bind_success=true")
 		return
 	}
 
