@@ -219,6 +219,14 @@ func (h *OrganizationHandler) DeleteOrganization(c *gin.Context) {
 		return
 	}
 	_ = h.service.DB.Where("organization_id = ?", id).Delete(&models.OrganizationMember{}).Error
+
+	// Also clear current_org_id and last_active_org_id for the owner
+	_ = h.service.DB.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
+		"current_org_id":     nil,
+		"last_active_org_id": nil,
+		"org_id":             nil,
+	}).Error
+
 	metrics.RecordAuditEvent(c.Request.Context(), "org.delete", "organization", "success")
 	JSONSuccess(c, gin.H{"deleted": id})
 }

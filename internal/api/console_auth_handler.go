@@ -216,7 +216,8 @@ func (h *ConsoleAuthHandler) Login(c *gin.Context) { // ignore_security_alert
 			ids = append(ids, m.OrganizationID)
 		}
 		var orgs []models.Organization
-		_ = h.service.DB.Where("id IN ?", ids).Find(&orgs).Error
+		// Only include active organizations
+		_ = h.service.DB.Where("id IN ? AND status = ?", ids, "active").Find(&orgs).Error
 		for _, o := range orgs {
 			orgsOut = append(orgsOut, OrganizationLite{ID: o.ID, Name: o.Name})
 		}
@@ -274,6 +275,22 @@ func (h *ConsoleAuthHandler) Me(c *gin.Context) {
 			permIDs = append(permIDs, r.PermissionID)
 		}
 	}
+	var orgsOut []OrganizationLite
+	var memberships []models.OrganizationMember
+	_ = h.service.DB.Where("user_id = ?", user.ID).Find(&memberships).Error
+
+	if len(memberships) > 0 {
+		var ids []string
+		for _, m := range memberships {
+			ids = append(ids, m.OrganizationID)
+		}
+		var orgs []models.Organization
+		_ = h.service.DB.Where("id IN ? AND status = ?", ids, "active").Find(&orgs).Error
+		for _, o := range orgs {
+			orgsOut = append(orgsOut, OrganizationLite{ID: o.ID, Name: o.Name})
+		}
+	}
+
 	resp := &ConsoleUserProfile{
 		ID:              user.ID,
 		Email:           user.Email,
@@ -286,6 +303,7 @@ func (h *ConsoleAuthHandler) Me(c *gin.Context) {
 		PlanID:          org.PlanID,
 		Status:          user.Status,
 		Permissions:     permIDs,
+		Orgs:            orgsOut,
 	}
 	JSONSuccess(c, resp)
 }
