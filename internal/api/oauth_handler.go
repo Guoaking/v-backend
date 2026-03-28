@@ -114,7 +114,7 @@ func (h *OAuthHandler) GoogleLoginRedirect(c *gin.Context) {
 func (h *OAuthHandler) GoogleCallback(c *gin.Context) {
 	code := c.Query("code")
 	state := c.Query("state")
-	
+
 	// 从配置中读取前端返回地址，如果未配置则降级到硬编码默认值
 	frontendRedirectURL := h.service.Config.OAuth.Google.FrontendReturnURL
 	if frontendRedirectURL == "" {
@@ -169,15 +169,19 @@ func (h *OAuthHandler) GoogleCallback(c *gin.Context) {
 	user, err := h.handleOAuthUser(c, userInfo, bindUserID)
 	if err != nil {
 		logger.GetLogger().Errorf("Failed to handle oauth user: %v", err)
+		// 如果是绑定失败，应该跳回安全设置页并带上错误信息
+		if bindUserID != "" {
+			baseFrontendURL := strings.Split(frontendRedirectURL, "/console")[0]
+			c.Redirect(http.StatusTemporaryRedirect, baseFrontendURL+"/account/security?error="+url.QueryEscape(err.Error()))
+			return
+		}
 		c.Redirect(http.StatusTemporaryRedirect, frontendRedirectURL+"?error=user_creation_failed")
 		return
 	}
 
 	// 如果是单纯绑定操作，不需要重新签发 JWT，直接重定向回安全设置页
 	if bindUserID != "" {
-		// 为了防止写死 localhost:5173，这里也使用配置的 frontendRedirectURL 来拼接
-		// 假设 frontendRedirectURL 是 "http://localhost:3000/console"
-		// 我们需要把它替换成 "/account/security" 路径
+		// 为了防止写死 localhost:3000，这里也使用配置的 frontendRedirectURL 来拼接
 		baseFrontendURL := strings.Split(frontendRedirectURL, "/console")[0]
 		c.Redirect(http.StatusTemporaryRedirect, baseFrontendURL+"/account/security?bind_success=true")
 		return
@@ -306,6 +310,17 @@ func (h *OAuthHandler) handleOAuthUser(ctx context.Context, info *googleUserInfo
 			}
 			// 已经绑定过了，直接返回
 			return nil, nil
+		}
+
+		// 检查该用户是否已经绑定过一个 google 账号
+		var count int64
+		if err := tx.Model(&models.UserOAuthConnection{}).Where("user_id = ? AND provider = ?", bindUserID, "google").Count(&count).Error; err != nil {
+			tx.Rollback()
+			return nil, fmt.Errorf("failed to check existing bindings: %v", err)
+		}
+		if count > 0 {
+			tx.Rollback()
+			return nil, fmt.Errorf("this account is already bound to a google account")
 		}
 
 		// 执行绑定
