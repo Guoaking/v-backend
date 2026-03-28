@@ -89,15 +89,17 @@
    - 挂起当前请求，静默调用一次 `POST /api/v1/auth/refresh`。
    - 如果续期成功，拿到新 Token 替换旧 Token，然后重试刚才失败的请求；如果续期失败，才真正踢回登录页。
 
-4. **设备指纹与会话表 (Device & Session Registry)**
-   - 建立 `user_sessions` 表，记录 `(session_id, user_id, device_id, refresh_token_hash, last_active_ip, platform, expires_at)`。
-   - 提供 `/api/v1/users/me/sessions` 接口，允许用户在 Console 中查看所有活跃设备，并提供“注销指定设备”的入口。
+4. **设备指纹与会话表 (Device & Session Registry) - 已通过 Redis 实现**
+   - 摒弃了厚重的关系型数据库 `user_sessions` 表。
+   - 改为在 Redis 中存储结构化的 Session 字典：`session:{user_id}:{jti} -> {user_agent, ip, last_seen}`。
+   - 提供 `/api/v1/console/users/me/sessions` 接口，允许用户在 Console 中查看所有活跃设备。
 
-5. **吊销与踢人机制 (Revocation & Kick-out)**
+5. **吊销与踢人机制 (Revocation & Kick-out) - 已实现**
+   - 提供了 `/api/v1/console/users/me/sessions/:id` (DELETE) 接口。
    - 当管理员点击“强制下线”或用户主动登出时：
-     1. 从 `user_sessions` 删除或标记对应的 `refresh_token_hash`。
-     2. 将当前未过期的 `access_token` (或者其 `jti` 唯一标识) 存入 Redis 黑名单，直至其自然过期。
-   - `JWTAuth` 中间件增加一层极轻量的 Redis 黑名单查验。
+     1. 从 Redis 的 Active Sessions (`session:{user_id}:{jti}`) 中删除该设备。
+     2. 将该 `jti` 加入黑名单 (`blocklist:{jti} = "revoked"`)，保留时间与 JWT 原本过期时间一致。
+   - `JWTAuth` 中间件增加一层极轻量的 Redis 黑名单查验。如果当前请求携带的 JWT 的 `jti` 在黑名单中，立刻返回 401。
 
 ---
 
@@ -125,4 +127,5 @@
 - [ ] **Simplify**: 修改 `auth_handler.go`，移除 OAuth Token 落库逻辑，仅返回 JWT。
 - [ ] **Doc**: 更新 API 文档，标记 API Key 为 Legacy（或仅限开发测试），推荐生产环境使用 OAuth + SDK。
 - [ ] **Feat**: 设计 `BillingService` 接口，解耦计费逻辑。
-- [ ] **Feat (User Auth)**: 规划 `user_sessions` 表结构，引入 Refresh Token 机制。
+- [x] **Feat (User Auth)**: 通过 Redis 引入 Active Sessions 机制和基于 `jti` 的 Blocklist。
+- [ ] **Feat (User Auth)**: 引入 HttpOnly Cookie 存放长效 Refresh Token 机制。
