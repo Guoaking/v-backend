@@ -56,9 +56,12 @@ func RequireOrganizationHeader(svc *service.KYCService) gin.HandlerFunc {
 			}
 		}
 		if !user.IsPlatformAdmin && member.Status != "active" {
-			response.JSONError(c, response.CodeForbidden, "Organization membership is inactive")
-			c.Abort()
-			return
+			// 同上，为了防止脏数据导致的死锁，允许 DELETE 请求通过，交由业务 Handler 最终校验
+			if c.Request.Method != "DELETE" {
+				response.JSONError(c, response.CodeForbidden, "Organization membership is inactive")
+				c.Abort()
+				return
+			}
 		}
 
 		// 更新最后活跃时间

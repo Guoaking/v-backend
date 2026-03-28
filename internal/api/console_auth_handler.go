@@ -414,12 +414,17 @@ func (h *ConsoleAuthHandler) Register(c *gin.Context) { // ignore_security_alert
 	}
 
 	// 创建组织
+	orgName := req.Company
+	if orgName == "" {
+		orgName = req.FullName + "'s Workspace"
+	}
 	org := models.Organization{
 		ID:           utils.GenerateID(),
-		Name:         req.Company,
+		Name:         orgName,
 		PlanID:       "starter",
 		BillingEmail: req.Email,
 		Status:       "active",
+		OwnerID:      "", // Will update after user is created
 	}
 
 	if err := tx.Create(&org).Error; err != nil {
@@ -505,6 +510,15 @@ func (h *ConsoleAuthHandler) Register(c *gin.Context) { // ignore_security_alert
 		logger.GetLogger().WithError(err).Error("创建组织成员关系失败")
 		middleware.RecordBusinessOperation("console_register", false, time.Since(start), "org_member_creation_failed")
 		JSONError(c, CodeDatabaseError, "组织成员创建失败")
+		return
+	}
+
+	// 更新组织的 OwnerID
+	if err := tx.Model(&org).Update("owner_id", user.ID).Error; err != nil {
+		tx.Rollback()
+		logger.GetLogger().WithError(err).Error("更新组织OwnerID失败")
+		middleware.RecordBusinessOperation("console_register", false, time.Since(start), "org_update_failed")
+		JSONError(c, CodeDatabaseError, "系统错误")
 		return
 	}
 
