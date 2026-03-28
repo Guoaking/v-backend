@@ -116,7 +116,6 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 
 			// Sandbox / STS endpoint for playground
 			consoleAuthHandler := api.NewConsoleAuthHandler(kycService)
-			console.POST("/sandbox/token", consoleAuthHandler.GenerateSandboxToken)
 
 			// 全局用户设置 (不需要 OrgHeader)
 			userGlobal := console.Group("/users")
@@ -134,7 +133,7 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 			// 组织相关的控制台接口
 			orgConsole := console.Group("")
 			orgConsole.Use(middleware.InjectOrgContext())
-			
+
 			// Sandbox / STS endpoint for playground
 			orgConsole.POST("/sandbox/token", consoleAuthHandler.GenerateSandboxToken)
 

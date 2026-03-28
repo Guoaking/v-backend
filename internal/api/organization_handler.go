@@ -178,13 +178,50 @@ func (h *OrganizationHandler) CreateOrganization(c *gin.Context) {
 		return
 	}
 	userID := c.GetString("userID")
-	org := &models.Organization{ID: utils.GenerateID(), Name: req.Name, Status: "active", OwnerID: userID, CreatedAt: time.Now(), UpdatedAt: time.Now()}
-	if err := h.service.DB.Create(org).Error; err != nil {
-		JSONError(c, CodeDatabaseError, "创建失败")
+
+	// Create org and member in a transaction
+	tx := h.service.DB.Begin()
+	if tx.Error != nil {
+		JSONError(c, CodeDatabaseError, "事务启动失败")
 		return
 	}
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	org := &models.Organization{ID: utils.GenerateID(), Name: req.Name, Status: "active", OwnerID: userID, CreatedAt: time.Now(), UpdatedAt: time.Now(), PlanID: "starter"}
+	if err := tx.Create(org).Error; err != nil {
+		tx.Rollback()
+		JSONError(c, CodeDatabaseError, "创建组织失败")
+		return
+	}
+
 	member := &models.OrganizationMember{ID: utils.GenerateID(), OrganizationID: org.ID, UserID: userID, Role: "owner", Status: "active", CreatedAt: time.Now(), UpdatedAt: time.Now()}
-	_ = h.service.DB.Create(member).Error
+	if err := tx.Create(member).Error; err != nil {
+		tx.Rollback()
+		JSONError(c, CodeDatabaseError, "创建组织成员关系失败")
+		return
+	}
+
+	// Update user's current organization
+	if err := tx.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
+		"current_org_id":     org.ID,
+		"last_active_org_id": org.ID,
+		"org_id":             org.ID,
+		"org_role":           "owner",
+	}).Error; err != nil {
+		tx.Rollback()
+		JSONError(c, CodeDatabaseError, "更新用户状态失败")
+		return
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		JSONError(c, CodeDatabaseError, "事务提交失败")
+		return
+	}
+
 	metrics.RecordAuditEvent(c.Request.Context(), "org.create", "organization", "success")
 	JSONSuccess(c, gin.H{
 		"id":     org.ID,
