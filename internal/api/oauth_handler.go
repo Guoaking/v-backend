@@ -169,13 +169,20 @@ func (h *OAuthHandler) GoogleCallback(c *gin.Context) {
 	user, err := h.handleOAuthUser(c, userInfo, bindUserID)
 	if err != nil {
 		logger.GetLogger().Errorf("Failed to handle oauth user: %v", err)
+
+		// 判断是否是账号已被注销
+		if err.Error() == "account_deleted" {
+			c.Redirect(http.StatusTemporaryRedirect, frontendRedirectURL+"/login?error=account_deleted")
+			return
+		}
+
 		// 如果是绑定失败，应该跳回安全设置页并带上错误信息
 		if bindUserID != "" {
 			baseFrontendURL := strings.Split(frontendRedirectURL, "/console")[0]
 			c.Redirect(http.StatusTemporaryRedirect, baseFrontendURL+"/account/security?error="+url.QueryEscape(err.Error()))
 			return
 		}
-		c.Redirect(http.StatusTemporaryRedirect, frontendRedirectURL+"?error=user_creation_failed")
+		c.Redirect(http.StatusTemporaryRedirect, frontendRedirectURL+"/login?error=user_creation_failed")
 		return
 	}
 
@@ -346,9 +353,15 @@ func (h *OAuthHandler) handleOAuthUser(ctx context.Context, info *googleUserInfo
 	err := tx.Where("provider = ? AND provider_account_id = ?", "google", info.ID).First(&conn).Error
 	if err == nil {
 		// 找到了绑定记录，直接查出对应的 User
-		if err := tx.Where("id = ?", conn.UserID).First(&user).Error; err != nil {
+		// 【重要修复】：使用 Unscoped 检查该用户是否已被注销
+		if err := tx.Unscoped().Where("id = ?", conn.UserID).First(&user).Error; err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("user linked to connection not found: %v", err)
+		}
+
+		if user.Status == "pending_deletion" || user.DeletedAt.Valid {
+			tx.Rollback()
+			return nil, fmt.Errorf("account_deleted")
 		}
 
 		// 更新最后登录时间
@@ -360,9 +373,16 @@ func (h *OAuthHandler) handleOAuthUser(ctx context.Context, info *googleUserInfo
 
 	// 2. 如果没找到绑定记录，说明这是此 Google 账号第一次登录
 	// 尝试通过邮箱查找是否已经有 User (比如之前用密码注册过)
-	err = tx.Where("email = ?", info.Email).First(&user).Error
+	// 【重要修复】：如果用户状态是 pending_deletion，我们不应该让他直接登录成功，
+	// 要么拒绝登录，要么恢复账号。这里为了产品体验，我们选择“阻止登录并提示”。
+	err = tx.Unscoped().Where("email = ?", info.Email).First(&user).Error
 
 	if err == nil {
+		if user.Status == "pending_deletion" || user.DeletedAt.Valid {
+			tx.Rollback()
+			return nil, fmt.Errorf("account_deleted")
+		}
+
 		// 找到了对应邮箱的 User，执行绑定逻辑 (创建一条 connection 记录)
 		newConn := models.UserOAuthConnection{
 			ID:                utils.GenerateID(),
