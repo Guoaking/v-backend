@@ -433,7 +433,8 @@ func (h *ConsoleHandler) DeleteMe(c *gin.Context) {
 		return
 	}
 	var cnt int64
-	_ = h.service.DB.Table("organizations").Where("owner_id = ?", userID).Count(&cnt).Error
+	// Only count active organizations, ignore deleted ones
+	_ = h.service.DB.Table("organizations").Where("owner_id = ? AND status = ?", userID, "active").Count(&cnt).Error
 	if cnt > 0 {
 		JSONError(c, CodeConflict, "You own organizations. Please transfer ownership or delete them first.")
 		return

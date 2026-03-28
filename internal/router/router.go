@@ -110,7 +110,7 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 		// 控制台API（需要用户认证）
 		console := v1.Group("/console")
 		console.Use(middleware.JWTAuth(kycService))
-		console.Use(middleware.InjectOrgContext())
+		// 移除全局的 InjectOrgContext
 		{
 			consoleHandler := api.NewConsoleHandler(kycService)
 
@@ -118,27 +118,36 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 			consoleAuthHandler := api.NewConsoleAuthHandler(kycService)
 			console.POST("/sandbox/token", consoleAuthHandler.GenerateSandboxToken)
 
-			console.GET("/users/me", consoleHandler.GetCurrentUser)
-			console.POST("/user/profile", consoleHandler.UpdateUserProfile)
-			console.PUT("/users/me/password", consoleHandler.UpdateUserPassword)
-			console.GET("/users/me/sessions", consoleHandler.GetActiveSessions)
-			console.DELETE("/users/me/sessions/:id", consoleHandler.RevokeSession)
+			// 全局用户设置 (不需要 OrgHeader)
+			userGlobal := console.Group("/users")
+			// 移除 console 组自带的 InjectOrgContext，因为对于 0 组织用户来说会报错
+			// 这意味着下面的路由不需要 OrgContext
+			userGlobal.GET("/me", consoleHandler.GetCurrentUser)
+			userGlobal.POST("/me/profile", consoleHandler.UpdateUserProfile)
+			userGlobal.PUT("/me/password", consoleHandler.UpdateUserPassword)
+			userGlobal.GET("/me/sessions", consoleHandler.GetActiveSessions)
+			userGlobal.DELETE("/me/sessions/:id", consoleHandler.RevokeSession)
+			userGlobal.GET("/me/connections", consoleHandler.GetOAuthConnections)
+			userGlobal.DELETE("/me/connections/:provider", consoleHandler.UnbindOAuthConnection)
+			userGlobal.DELETE("/me", consoleHandler.DeleteMe)
 
-			// OAuth Connections
-			console.GET("/users/me/connections", consoleHandler.GetOAuthConnections)
-			console.DELETE("/users/me/connections/:provider", consoleHandler.UnbindOAuthConnection)
+			// 组织相关的控制台接口
+			orgConsole := console.Group("")
+			orgConsole.Use(middleware.InjectOrgContext())
+			
+			// Sandbox / STS endpoint for playground
+			orgConsole.POST("/sandbox/token", consoleAuthHandler.GenerateSandboxToken)
 
-			console.GET("/usage", middleware.RequireOrganizationHeader(kycService), middleware.RequirePermission(models.PermLogsRead), consoleHandler.GetUsage)
-			console.GET("/usage/stats", middleware.RequireOrganizationHeader(kycService), middleware.RequirePermission(models.PermLogsRead), consoleHandler.GetUsageStats)
-			console.GET("/logs", middleware.RequireOrganizationHeader(kycService), middleware.RequirePermission(models.PermLogsRead), consoleHandler.GetLogs)
-			console.DELETE("/users/me", consoleHandler.DeleteMe)
-			console.GET("/me/notifications", middleware.JWTAuth(kycService), consoleHandler.GetNotifications)
-			console.PUT("/me/notifications/:id/read", middleware.JWTAuth(kycService), consoleHandler.MarkNotificationRead)
-			console.GET("/usage/quota", middleware.RequireOrganizationHeader(kycService), consoleHandler.GetQuotaStatus)
+			orgConsole.GET("/usage", middleware.RequireOrganizationHeader(kycService), middleware.RequirePermission(models.PermLogsRead), consoleHandler.GetUsage)
+			orgConsole.GET("/usage/stats", middleware.RequireOrganizationHeader(kycService), middleware.RequirePermission(models.PermLogsRead), consoleHandler.GetUsageStats)
+			orgConsole.GET("/logs", middleware.RequireOrganizationHeader(kycService), middleware.RequirePermission(models.PermLogsRead), consoleHandler.GetLogs)
+			orgConsole.GET("/me/notifications", consoleHandler.GetNotifications)
+			orgConsole.PUT("/me/notifications/:id/read", consoleHandler.MarkNotificationRead)
+			orgConsole.GET("/usage/quota", middleware.RequireOrganizationHeader(kycService), consoleHandler.GetQuotaStatus)
 
 			// OAuth 客户端管理（组织维度）
 			clientHandler := api.NewClientHandler(kycService)
-			clients := console.Group("/oauth/clients")
+			clients := orgConsole.Group("/oauth/clients")
 			clients.Use(middleware.RequireOrganizationHeader(kycService))
 			clients.POST("/register", middleware.RequirePermission(models.PermOAuthWrite), clientHandler.RegisterClient)
 			clients.GET("", middleware.RequirePermission(models.PermOAuthRead), clientHandler.ListClients)
