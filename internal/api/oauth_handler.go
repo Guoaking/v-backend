@@ -83,7 +83,7 @@ func (h *OAuthHandler) GoogleCallback(c *gin.Context) {
 	// 从配置中读取前端返回地址，如果未配置则降级到硬编码默认值
 	frontendRedirectURL := h.service.Config.OAuth.Google.FrontendReturnURL
 	if frontendRedirectURL == "" {
-		frontendRedirectURL = "http://localhost:5173/console"
+		frontendRedirectURL = "http://localhost:3000/console"
 	}
 
 	if code == "" || state == "" {
