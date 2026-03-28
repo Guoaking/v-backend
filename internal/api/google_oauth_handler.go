@@ -159,7 +159,6 @@ func (h *GoogleOAuthHandler) GoogleLogin(c *gin.Context) {
 			Email:     user.Email,
 			FullName:  user.Name,
 			AvatarURL: user.AvatarURL,
-			Company:   org.Name,
 			Role:      user.Role,
 			OrgRole:   user.OrgRole,
 			OrgID:     user.OrgID,

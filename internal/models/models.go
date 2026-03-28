@@ -54,7 +54,6 @@ type User struct {
 	Name            string         `json:"name"`
 	FullName        string         `json:"full_name"`
 	AvatarURL       string         `json:"avatar_url"`
-	Company         string         `json:"company"`
 	Role            string         `json:"role"` // user, admin
 	OrgID           string         `json:"org_id"`
 	OrgRole         string         `json:"org_role"` // owner, admin, developer, viewer

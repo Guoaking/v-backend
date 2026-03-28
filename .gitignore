@@ -42,6 +42,6 @@ kyc-service-new
 
 # Test storage and artifacts
 test_storage/
-tests/e2e/test_storage/
+tests/integration/test_storage/
 coverage/
 *.png

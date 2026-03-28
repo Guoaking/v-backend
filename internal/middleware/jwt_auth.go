@@ -90,6 +90,27 @@ func JWTAuth(service *service.KYCService) gin.HandlerFunc {
 			}
 		}
 
+		// 检查黑名单 (Blocklist) - 用于会话吊销
+		if jti, ok := claims["jti"].(string); ok && jti != "" {
+			if service.Redis != nil {
+				blocklistKey := "blocklist:" + jti
+				exists, _ := service.Redis.Exists(c.Request.Context(), blocklistKey).Result()
+				if exists > 0 {
+					c.JSON(401, gin.H{
+						"code":       1001,
+						"message":    "会话已失效，请重新登录",
+						"error":      "Token has been revoked",
+						"timestamp":  time.Now().UnixMilli(),
+						"request_id": c.GetString("request_id"),
+						"path":       c.Request.URL.Path,
+						"method":     c.Request.Method,
+					})
+					c.Abort()
+					return
+				}
+			}
+		}
+
 		// 提取用户信息
 		userID, ok := claims["user_id"].(string)
 		if !ok {

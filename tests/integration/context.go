@@ -1,4 +1,4 @@
-package e2e
+package integration
 
 import (
 	"bytes"
@@ -161,14 +161,19 @@ func (c *E2EContext) NewRequest(t *testing.T, method, path string) *RequestBuild
 
 // AsUser 模拟控制台普通用户登录
 func (b *RequestBuilder) AsUser() *RequestBuilder {
+	return b.AsSpecificUser(b.ctx.UserID, b.ctx.OrgID)
+}
+
+// AsSpecificUser 模拟特定用户登录
+func (b *RequestBuilder) AsSpecificUser(userID string, orgID string) *RequestBuilder {
 	token, err := b.ctx.generateToken(jwt.MapClaims{
-		"user_id": b.ctx.UserID,
-		"org_id":  b.ctx.OrgID,
+		"user_id": userID,
+		"org_id":  orgID,
 		"exp":     time.Now().Add(24 * time.Hour).Unix(),
 	})
 	require.NoError(b.t, err)
 	b.header.Set("Authorization", "Bearer "+token)
-	b.header.Set("X-Organization-ID", b.ctx.OrgID)
+	b.header.Set("X-Organization-ID", orgID)
 	return b
 }
 
@@ -223,6 +228,15 @@ func (b *RequestBuilder) AsPlayground() *RequestBuilder {
 // WithBody 设置请求体
 func (b *RequestBuilder) WithBody(body io.Reader) *RequestBuilder {
 	b.body = body
+	return b
+}
+
+// WithJSON 序列化并设置请求体，自动添加 Content-Type: application/json
+func (b *RequestBuilder) WithJSON(v interface{}) *RequestBuilder {
+	payload, err := json.Marshal(v)
+	require.NoError(b.t, err)
+	b.body = bytes.NewReader(payload)
+	b.header.Set("Content-Type", "application/json")
 	return b
 }
 

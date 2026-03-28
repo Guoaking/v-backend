@@ -30,7 +30,6 @@ type UserMeResponse struct {
 	OrgRole         string   `json:"org_role"`
 	CurrentOrgID    string   `json:"currentOrgId"`
 	Permissions     []string `json:"permissions"`
-	Company         string   `json:"company"`
 	IsPlatformAdmin bool     `json:"is_platform_admin"`
 }
 

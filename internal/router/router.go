@@ -108,15 +108,16 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 		console.Use(middleware.InjectOrgContext())
 		{
 			consoleHandler := api.NewConsoleHandler(kycService)
-			userAuthHandler := api.NewUserAuthHandler(kycService)
 
 			// Sandbox / STS endpoint for playground
 			consoleAuthHandler := api.NewConsoleAuthHandler(kycService)
 			console.POST("/sandbox/token", consoleAuthHandler.GenerateSandboxToken)
 
 			console.GET("/users/me", consoleHandler.GetCurrentUser)
-			console.PUT("/users/me", consoleHandler.UpdateUserProfile)
-			console.PUT("/users/me/password", userAuthHandler.UpdatePassword)
+			console.POST("/user/profile", consoleHandler.UpdateUserProfile)
+			console.PUT("/users/me/password", consoleHandler.UpdateUserPassword)
+			console.GET("/users/me/sessions", consoleHandler.GetActiveSessions)
+			console.DELETE("/users/me/sessions/:id", consoleHandler.RevokeSession)
 
 			console.GET("/usage", middleware.RequireOrganizationHeader(kycService), middleware.RequirePermission(models.PermLogsRead), consoleHandler.GetUsage)
 			console.GET("/usage/stats", middleware.RequireOrganizationHeader(kycService), middleware.RequirePermission(models.PermLogsRead), consoleHandler.GetUsageStats)

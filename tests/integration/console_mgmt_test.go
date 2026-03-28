@@ -1,4 +1,4 @@
-package e2e
+package integration
 
 import (
 	"bytes"
@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"testing"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -27,16 +29,43 @@ func (s *ConsoleMgmtSuite) TestSmoke_UserProfile() {
 		AsUser().
 		ExpectSuccess()
 
-	// 2. Update
+	// 2. Update Profile
 	upReq := map[string]string{"name": "Refactored Name"}
-	body, _ := json.Marshal(upReq)
-	s.Ctx.NewRequest(s.T(), "PUT", "/api/v1/console/users/me").
+	s.Ctx.NewRequest(s.T(), "POST", "/api/v1/console/user/profile").
 		AsUser().
-		WithBody(bytes.NewReader(body)).
-		WithHeader("Content-Type", "application/json").
+		WithJSON(upReq).
 		ExpectSuccess()
 
 	s.T().Log("✅ Smoke: 用户资料流验证通过")
+}
+
+// TestUpdatePassword 验证密码修改流
+func (s *ConsoleMgmtSuite) TestUpdatePassword() {
+	// 1. 先确保有一个已知的密码，这里我们通过直接修改数据库来重置为 password123
+	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
+	s.Ctx.App.DB.Exec("UPDATE users SET password = ? WHERE email = 'console@example.com'", string(hashedPassword))
+
+	// 2. 尝试使用错误的旧密码更新
+	wrongReq := map[string]string{
+		"current_password": "wrongpassword",
+		"new_password":     "newpassword456",
+	}
+	s.Ctx.NewRequest(s.T(), "PUT", "/api/v1/console/users/me/password").
+		AsUser().
+		WithJSON(wrongReq).
+		ExpectStatus(401) // Unauthorized
+
+	// 3. 使用正确的旧密码更新
+	correctReq := map[string]string{
+		"current_password": "password123",
+		"new_password":     "newpassword456",
+	}
+	s.Ctx.NewRequest(s.T(), "PUT", "/api/v1/console/users/me/password").
+		AsUser().
+		WithJSON(correctReq).
+		ExpectSuccess()
+
+	s.T().Log("✅ 密码修改流程验证通过")
 }
 
 // TestUsageAndQuota 验证用量统计与配额查询

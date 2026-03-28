@@ -1,22 +1,22 @@
-# Backend E2E Testing Guide
+# Backend Integration Testing Guide
 
-This guide describes how to efficiently write and maintain End-to-End (E2E) tests for the KYC backend.
+This guide describes how to efficiently write and maintain Integration tests for the KYC backend.
 
 ## 1. Overview
-E2E tests verify the entire stack (API -> Middleware -> Service -> Database/Cache) by simulating real HTTP requests using `httptest`.
+Integration tests verify the entire stack (API -> Middleware -> Service -> Database/Cache) by simulating real HTTP requests using `httptest`.
 
-- **Location**: `tests/e2e/`
+- **Location**: `tests/integration/`
 - **Framework**: `testify/suite` + `RequestBuilder` (Fluent API)
 - **Database**: Uses `config.local.yaml` (usually a local Postgres/Redis).
 
 ## 2. Test File Structure
 
-The E2E tests are modularized by business domain:
-- [context.go](file:///v-backend/tests/e2e/context.go): Shared test suite base and helpers.
-- [kyc_core_test.go](file:///v-backend/tests/e2e/kyc_core_test.go): OCR, Face, and Liveness core business.
-- [auth_security_test.go](file:///v-backend/tests/e2e/auth_security_test.go): Login, Register, RBAC, and STS.
-- [console_mgmt_test.go](file:///v-backend/tests/e2e/console_mgmt_test.go): User Profile, Usage, Quota, and OAuth Clients.
-- [admin_org_test.go](file:///v-backend/tests/e2e/admin_org_test.go): Organization and Admin management.
+The Integration tests are modularized by business domain:
+- [context.go](file:///v-backend/tests/integration/context.go): Shared test suite base and helpers.
+- [kyc_core_test.go](file:///v-backend/tests/integration/kyc_core_test.go): OCR, Face, and Liveness core business.
+- [auth_security_test.go](file:///v-backend/tests/integration/auth_security_test.go): Login, Register, RBAC, and STS.
+- [console_mgmt_test.go](file:///v-backend/tests/integration/console_mgmt_test.go): User Profile, Usage, Quota, and OAuth Clients.
+- [admin_org_test.go](file:///v-backend/tests/integration/admin_org_test.go): Organization and Admin management.
 
 ## 3. Identity Injection
 The `RequestBuilder` supports multiple identities:

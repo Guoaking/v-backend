@@ -61,7 +61,7 @@ func (h *KYCHandler) OCR(c *gin.Context) {
 	result, err := h.service.OCR(ctx, &req)
 	fmt.Printf("output: %v, %v\n", "end", time.Since(now))
 	if err != nil {
-		if strings.Contains(err.Error(), "Quota exceeded") {
+		if strings.Contains(err.Error(), "QUOTA_EXCEEDED") || strings.Contains(err.Error(), "Quota exceeded") {
 			JSONError(c, CodePaymentRequired, "Quota exceeded. Please upgrade your plan.")
 			return
 		}

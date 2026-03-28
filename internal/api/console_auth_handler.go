@@ -49,7 +49,6 @@ type ConsoleUserProfile struct {
 	Email           string              `json:"email"`
 	FullName        string              `json:"full_name"`
 	AvatarURL       string              `json:"avatar,omitempty"`
-	Company         string              `json:"company,omitempty"`
 	Role            string              `json:"role"`
 	OrgRole         string              `json:"org_role"`
 	OrgID           string              `json:"org_id"`
@@ -193,7 +192,7 @@ func (h *ConsoleAuthHandler) Login(c *gin.Context) { // ignore_security_alert
 	user.OrgRole = roleToUse
 	user.OrgID = orgIDToUse
 	// 生成JWT令牌（绑定当前选定组织）
-	accessToken, err := h.generateUserJWT(&user, &org)
+	accessToken, err := h.generateUserJWT(&user, &org, c.Request.UserAgent(), c.ClientIP())
 	if err != nil {
 		logger.GetLogger().WithError(err).Error("生成JWT失败")
 		metrics.RecordBusinessOperation(c.Request.Context(), "console_login", false, time.Since(start), "jwt_generation_failed")
@@ -228,7 +227,6 @@ func (h *ConsoleAuthHandler) Login(c *gin.Context) { // ignore_security_alert
 		Email:           user.Email,
 		FullName:        user.Name,
 		AvatarURL:       user.AvatarURL,
-		Company:         org.Name,
 		Role:            user.Role,
 		OrgRole:         roleToUse,
 		OrgID:           orgIDToUse,
@@ -533,7 +531,7 @@ func (h *ConsoleAuthHandler) Register(c *gin.Context) { // ignore_security_alert
 	middleware.RecordBusinessOperation("console_register", true, time.Since(start), "")
 
 	// 生成 JWT
-	accessToken, err := h.generateUserJWT(&user, &org)
+	accessToken, err := h.generateUserJWT(&user, &org, c.Request.UserAgent(), c.ClientIP())
 	if err != nil {
 		logger.GetLogger().WithError(err).Error("生成JWT失败")
 		JSONSuccess(c, ConsoleRegisterResponse{Message: "注册成功，但令牌生成失败，请手动登录"})
@@ -547,7 +545,6 @@ func (h *ConsoleAuthHandler) Register(c *gin.Context) { // ignore_security_alert
 		Email:           user.Email,
 		FullName:        user.Name,
 		AvatarURL:       user.AvatarURL,
-		Company:         org.Name,
 		Role:            user.Role,
 		OrgRole:         user.OrgRole,
 		OrgID:           org.ID,
@@ -571,9 +568,12 @@ func (s *ConsoleAuthHandler) SyncOrganizationQuotasWithPolicy(orgID string, plan
 	return nil
 }
 
-// generateUserJWT 生成用户JWT令牌
-func (h *ConsoleAuthHandler) generateUserJWT(user *models.User, org *models.Organization) (string, error) {
+// generateUserJWT 生成用户JWT令牌并记录Session
+func (h *ConsoleAuthHandler) generateUserJWT(user *models.User, org *models.Organization, userAgent string, ip string) (string, error) {
+	jti := utils.GenerateID()
+
 	claims := jwt.MapClaims{
+		"jti":      jti,
 		"user_id":  user.ID,
 		"email":    user.Email,
 		"role":     user.Role,
@@ -582,6 +582,21 @@ func (h *ConsoleAuthHandler) generateUserJWT(user *models.User, org *models.Orga
 		"plan_id":  org.PlanID,
 		"exp":      time.Now().Add(24 * time.Hour).Unix(),
 		"iat":      time.Now().Unix(),
+	}
+
+	// 将会话信息存入 Redis (如果配置了 Redis)
+	if h.service.Redis != nil {
+		sessionData := map[string]interface{}{
+			"id":         jti,
+			"user_id":    user.ID,
+			"user_agent": userAgent,
+			"ip":         ip,
+			"created_at": time.Now().Unix(),
+			"last_seen":  time.Now().Unix(),
+		}
+		sessionJSON, _ := json.Marshal(sessionData)
+		sessionKey := fmt.Sprintf("session:%s:%s", user.ID, jti)
+		h.service.Redis.Set(context.Background(), sessionKey, sessionJSON, 24*time.Hour)
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

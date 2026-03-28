@@ -1,7 +1,10 @@
 package api
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"kyc-service/internal/middleware"
@@ -11,6 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -18,7 +22,22 @@ import (
 type ConsoleUpdateUserRequest struct {
 	FullName  string `json:"name,omitempty"`
 	AvatarURL string `json:"avatar,omitempty"`
-	Company   string `json:"company,omitempty"`
+}
+
+type ActiveSession struct {
+	ID        string    `json:"id"`
+	Device    string    `json:"device"`
+	OS        string    `json:"os"`
+	Browser   string    `json:"browser"`
+	IP        string    `json:"ip"`
+	Location  string    `json:"location"`
+	LastSeen  time.Time `json:"last_seen"`
+	IsCurrent bool      `json:"is_current"`
+}
+
+type UpdateUserPasswordRequest struct {
+	CurrentPassword string `json:"current_password" binding:"required"`
+	NewPassword     string `json:"new_password" binding:"required,min=6"`
 }
 
 func (h *ConsoleHandler) GetCurrentUser(c *gin.Context) {
@@ -83,7 +102,6 @@ func (h *ConsoleHandler) GetCurrentUser(c *gin.Context) {
 		OrgRole:         c.GetString("orgRole"),
 		CurrentOrgID:    currentOrg,
 		Permissions:     perms,
-		Company:         org.Name,
 		IsPlatformAdmin: user.IsPlatformAdmin,
 	}
 
@@ -147,14 +165,6 @@ func (h *ConsoleHandler) UpdateUserProfile(c *gin.Context) {
 		}
 	}
 
-	// 如果更新了公司名称，也更新组织名称
-	if req.Company != "" && user.OrgID != "" {
-		if err := h.service.DB.Model(&models.Organization{}).Where("id = ?", user.OrgID).Update("name", req.Company).Error; err != nil {
-			logger.GetLogger().WithError(err).Error("更新组织名称失败")
-			// 不返回错误，继续处理
-		}
-	}
-
 	// 记录审计日志
 	auditLog := &models.AuditLog{
 		UserID:    userID,
@@ -176,6 +186,197 @@ func (h *ConsoleHandler) UpdateUserProfile(c *gin.Context) {
 	JSONSuccess(c, gin.H{
 		"success": true,
 		"message": "资料更新成功",
+	})
+}
+
+func (h *ConsoleHandler) UpdateUserPassword(c *gin.Context) {
+	start := time.Now()
+
+	userClaims, exists := c.Get("user")
+	if !exists {
+		JSONError(c, CodeUnauthorized, "未授权访问")
+		return
+	}
+	claims := userClaims.(jwt.MapClaims)
+	userID := claims["user_id"].(string)
+
+	var req UpdateUserPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		JSONError(c, CodeInvalidParameter, "参数验证失败")
+		return
+	}
+
+	var user models.User
+	if err := h.service.DB.First(&user, "id = ?", userID).Error; err != nil {
+		JSONError(c, CodeNotFound, "用户不存在")
+		return
+	}
+
+	// 验证旧密码
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.CurrentPassword)); err != nil {
+		JSONError(c, CodeUnauthorized, "当前密码错误")
+		return
+	}
+
+	// 生成新密码哈希
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		logger.GetLogger().WithError(err).Error("密码哈希失败")
+		JSONError(c, CodeInternalError, "系统错误")
+		return
+	}
+
+	// 更新密码
+	if err := h.service.DB.Model(&user).Update("password", string(hashedPassword)).Error; err != nil {
+		logger.GetLogger().WithError(err).Error("更新密码失败")
+		JSONError(c, CodeDatabaseError, "更新失败")
+		return
+	}
+
+	// 记录审计日志
+	auditLog := &models.AuditLog{
+		UserID:    userID,
+		OrgID:     user.OrgID,
+		Action:    "update_password",
+		Resource:  "user",
+		IP:        c.ClientIP(),
+		UserAgent: c.Request.UserAgent(),
+		Status:    "success",
+	}
+	_ = h.recordAuditLog(auditLog)
+
+	middleware.RecordBusinessOperation("update_password", true, time.Since(start), "")
+
+	JSONSuccess(c, gin.H{
+		"success": true,
+		"message": "密码更新成功",
+	})
+}
+
+func (h *ConsoleHandler) GetActiveSessions(c *gin.Context) {
+	userClaims, exists := c.Get("user")
+	if !exists {
+		JSONError(c, CodeUnauthorized, "未授权访问")
+		return
+	}
+	claims := userClaims.(jwt.MapClaims)
+	userID := claims["user_id"].(string)
+	currentJti, _ := claims["jti"].(string)
+
+	var sessions []ActiveSession
+
+	if h.service.Redis != nil {
+		ctx := context.Background()
+		pattern := fmt.Sprintf("session:%s:*", userID)
+		keys, err := h.service.Redis.Keys(ctx, pattern).Result()
+		if err == nil {
+			for _, key := range keys {
+				val, err := h.service.Redis.Get(ctx, key).Result()
+				if err == nil {
+					var rawData map[string]interface{}
+					if err := json.Unmarshal([]byte(val), &rawData); err == nil {
+						jti := rawData["id"].(string)
+
+						// 解析 User-Agent
+						uaStr := rawData["user_agent"].(string)
+						device := "Unknown Device"
+						browser := "Unknown Browser"
+						os := "Unknown OS"
+
+						if strings.Contains(uaStr, "Mac OS X") {
+							device = "MacBook"
+							os = "macOS"
+						} else if strings.Contains(uaStr, "Windows") {
+							device = "PC"
+							os = "Windows"
+						} else if strings.Contains(uaStr, "iPhone") {
+							device = "iPhone"
+							os = "iOS"
+						} else if strings.Contains(uaStr, "Linux") {
+							device = "PC"
+							os = "Linux"
+						} else if strings.Contains(uaStr, "Android") {
+							device = "Android"
+							os = "Android"
+						} else if strings.Contains(uaStr, "iPad") {
+							device = "iPad"
+							os = "iOS"
+						}
+
+						if strings.Contains(uaStr, "Edg") {
+							browser = "Edge"
+						} else if strings.Contains(uaStr, "Chrome") {
+							browser = "Chrome"
+						} else if strings.Contains(uaStr, "Firefox") {
+							browser = "Firefox"
+						} else if strings.Contains(uaStr, "Safari") {
+							browser = "Safari"
+						}
+
+						lastSeenRaw := rawData["last_seen"].(float64)
+
+						sessions = append(sessions, ActiveSession{
+							ID:        jti,
+							Device:    device,
+							OS:        os,
+							Browser:   browser,
+							IP:        rawData["ip"].(string),
+							Location:  "Local Network", // 实际项目中可以通过 GeoIP 解析
+							LastSeen:  time.Unix(int64(lastSeenRaw), 0),
+							IsCurrent: jti == currentJti,
+						})
+					}
+				}
+			}
+		}
+	}
+
+	// 如果没有从 Redis 取到数据（比如没配置 Redis），降级使用当前请求的信息
+	if len(sessions) == 0 {
+		sessions = append(sessions, ActiveSession{
+			ID:        currentJti,
+			Device:    "Current Device",
+			OS:        "Unknown",
+			Browser:   "Unknown",
+			IP:        c.ClientIP(),
+			Location:  "Unknown",
+			LastSeen:  time.Now(),
+			IsCurrent: true,
+		})
+	}
+
+	JSONSuccess(c, sessions)
+}
+
+func (h *ConsoleHandler) RevokeSession(c *gin.Context) {
+	sessionID := c.Param("id")
+
+	userClaims, exists := c.Get("user")
+	if !exists {
+		JSONError(c, CodeUnauthorized, "未授权访问")
+		return
+	}
+	claims := userClaims.(jwt.MapClaims)
+	userID := claims["user_id"].(string)
+
+	if h.service.Redis != nil {
+		ctx := context.Background()
+
+		// 1. 从 Redis 的 Active Sessions 中删除该设备
+		sessionKey := fmt.Sprintf("session:%s:%s", userID, sessionID)
+		h.service.Redis.Del(ctx, sessionKey)
+
+		// 2. 将该 JTI 加入黑名单 (Blocklist)，防止其继续使用未过期的 JWT 访问 API
+		// 黑名单保留时间建议与 JWT 签发时的过期时间 (24h) 一致
+		blocklistKey := fmt.Sprintf("blocklist:%s", sessionID)
+		h.service.Redis.Set(ctx, blocklistKey, "revoked", 24*time.Hour)
+	}
+
+	logger.GetLogger().WithField("session_id", sessionID).Info("Session revoked and blocklisted")
+
+	JSONSuccess(c, gin.H{
+		"success": true,
+		"message": "会话已下线",
 	})
 }
 
