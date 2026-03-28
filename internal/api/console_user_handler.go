@@ -440,16 +440,32 @@ func (h *ConsoleHandler) DeleteMe(c *gin.Context) {
 		return
 	}
 	tx := h.service.DB.Begin()
+
+	// Hard delete user oauth connections so the email/google account can be reused
+	if err := tx.Where("user_id = ?", userID).Delete(&models.UserOAuthConnection{}).Error; err != nil {
+		tx.Rollback()
+		JSONError(c, CodeDatabaseError, "Failed to delete oauth connections")
+		return
+	}
+
 	if err := tx.Model(&models.OrganizationMember{}).Where("user_id = ?", userID).Update("status", "suspended").Error; err != nil {
 		tx.Rollback()
 		JSONError(c, CodeDatabaseError, "更新成员状态失败")
 		return
 	}
-	if err := tx.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]interface{}{"status": "pending_deletion", "deleted_at": time.Now()}).Error; err != nil {
+
+	// Change email to a random string to free up the email for re-registration
+	deletedEmail := fmt.Sprintf("deleted_%d_%s", time.Now().Unix(), user.Email)
+	if err := tx.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]interface{}{
+		"status":     "pending_deletion",
+		"deleted_at": time.Now(),
+		"email":      deletedEmail,
+	}).Error; err != nil {
 		tx.Rollback()
 		JSONError(c, CodeDatabaseError, "更新用户失败")
 		return
 	}
+
 	if err := tx.Commit().Error; err != nil {
 		JSONError(c, CodeDatabaseError, "事务提交失败")
 		return
