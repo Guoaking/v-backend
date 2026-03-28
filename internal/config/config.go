@@ -75,9 +75,10 @@ type OAuthConfig struct {
 }
 
 type GoogleOAuthConfig struct {
-	ClientID     string `mapstructure:"client_id"`
-	ClientSecret string `mapstructure:"client_secret"`
-	RedirectURL  string `mapstructure:"redirect_url"`
+	ClientID          string `mapstructure:"client_id"`
+	ClientSecret      string `mapstructure:"client_secret"`
+	RedirectURL       string `mapstructure:"redirect_url"`
+	FrontendReturnURL string `mapstructure:"frontend_return_url"`
 }
 
 type StorageConfig struct {

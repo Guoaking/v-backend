@@ -48,6 +48,7 @@ oauth:
     client_id: "481475455679-arokubdmn2dr9sv5999lavnbinpf5mct.apps.googleusercontent.com"
     client_secret: "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"
     redirect_url: "http://localhost:8092/api/v1/auth/google/callback"
+    frontend_return_url: "http://localhost:5173/console"
 
 third_party:
   ocr_service:

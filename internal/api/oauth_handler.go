@@ -79,7 +79,12 @@ func (h *OAuthHandler) GoogleLoginRedirect(c *gin.Context) {
 func (h *OAuthHandler) GoogleCallback(c *gin.Context) {
 	code := c.Query("code")
 	state := c.Query("state")
-	frontendRedirectURL := "http://localhost:5173/console" // TODO: read from config or state
+	
+	// 从配置中读取前端返回地址，如果未配置则降级到硬编码默认值
+	frontendRedirectURL := h.service.Config.OAuth.Google.FrontendReturnURL
+	if frontendRedirectURL == "" {
+		frontendRedirectURL = "http://localhost:5173/console"
+	}
 
 	if code == "" || state == "" {
 		c.Redirect(http.StatusTemporaryRedirect, frontendRedirectURL+"?error=invalid_callback")
