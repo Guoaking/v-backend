@@ -389,10 +389,21 @@ func (h *OAuthHandler) handleOAuthUser(ctx context.Context, info *googleUserInfo
 	orgID := utils.GenerateID()
 	userID := utils.GenerateID()
 
+	// 优先使用给定的名字，如果为空则从邮箱截取
+	displayName := info.Name
+	if displayName == "" {
+		parts := strings.Split(info.Email, "@")
+		if len(parts) > 0 {
+			displayName = parts[0]
+		} else {
+			displayName = "User"
+		}
+	}
+
 	// 3.1 创建默认组织
 	org := models.Organization{
 		ID:           orgID,
-		Name:         info.Name + "'s Workspace",
+		Name:         displayName + "'s Workspace",
 		PlanID:       "starter",
 		BillingEmail: info.Email,
 		Status:       "active",
@@ -409,8 +420,8 @@ func (h *OAuthHandler) handleOAuthUser(ctx context.Context, info *googleUserInfo
 	newUser := models.User{
 		ID:              userID,
 		Email:           info.Email,
-		Name:            info.Name,
-		FullName:        info.Name,
+		Name:            displayName,
+		FullName:        displayName,
 		AvatarURL:       info.Picture,
 		Role:            "user",
 		OrgID:           orgID,

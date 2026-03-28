@@ -36,7 +36,7 @@ type ActiveSession struct {
 }
 
 type UpdateUserPasswordRequest struct {
-	CurrentPassword string `json:"current_password" binding:"required"`
+	CurrentPassword string `json:"current_password"`
 	NewPassword     string `json:"new_password" binding:"required,min=6"`
 }
 
@@ -212,10 +212,17 @@ func (h *ConsoleHandler) UpdateUserPassword(c *gin.Context) {
 		return
 	}
 
-	// 验证旧密码
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.CurrentPassword)); err != nil {
-		JSONError(c, CodeUnauthorized, "当前密码错误")
-		return
+	// 如果用户有密码，且传了旧密码，则验证
+	// 如果用户没有密码（比如纯通过 Google 注册），则允许旧密码为空
+	if user.Password != "" {
+		if req.CurrentPassword == "" {
+			JSONError(c, CodeInvalidParameter, "当前密码不能为空")
+			return
+		}
+		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.CurrentPassword)); err != nil {
+			JSONError(c, CodeUnauthorized, "当前密码错误")
+			return
+		}
 	}
 
 	// 生成新密码哈希
