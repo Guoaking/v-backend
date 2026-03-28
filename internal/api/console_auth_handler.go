@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -584,17 +585,22 @@ func (h *ConsoleAuthHandler) generateUserJWT(user *models.User, org *models.Orga
 		"iat":      time.Now().Unix(),
 	}
 
+	// 生成简单的设备指纹 (基于 IP + UserAgent 的哈希)
+	deviceFingerprint := fmt.Sprintf("%x", md5.Sum([]byte(ip+userAgent)))
+
 	// 将会话信息存入 Redis (如果配置了 Redis)
 	if h.service.Redis != nil {
 		sessionData := map[string]interface{}{
-			"id":         jti,
-			"user_id":    user.ID,
-			"user_agent": userAgent,
-			"ip":         ip,
-			"created_at": time.Now().Unix(),
-			"last_seen":  time.Now().Unix(),
+			"id":                 jti,
+			"user_id":            user.ID,
+			"user_agent":         userAgent,
+			"ip":                 ip,
+			"device_fingerprint": deviceFingerprint,
+			"created_at":         time.Now().Unix(),
+			"last_seen":          time.Now().Unix(),
 		}
 		sessionJSON, _ := json.Marshal(sessionData)
+		// 我们依然使用 jti 作为唯一 key，但在展示时会根据 device_fingerprint 进行去重
 		sessionKey := fmt.Sprintf("session:%s:%s", user.ID, jti)
 		h.service.Redis.Set(context.Background(), sessionKey, sessionJSON, 24*time.Hour)
 	}

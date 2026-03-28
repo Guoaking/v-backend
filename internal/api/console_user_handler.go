@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -271,6 +272,8 @@ func (h *ConsoleHandler) GetActiveSessions(c *gin.Context) {
 	currentJti, _ := claims["jti"].(string)
 
 	var sessions []ActiveSession
+	// 使用 map 来根据设备指纹去重
+	deviceMap := make(map[string]ActiveSession)
 
 	if h.service.Redis != nil {
 		ctx := context.Background()
@@ -321,8 +324,17 @@ func (h *ConsoleHandler) GetActiveSessions(c *gin.Context) {
 						}
 
 						lastSeenRaw := rawData["last_seen"].(float64)
+						isCurrent := jti == currentJti
 
-						sessions = append(sessions, ActiveSession{
+						fingerprint := ""
+						if fp, ok := rawData["device_fingerprint"].(string); ok {
+							fingerprint = fp
+						} else {
+							// 兼容老数据
+							fingerprint = fmt.Sprintf("%x", md5.Sum([]byte(rawData["ip"].(string)+uaStr)))
+						}
+
+						session := ActiveSession{
 							ID:        jti,
 							Device:    device,
 							OS:        os,
@@ -330,12 +342,28 @@ func (h *ConsoleHandler) GetActiveSessions(c *gin.Context) {
 							IP:        rawData["ip"].(string),
 							Location:  "Local Network", // 实际项目中可以通过 GeoIP 解析
 							LastSeen:  time.Unix(int64(lastSeenRaw), 0),
-							IsCurrent: jti == currentJti,
-						})
+							IsCurrent: isCurrent,
+						}
+
+						// 如果这个设备记录已经存在
+						if existing, ok := deviceMap[fingerprint]; ok {
+							// 如果当前遍历的记录是 "Current" 或者是更新的记录，则覆盖
+							if isCurrent || (!existing.IsCurrent && session.LastSeen.After(existing.LastSeen)) {
+								// 保留最新的，但如果要删除，可能需要同时删除旧的 Redis Key，
+								// 这里只做展示层的合并去重
+								deviceMap[fingerprint] = session
+							}
+						} else {
+							deviceMap[fingerprint] = session
+						}
 					}
 				}
 			}
 		}
+	}
+
+	for _, session := range deviceMap {
+		sessions = append(sessions, session)
 	}
 
 	// 如果没有从 Redis 取到数据（比如没配置 Redis），降级使用当前请求的信息
