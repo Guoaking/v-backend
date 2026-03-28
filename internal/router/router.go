@@ -100,6 +100,11 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 			consoleAuth.POST("/login", consoleAuthHandler.Login)
 			consoleAuth.POST("/register", consoleAuthHandler.Register)
 			consoleAuth.GET("/me", middleware.JWTAuth(kycService), consoleAuthHandler.Me)
+
+			// OAuth2.0
+			oauthHandler := api.NewOAuthHandler(kycService, consoleAuthHandler)
+			consoleAuth.GET("/google/login", oauthHandler.GoogleLoginRedirect)
+			consoleAuth.GET("/google/callback", oauthHandler.GoogleCallback)
 		}
 
 		// 控制台API（需要用户认证）
@@ -118,6 +123,10 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 			console.PUT("/users/me/password", consoleHandler.UpdateUserPassword)
 			console.GET("/users/me/sessions", consoleHandler.GetActiveSessions)
 			console.DELETE("/users/me/sessions/:id", consoleHandler.RevokeSession)
+
+			// OAuth Connections
+			console.GET("/users/me/connections", consoleHandler.GetOAuthConnections)
+			console.DELETE("/users/me/connections/:provider", consoleHandler.UnbindOAuthConnection)
 
 			console.GET("/usage", middleware.RequireOrganizationHeader(kycService), middleware.RequirePermission(models.PermLogsRead), consoleHandler.GetUsage)
 			console.GET("/usage/stats", middleware.RequireOrganizationHeader(kycService), middleware.RequirePermission(models.PermLogsRead), consoleHandler.GetUsageStats)

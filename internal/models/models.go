@@ -68,6 +68,19 @@ type User struct {
 	IsPlatformAdmin bool           `gorm:"default:false" json:"is_platform_admin"`
 }
 
+// UserOAuthConnection 第三方账号绑定表 (1:N)
+type UserOAuthConnection struct {
+	ID                string    `gorm:"primaryKey" json:"id"`
+	UserID            string    `gorm:"index;not null" json:"user_id"`
+	Provider          string    `gorm:"index:idx_provider_account,unique;not null" json:"provider"` // google, github
+	ProviderAccountID string    `gorm:"index:idx_provider_account,unique;not null" json:"provider_account_id"`
+	ProviderEmail     string    `json:"provider_email"`
+	AccessToken       string    `json:"-"`
+	RefreshToken      string    `json:"-"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
+}
+
 // OAuthClient OAuth客户端
 type OAuthClient struct {
 	ID              string         `gorm:"primaryKey" json:"id"`

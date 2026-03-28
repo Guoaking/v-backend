@@ -135,6 +135,7 @@ func autoMigrate(db *gorm.DB) error {
 	modelsToMigrate := []interface{}{
 		&models.AuditLog{},
 		&models.User{},
+		&models.UserOAuthConnection{},
 		&models.OAuthClient{},
 		&models.OAuthToken{},
 		&models.Organization{},

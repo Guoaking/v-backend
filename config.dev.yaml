@@ -43,6 +43,12 @@ security:
   service_secret_key: "kyc-service-secret-key-2024"      # 服务签名密钥
   encryption_key: "oM9P4o6b8ib+dO1oh571cyfuJPdGqi6W"
 
+oauth:
+  google:
+    client_id: "481475455679-arokubdmn2dr9sv5999lavnbinpf5mct.apps.googleusercontent.com"
+    client_secret: "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"
+    redirect_url: "http://localhost:8092/api/v1/auth/google/callback"
+
 third_party:
   ocr_service:
     url: "http://host.docker.internal:8080/vrlOCR"

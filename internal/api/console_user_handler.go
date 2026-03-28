@@ -420,3 +420,76 @@ func (h *ConsoleHandler) DeleteMe(c *gin.Context) {
 	}
 	JSONSuccess(c, gin.H{"deleted": true})
 }
+
+// GetOAuthConnections 获取用户已绑定的第三方账号
+func (h *ConsoleHandler) GetOAuthConnections(c *gin.Context) {
+	userClaims, exists := c.Get("user")
+	if !exists {
+		JSONError(c, CodeUnauthorized, "Unauthorized")
+		return
+	}
+	claims := userClaims.(jwt.MapClaims)
+	userID := claims["user_id"].(string)
+
+	var connections []models.UserOAuthConnection
+	if err := h.service.DB.Where("user_id = ?", userID).Find(&connections).Error; err != nil {
+		JSONError(c, CodeInternalError, "Failed to fetch connections")
+		return
+	}
+
+	// 过滤敏感字段，只返回需要展示的信息
+	var result []map[string]interface{}
+	for _, conn := range connections {
+		result = append(result, map[string]interface{}{
+			"id":             conn.ID,
+			"provider":       conn.Provider,
+			"provider_email": conn.ProviderEmail,
+			"created_at":     conn.CreatedAt,
+		})
+	}
+
+	JSONSuccess(c, gin.H{"connections": result})
+}
+
+// UnbindOAuthConnection 解绑第三方账号
+func (h *ConsoleHandler) UnbindOAuthConnection(c *gin.Context) {
+	provider := c.Param("provider")
+	userClaims, exists := c.Get("user")
+	if !exists {
+		JSONError(c, CodeUnauthorized, "Unauthorized")
+		return
+	}
+	claims := userClaims.(jwt.MapClaims)
+	userID := claims["user_id"].(string)
+
+	// 安全检查 1: 检查用户是否有密码
+	var user models.User
+	if err := h.service.DB.First(&user, "id = ?", userID).Error; err != nil {
+		JSONError(c, CodeInternalError, "User not found")
+		return
+	}
+
+	// 安全检查 2: 获取当前所有的绑定记录
+	var connections []models.UserOAuthConnection
+	if err := h.service.DB.Where("user_id = ?", userID).Find(&connections).Error; err != nil {
+		JSONError(c, CodeInternalError, "Failed to fetch connections")
+		return
+	}
+
+	// 防锁死机制：如果没有密码，且只有这一个第三方绑定，拒绝解绑
+	if user.Password == "" && len(connections) <= 1 {
+		JSONError(c, CodeInvalidParameter, "Cannot unbind the only login method. Please set a password first.")
+		return
+	}
+
+	// 执行解绑
+	if err := h.service.DB.Where("user_id = ? AND provider = ?", userID, provider).Delete(&models.UserOAuthConnection{}).Error; err != nil {
+		JSONError(c, CodeInternalError, "Failed to unbind connection")
+		return
+	}
+
+	JSONSuccess(c, gin.H{
+		"success": true,
+		"message": fmt.Sprintf("Successfully unbound %s account", provider),
+	})
+}

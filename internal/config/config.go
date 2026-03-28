@@ -20,6 +20,8 @@ type Config struct {
 
 	Security SecurityConfig `mapstructure:"security"`
 
+	OAuth OAuthConfig `mapstructure:"oauth"`
+
 	ThirdParty ThirdPartyConfig `mapstructure:"third_party"`
 
 	Monitoring MonitoringConfig `mapstructure:"monitoring"`
@@ -66,6 +68,16 @@ type SecurityConfig struct {
 	RateLimitBurst     int           `mapstructure:"rate_limit_burst"`
 	KongSharedSecret   string        `mapstructure:"kong_shared_secret"`
 	ServiceSecretKey   string        `mapstructure:"service_secret_key"`
+}
+
+type OAuthConfig struct {
+	Google GoogleOAuthConfig `mapstructure:"google"`
+}
+
+type GoogleOAuthConfig struct {
+	ClientID     string `mapstructure:"client_id"`
+	ClientSecret string `mapstructure:"client_secret"`
+	RedirectURL  string `mapstructure:"redirect_url"`
 }
 
 type StorageConfig struct {
