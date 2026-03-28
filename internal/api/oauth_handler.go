@@ -101,7 +101,7 @@ func (h *OAuthHandler) GoogleLoginRedirect(c *gin.Context) {
 	h.service.Redis.Set(c, fmt.Sprintf("oauth_state:%s", state), stateVal, 5*time.Minute)
 
 	googleAuthURL := fmt.Sprintf(
-		"https://accounts.google.com/o/oauth2/v2/auth?client_id=%s&redirect_uri=%s&response_type=code&scope=email profile&state=%s",
+		"https://accounts.google.com/o/oauth2/v2/auth?client_id=%s&redirect_uri=%s&response_type=code&scope=email profile&state=%s&prompt=select_account",
 		url.QueryEscape(clientID),
 		url.QueryEscape(redirectURL),
 		url.QueryEscape(state),
