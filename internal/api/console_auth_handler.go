@@ -605,6 +605,11 @@ func (s *ConsoleAuthHandler) SyncOrganizationQuotasWithPolicy(orgID string, plan
 func (h *ConsoleAuthHandler) generateUserJWT(user *models.User, org *models.Organization, userAgent string, ip string) (string, error) {
 	jti := utils.GenerateID()
 
+	planID := ""
+	if org != nil {
+		planID = org.PlanID
+	}
+
 	claims := jwt.MapClaims{
 		"jti":      jti,
 		"user_id":  user.ID,
@@ -612,7 +617,7 @@ func (h *ConsoleAuthHandler) generateUserJWT(user *models.User, org *models.Orga
 		"role":     user.Role,
 		"org_id":   user.OrgID,
 		"org_role": user.OrgRole,
-		"plan_id":  org.PlanID,
+		"plan_id":  planID,
 		"exp":      time.Now().Add(24 * time.Hour).Unix(),
 		"iat":      time.Now().Unix(),
 	}
