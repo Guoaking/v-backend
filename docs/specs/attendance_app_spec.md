@@ -142,9 +142,33 @@ type DataCollectionDocument struct {
   }
   ```
 
+### 3.3 员工自助查询 (Self-Service)
+
+#### 3.3.1 `POST /api/v1/attendance/self/otp`
+- **功能**：请求查看个人信息的验证码（通过手机号或企业内通知）。
+
+#### 3.3.2 `GET /api/v1/attendance/self/records`
+- **功能**：员工凭验证码换取的临时 Session 查询自己当周/当月的打卡记录。
+
 ---
 
-## 4. 关键技术点对齐 (Alignment Required)
+## 4. 管理端接口 (Admin API)
+
+这些接口供企业老板/HR在 Console 控制台使用（复用现有的 Console JWT 鉴权）。
+
+#### 4.1 `GET /api/v1/console/attendance/records`
+- **功能**：分页查询考勤记录，支持按员工、日期、状态（如 `manual_review`）过滤。
+
+#### 4.2 `PUT /api/v1/console/attendance/records/:id/review`
+- **功能**：处理降级的异常打卡。
+- **请求体**：`{ "action": "approve" | "reject" }`
+
+#### 4.3 `GET /api/v1/console/attendance/stats`
+- **功能**：考勤大盘聚合数据（今日迟到人数、当月工时统计等）。
+
+---
+
+## 5. 关键技术点对齐 (Alignment Required)
 
 在正式编码前，请确认以下技术决策：
 
