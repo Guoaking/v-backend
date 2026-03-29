@@ -2,6 +2,7 @@ package api
 
 import (
 	"kyc-service/internal/apps/attendance/middleware"
+	"kyc-service/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -49,14 +50,14 @@ func RegisterRoutes(r *gin.RouterGroup, jwtSecret string) {
 // 以下为 Handler 骨架 (待填充具体业务逻辑)
 // ==============================================================================
 
-func handleOCR(c *gin.Context)            { c.JSON(200, gin.H{"status": "ok"}) }
-func handleSubmit(c *gin.Context)         { c.JSON(200, gin.H{"status": "ok"}) }
-func handleGetConfig(c *gin.Context)      { c.JSON(200, gin.H{"status": "ok"}) }
-func handleIdentityMatch(c *gin.Context)  { c.JSON(200, gin.H{"status": "ok"}) }
-func handlePunch(c *gin.Context)          { c.JSON(200, gin.H{"status": "ok"}) }
-func handleRequestOTP(c *gin.Context)     { c.JSON(200, gin.H{"status": "ok"}) }
-func handleGetSelfRecords(c *gin.Context) { c.JSON(200, gin.H{"status": "ok"}) }
+func handleOCR(c *gin.Context)            { response.JSONSuccess(c, gin.H{"status": "ok"}) }
+func handleSubmit(c *gin.Context)         { response.JSONSuccess(c, gin.H{"status": "ok"}) }
+func handleGetConfig(c *gin.Context)      { response.JSONSuccess(c, gin.H{"status": "ok"}) }
+func handleIdentityMatch(c *gin.Context)  { response.JSONSuccess(c, gin.H{"status": "ok"}) }
+func handlePunch(c *gin.Context)          { response.JSONSuccess(c, gin.H{"status": "ok"}) }
+func handleRequestOTP(c *gin.Context)     { response.JSONSuccess(c, gin.H{"status": "ok"}) }
+func handleGetSelfRecords(c *gin.Context) { response.JSONSuccess(c, gin.H{"status": "ok"}) }
 
-func handleConsoleGetRecords(c *gin.Context)   { c.JSON(200, gin.H{"status": "ok"}) }
-func handleConsoleReviewRecord(c *gin.Context) { c.JSON(200, gin.H{"status": "ok"}) }
-func handleConsoleGetStats(c *gin.Context)     { c.JSON(200, gin.H{"status": "ok"}) }
+func handleConsoleGetRecords(c *gin.Context)   { response.JSONSuccess(c, gin.H{"status": "ok"}) }
+func handleConsoleReviewRecord(c *gin.Context) { response.JSONSuccess(c, gin.H{"status": "ok"}) }
+func handleConsoleGetStats(c *gin.Context)     { response.JSONSuccess(c, gin.H{"status": "ok"}) }
