@@ -97,8 +97,8 @@ flowchart TD
 
 ### 3.3 反复打卡与去重机制 (Punch-in Deduplication)
 员工可能因为不确定是否打卡成功而反复扫码打卡。系统需要处理这种高频操作以防止数据污染和计算资源浪费：
-1. **短时防抖 (Rate Limiting/Debouncing)**：在 BFF 层拦截，如果同一个 `employee_id` 在 5 分钟内再次提交打卡请求，直接返回上一次的成功状态，**不调用底层活体和比对模型**。
-2. **逻辑去重 (Upsert by Time Window)**：在 `attendance_records` 中，如果同一员工在同一个“考勤时段”（如早班 08:00 - 10:00）内有多次打卡，业务上只认可最早（或最晚）的一条。后端可以选择覆盖更新 (Update) 或者在查询侧 (Dashboard) 做聚合去重。
+1. **短时防抖 (Rate Limiting/Debouncing)**：在 BFF 层拦截，如果同一个 `employee_id` 在 5 分钟内再次提交打卡请求，直接返回上一次的成功状态，**不调用底层活体和比对模型，也不新增记录**。
+2. **读时去重 (Append-Only & Deduplicate on Read)**：在 `attendance_records` 数据库层面，超过 5 分钟的反复打卡会作为**多条独立记录**真实落库（保留数据轨迹）。但在 HR 的考勤报表视图（Dashboard）查询时，按考勤时段通过 SQL 聚合函数（如 `MIN(punch_time)` 或 `MAX(punch_time)`）进行逻辑去重，只展示最有效的一条。
 
 ---
 

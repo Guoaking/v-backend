@@ -189,7 +189,7 @@ type DataCollectionDocument struct {
 
 ### 4.1 计费耦合点对齐
 - **方案**：在 `attendance/punch` 接口内部，我们会硬编码一个属于我们自己平台（Service Provider）的 `SystemAppKey` 去调用 `service.Liveness()` 和 `service.FaceCompare()`，并显式将这笔账记在请求上下文中的 `OrgID` 头上。
-- **确认点**：客户的 `Org` 必须有一个免费的 `Plan`，否则内部调用会因为 Quota 不足而失败。
+- **确认点**：客户的 `Org` 必须内置分配一个免费的套餐（例如：`PlanID = 'free_attendance'`，包含每月 5000 次调用额度）。如果额度耗尽，打卡接口会报错，以此复用现有的计费和 Quota 限制逻辑。
 
 ### 4.2 数据存储合规对齐
 - **方案**：`face_image_url` 和 `fallback_image_url` 将存储在系统的标准 OSS/S3 中。
@@ -197,4 +197,4 @@ type DataCollectionDocument struct {
 
 ### 4.3 并发与限流对齐
 - **方案**：考勤打卡具有极强的时效性和集中性（如早上 8:55-9:00）。
-- **确认点**：BFF 层的打卡接口需要挂载限流中间件（Rate Limiter），如单 IP 10qps，单 Org 50qps。若触发限流，直接指导前端进入 `fallback_mode`（拍摄水印照片），保护底层 GPU 资源不被打挂。
+- **确认点**：BFF 层的打卡接口需要挂载限流中间件（Rate Limiter），如单 IP 10qps，单 Org 50qps。**策略为“直接降级”而非“排队”**：若触发限流，后端立即返回 `429 Too Many Requests`，前端捕获后直接进入 `fallback_mode`（拍摄水印照片），保护底层 GPU 资源的同时，不让员工在闸机口罚站等待。
