@@ -1,6 +1,8 @@
 package api
 
 import (
+	"fmt"
+
 	"kyc-service/internal/apps/attendance/middleware"
 	"kyc-service/internal/apps/attendance/service"
 	"kyc-service/pkg/response"
@@ -41,6 +43,9 @@ func RegisterRoutes(r *gin.RouterGroup, jwtSecret string, svc *service.Attendanc
 	// 注意：这些路由应该在外部被现有的 Console JWT Auth 中间件保护
 	consoleAttendanceGroup := r.Group("/console/attendance")
 	{
+		// 生成/获取 Magic Link 接口
+		consoleAttendanceGroup.GET("/magic-link", handleConsoleGetMagicLink(svc, jwtSecret))
+
 		consoleAttendanceGroup.GET("/records", handleConsoleGetRecords(svc))
 		consoleAttendanceGroup.PUT("/records/:id/review", handleConsoleReviewRecord(svc))
 		consoleAttendanceGroup.GET("/stats", handleConsoleGetStats(svc))
@@ -50,6 +55,34 @@ func RegisterRoutes(r *gin.RouterGroup, jwtSecret string, svc *service.Attendanc
 // ==============================================================================
 // 以下为 Handler 骨架 (待填充具体业务逻辑)
 // ==============================================================================
+
+func handleConsoleGetMagicLink(svc *service.AttendanceService, jwtSecret string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 在真实的 Console 路由中，orgID 应该是从登录老板的 Context/Token 里拿到的
+		// 这里为了测试方便，我们先写死一个测试用的 orgID，或者从 query 拿
+		orgID := c.Query("org_id")
+		if orgID == "" {
+			orgID = "test_org_123" // Fallback for local testing
+		}
+
+		token, err := svc.GenerateMagicLinkToken(orgID, jwtSecret)
+		if err != nil {
+			response.JSONError(c, response.CodeInternalError, "Failed to generate magic link")
+			return
+		}
+
+		// 拼接成完整的 H5 URL
+		// 注意：实际部署时，域名应该从配置中读取
+		enrollURL := fmt.Sprintf("http://localhost:3000/attendance/enroll?token=%s", token)
+		punchURL := fmt.Sprintf("http://localhost:3000/attendance/punch?token=%s", token)
+
+		response.JSONSuccess(c, gin.H{
+			"token":      token,
+			"enroll_url": enrollURL,
+			"punch_url":  punchURL,
+		})
+	}
+}
 
 func handleOCR(svc *service.AttendanceService) gin.HandlerFunc {
 	return func(c *gin.Context) {

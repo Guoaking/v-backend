@@ -11,6 +11,7 @@ import (
 	"kyc-service/pkg/logger"
 	"kyc-service/pkg/utils"
 
+	"github.com/golang-jwt/jwt/v5"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -30,8 +31,26 @@ func NewAttendanceService(db *gorm.DB, kycService *coreService.KYCService) *Atte
 }
 
 // ==============================================================================
-// 员工注册相关
+// B端管理与 Token 生成
 // ==============================================================================
+
+// GenerateMagicLinkToken 生成供 C 端 H5 使用的 JWT Token
+func (s *AttendanceService) GenerateMagicLinkToken(orgID string, jwtSecret string) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"org_id": orgID,
+		"scope":  "attendance_magic_link",
+		// 考勤码不需要长期有效，通常配置为较短时间（比如 30 天），过期后老板需重新生成并打印
+		"exp": time.Now().AddDate(0, 1, 0).Unix(),
+		"iat": time.Now().Unix(),
+	})
+
+	tokenString, err := token.SignedString([]byte(jwtSecret))
+	if err != nil {
+		return "", fmt.Errorf("failed to sign token: %w", err)
+	}
+
+	return tokenString, nil
+}
 
 // OCRResult 结构体
 type OCRResult struct {
@@ -161,11 +180,13 @@ func (s *AttendanceService) extractFaceFeature(ctx context.Context, faceImageBas
 // ==============================================================================
 
 type PunchRequest struct {
-	IDNumber      string `json:"id_number" binding:"required"`
-	PunchType     string `json:"punch_type" binding:"required"` // in, out
-	LivenessData  string `json:"liveness_data"`                 // base64 video/image
-	FallbackMode  bool   `json:"fallback_mode"`
-	FallbackImage string `json:"fallback_image"`
+	IDNumber      string  `json:"id_number" binding:"required"`
+	PunchType     string  `json:"punch_type" binding:"required"` // in, out
+	LivenessData  string  `json:"liveness_data"`                 // base64 video/image
+	FallbackMode  bool    `json:"fallback_mode"`
+	FallbackImage string  `json:"fallback_image"`
+	Latitude      float64 `json:"latitude"` // 从前端获取的 GPS 坐标
+	Longitude     float64 `json:"longitude"`
 }
 
 // PunchIn 执行打卡
@@ -188,6 +209,8 @@ func (s *AttendanceService) PunchIn(ctx context.Context, orgID string, req *Punc
 		EmployeeID: emp.ID,
 		PunchTime:  time.Now(),
 		PunchType:  req.PunchType,
+		Latitude:   req.Latitude,
+		Longitude:  req.Longitude,
 	}
 
 	// 3. 处理降级模式 (Fallback)

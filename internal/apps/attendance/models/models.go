@@ -35,6 +35,8 @@ type AttendanceRecord struct {
 	FaceScore        float64   `json:"face_score"`
 	Status           string    `gorm:"type:varchar(20)" json:"status"`                        // "success", "manual_review" (需人工复核)
 	FallbackImageURL string    `gorm:"type:varchar(255)" json:"fallback_image_url,omitempty"` // 失败降级时的现场照片
+	Latitude         float64   `json:"latitude"`                                              // 打卡时的纬度
+	Longitude        float64   `json:"longitude"`                                             // 打卡时的经度
 	CreatedAt        time.Time `json:"created_at"`
 }
 
