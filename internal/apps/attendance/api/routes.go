@@ -129,7 +129,24 @@ func handleIdentityMatch(svc *service.AttendanceService) gin.HandlerFunc {
 
 func handlePunch(svc *service.AttendanceService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		response.JSONSuccess(c, gin.H{"status": "ok"})
+		orgID, exists := c.Get(middleware.AttendanceContextOrgID)
+		if !exists {
+			response.JSONError(c, response.CodeInvalidParameter, "Missing org_id in context")
+			return
+		}
+
+		var req service.PunchRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			response.JSONError(c, response.CodeInvalidParameter, err.Error())
+			return
+		}
+
+		if err := svc.PunchIn(c.Request.Context(), orgID.(string), &req); err != nil {
+			response.JSONError(c, response.CodeInternalError, err.Error())
+			return
+		}
+
+		response.JSONSuccess(c, gin.H{"status": "punch successful"})
 	}
 }
 

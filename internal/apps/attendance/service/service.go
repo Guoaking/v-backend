@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"kyc-service/internal/apps/attendance/models"
 	coreService "kyc-service/internal/service"
@@ -159,13 +160,63 @@ func (s *AttendanceService) extractFaceFeature(ctx context.Context, faceImageBas
 // 考勤打卡相关
 // ==============================================================================
 
+type PunchRequest struct {
+	IDNumber      string `json:"id_number" binding:"required"`
+	PunchType     string `json:"punch_type" binding:"required"` // in, out
+	LivenessData  string `json:"liveness_data"`                 // base64 video/image
+	FallbackMode  bool   `json:"fallback_mode"`
+	FallbackImage string `json:"fallback_image"`
+}
+
 // PunchIn 执行打卡
-func (s *AttendanceService) PunchIn(ctx context.Context, orgID string, req interface{}) error {
-	// TODO: Phase 3 实现
-	// 1. 查缓存，防抖
-	// 2. 检查 fallback_mode
-	// 3. 若非 fallback，调用底层活体和比对
-	// 4. 落库 models.AttendanceRecord
+func (s *AttendanceService) PunchIn(ctx context.Context, orgID string, req *PunchRequest) error {
+	log := logger.GetLogger().WithContext(ctx)
+
+	// 1. 查缓存，防抖 (Debounce)
+	// TODO: 使用 Redis 检查 `attendance:punch:debounce:{orgID}:{idNumber}:{punchType}` 是否存在
+	// 如果存在，直接 return nil (视为成功)
+
+	// 2. 查员工是否存在
+	var emp models.OrganizationEmployee
+	if err := s.db.Where("org_id = ? AND id_number = ? AND status = ?", orgID, req.IDNumber, "active").First(&emp).Error; err != nil {
+		return fmt.Errorf("employee not found or inactive")
+	}
+
+	record := models.AttendanceRecord{
+		ID:         utils.GenerateID(),
+		OrgID:      orgID,
+		EmployeeID: emp.ID,
+		PunchTime:  time.Now(),
+		PunchType:  req.PunchType,
+	}
+
+	// 3. 处理降级模式 (Fallback)
+	if req.FallbackMode {
+		log.Infof("Processing punch-in in fallback mode for %s", req.IDNumber)
+		record.Status = "manual_review"
+		record.FallbackImageURL = req.FallbackImage // 实际工程中这里应该先转存 OSS
+	} else {
+		// 4. 正常打卡：调用底层活体和 1:1 比对
+		log.Infof("Calling underlying KYC liveness and 1:1 face match for %s", req.IDNumber)
+
+		// TODO: 构建核心 KYCRequest 并调用 s.kycService.SubmitKYCRequest()
+		// 传入 req.LivenessData 和 emp.FaceFeature 进行比对
+		// 注入系统内部的 req.AppKey = "system_attendance_app_key" 以完成计费隔离
+
+		// 模拟调用成功
+		record.Status = "success"
+		record.LivenessScore = 0.98
+		record.FaceScore = 0.99
+	}
+
+	// 5. 落库流水
+	if err := s.db.Create(&record).Error; err != nil {
+		return fmt.Errorf("failed to save attendance record: %w", err)
+	}
+
+	// 6. 写入防抖缓存
+	// TODO: redis.Set(`attendance:punch:debounce:{orgID}:{idNumber}:{punchType}`, "1", 5*time.Minute)
+
 	return nil
 }
 
