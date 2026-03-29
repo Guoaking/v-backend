@@ -101,21 +101,7 @@ func handleOCR(svc *service.AttendanceService) gin.HandlerFunc {
 
 		idType := c.DefaultPostForm("id_type", "thai_id")
 
-		// 读取文件到内存
-		f, err := file.Open()
-		if err != nil {
-			response.JSONError(c, response.CodeInternalError, "Failed to open image file")
-			return
-		}
-		defer f.Close()
-
-		buf := make([]byte, file.Size)
-		if _, err := f.Read(buf); err != nil {
-			response.JSONError(c, response.CodeInternalError, "Failed to read image file")
-			return
-		}
-
-		res, err := svc.ProcessOCR(c.Request.Context(), orgID.(string), buf, idType)
+		res, err := svc.ProcessOCR(c.Request.Context(), orgID.(string), file, idType)
 		if err != nil {
 			response.JSONError(c, response.CodeInternalError, err.Error())
 			return
@@ -156,7 +142,25 @@ func handleGetConfig(svc *service.AttendanceService) gin.HandlerFunc {
 
 func handleIdentityMatch(svc *service.AttendanceService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		response.JSONSuccess(c, gin.H{"status": "ok"})
+		orgID, exists := c.Get(middleware.AttendanceContextOrgID)
+		if !exists {
+			response.JSONError(c, response.CodeInvalidParameter, "Missing org_id in context")
+			return
+		}
+
+		var req service.IdentityMatchRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			response.JSONError(c, response.CodeInvalidParameter, err.Error())
+			return
+		}
+
+		res, err := svc.MatchIdentity(c.Request.Context(), orgID.(string), req.Query)
+		if err != nil {
+			response.JSONError(c, response.CodeInternalError, err.Error())
+			return
+		}
+
+		response.JSONSuccess(c, res)
 	}
 }
 

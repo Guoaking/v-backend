@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"mime/multipart"
 	"time"
 
 	"kyc-service/internal/apps/attendance/models"
@@ -62,29 +63,101 @@ type OCRResult struct {
 
 // ProcessOCR 处理证件 OCR 提取
 // 它调用核心的 KYCService，并将结果暂存，返回给前端供用户修改
-func (s *AttendanceService) ProcessOCR(ctx context.Context, orgID string, imageBytes []byte, idType string) (*OCRResult, error) {
-	// TODO: 真正的 OCR 调用逻辑需要适配 coreService.OCRRequest
-	// 目前先返回一个 mock 结果，保证编译通过，后续对接真实的 coreService.OCR
-
-	// 模拟返回
-	mockFields := map[string]interface{}{
-		"id_number": "mock_12345",
-		"name":      "Mock User",
+func (s *AttendanceService) ProcessOCR(ctx context.Context, orgID string, file *multipart.FileHeader, idType string) (*OCRResult, error) {
+	// 1. 构建底层所需的请求
+	req := &coreService.OCRRequest{
+		Picture: file,
+		Type:    idType,
 	}
 
-	rawBytes, _ := json.Marshal(mockFields)
+	// 2. 调用底层 OCR 服务
+	resp, err := s.kycService.OCR(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("underlying OCR failed: %w", err)
+	}
+
+	if resp.Code != 200 && resp.Code != 0 {
+		return nil, fmt.Errorf("ocr service error: %s", resp.Msg)
+	}
+
+	// 3. 将底层返回的字段拍平，返回给前端
+	// TODO: 真正的映射逻辑取决于底层的 ParsingResults 结构
+	mappedFields := map[string]interface{}{}
+
+	// 简单提取，如果有对应字段则放入
+	if val, ok := resp.ParsingResults["id_number"]; ok {
+		mappedFields["id_number"] = val.Text
+	} else if val, ok := resp.ParsingResults["id"]; ok {
+		mappedFields["id_number"] = val.Text
+	}
+
+	if val, ok := resp.ParsingResults["name"]; ok {
+		mappedFields["name"] = val.Text
+	}
+
+	// 如果没提取到，兜底给空字符串，让前端填
+	if _, ok := mappedFields["id_number"]; !ok {
+		mappedFields["id_number"] = ""
+	}
+	if _, ok := mappedFields["name"]; !ok {
+		mappedFields["name"] = ""
+	}
 
 	result := &OCRResult{
 		SessionID:  utils.GenerateID(),
-		Fields:     mockFields,
-		Confidence: 0.95,
-		RawJSON:    string(rawBytes),
+		Fields:     mappedFields,
+		Confidence: 0.95, // 假设一个默认值，或者从 resp 中提取
 	}
+
+	rawBytes, _ := json.Marshal(resp.ParsingResults)
+	result.RawJSON = string(rawBytes)
 
 	return result, nil
 }
 
-// EnrollRequest 注册请求
+// IdentityMatchRequest 身份匹配请求
+type IdentityMatchRequest struct {
+	Query string `json:"query" binding:"required"` // 通常是手机号后 4 位
+}
+
+// IdentityMatchResult 身份匹配结果
+type IdentityMatchResult struct {
+	IDNumber string `json:"id_number"`
+	Name     string `json:"name"`
+}
+
+// MatchIdentity 根据手机号后4位匹配员工身份
+func (s *AttendanceService) MatchIdentity(ctx context.Context, orgID string, query string) (*IdentityMatchResult, error) {
+	var emp models.OrganizationEmployee
+
+	// 查找该企业下，手机号以 query 结尾的 active 员工
+	// 注意：实际生产中如果有多人手机号尾号相同，应该返回列表供用户选择。这里简化为取第一条。
+	err := s.db.Where("org_id = ? AND status = ? AND phone LIKE ?", orgID, "active", "%"+query).First(&emp).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, fmt.Errorf("identity not found")
+		}
+		return nil, fmt.Errorf("database error: %w", err)
+	}
+
+	// 名字简单脱敏，比如 "张三" -> "张*三" 或 "张*"
+	// 这里用一个简单的本地实现代替 utils.MaskName
+	maskedName := emp.Name
+	if len([]rune(emp.Name)) >= 2 {
+		runes := []rune(emp.Name)
+		if len(runes) == 2 {
+			maskedName = string(runes[0]) + "*"
+		} else {
+			maskedName = string(runes[0]) + "*" + string(runes[len(runes)-1])
+		}
+	}
+
+	return &IdentityMatchResult{
+		IDNumber: emp.IDNumber,
+		Name:     maskedName,
+	}, nil
+}
+
 type EnrollRequest struct {
 	SessionID   string                 `json:"session_id"`
 	IDNumber    string                 `json:"id_number" binding:"required"`
