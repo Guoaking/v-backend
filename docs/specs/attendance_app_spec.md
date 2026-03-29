@@ -117,8 +117,23 @@ type DataCollectionDocument struct {
 
 ### 3.2 员工打卡 (Punch)
 
-#### 3.2.1 `POST /api/v1/attendance/punch`
-- **功能**：执行活体检测与 1:1 人脸比对。
+#### 3.2.1 `GET /api/v1/attendance/config`
+- **功能**：前端渲染打卡页前，拉取当前租户的打卡策略配置。
+- **响应体**：
+  ```json
+  {
+      "code": 0,
+      "data": {
+          "punch_mode": "liveness_active", // 枚举：photo_only, liveness_silent, liveness_active
+          "allow_late_punch": true,
+          "require_location": false
+      }
+  }
+  ```
+
+#### 3.2.2 `POST /api/v1/attendance/punch`
+- **功能**：执行打卡操作（依据 `punch_mode` 决定是否调用底层模型）。
+- **去重防抖逻辑**：如果在 5 分钟内同一 `id_number` 重复提交相同的 `punch_type`，直接返回 HTTP 200 和上一次的记录状态，不扣减 Quota，不在 `attendance_records` 新增记录。
 - **降级逻辑**：前端在连续 2 次识别失败后，将 `fallback_mode` 设为 `true`，此时仅上传现场照片，跳过严格活体和比对，直接标记为 `manual_review`。
 - **请求体**：
   ```json
