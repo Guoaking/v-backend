@@ -17,7 +17,7 @@ type OrganizationEmployee struct {
 	Name         string    `gorm:"not null;type:varchar(64)" json:"name"`
 	Phone        string    `gorm:"type:varchar(20)" json:"phone"`
 	FaceFeature  []byte    `gorm:"type:bytea" json:"-"`                             // 提取出的人脸特征向量，不对外暴露
-	FaceImageURL string    `gorm:"type:text" json:"face_image_url"`                 // 原始人脸图(Base64或URL)，放开长度限制
+	FaceImageURL string    `gorm:"type:varchar(255)" json:"face_image_url"`         // 原始人脸图的文件路径
 	Status       string    `gorm:"type:varchar(20);default:'active'" json:"status"` // active, inactive, deleted
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
@@ -33,10 +33,10 @@ type AttendanceRecord struct {
 	PunchType        string    `gorm:"type:varchar(10)" json:"punch_type"` // "in", "out"
 	LivenessScore    float64   `json:"liveness_score"`
 	FaceScore        float64   `json:"face_score"`
-	Status           string    `gorm:"type:varchar(20)" json:"status"`                // "success", "manual_review" (需人工复核)
-	FallbackImageURL string    `gorm:"type:text" json:"fallback_image_url,omitempty"` // 失败降级时的现场照片(Base64或URL)
-	Latitude         float64   `json:"latitude"`                                      // 打卡时的纬度
-	Longitude        float64   `json:"longitude"`                                     // 打卡时的经度
+	Status           string    `gorm:"type:varchar(20)" json:"status"`                        // "success", "manual_review" (需人工复核)
+	FallbackImageURL string    `gorm:"type:varchar(255)" json:"fallback_image_url,omitempty"` // 失败降级时的现场照片的文件路径
+	Latitude         float64   `json:"latitude"`                                              // 打卡时的纬度
+	Longitude        float64   `json:"longitude"`                                             // 打卡时的经度
 	CreatedAt        time.Time `json:"created_at"`
 }
 

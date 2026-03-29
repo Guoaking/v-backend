@@ -197,6 +197,14 @@ func (s *AttendanceService) EnrollEmployee(ctx context.Context, orgID string, re
 			return fmt.Errorf("face extraction failed: %w", err)
 		}
 
+		// 处理 Base64 图片，保存到本地文件系统
+		faceImagePath, err := SaveBase64ToLocal(req.FaceImage, "attendance/faces", req.IDNumber)
+		if err != nil {
+			log.Errorf("Failed to save face image: %v", err)
+			// 依然允许继续，不阻断主流程，只是存个空或原来的数据
+			faceImagePath = ""
+		}
+
 		// 3. 落库或更新 models.OrganizationEmployee
 		emp := models.OrganizationEmployee{
 			ID:           utils.GenerateID(),
@@ -205,7 +213,7 @@ func (s *AttendanceService) EnrollEmployee(ctx context.Context, orgID string, re
 			Name:         req.Name,
 			Phone:        req.Phone,
 			FaceFeature:  faceFeature,
-			FaceImageURL: req.FaceImage, // 实际应该先上传 OSS
+			FaceImageURL: faceImagePath, // 现在存的是文件路径，如 /uploads/attendance/faces/xxx.jpg
 			Status:       "active",
 		}
 
@@ -293,7 +301,13 @@ func (s *AttendanceService) PunchIn(ctx context.Context, orgID string, req *Punc
 	if req.FallbackMode {
 		log.Infof("Processing punch-in in fallback mode for %s", req.IDNumber)
 		record.Status = "manual_review"
-		record.FallbackImageURL = req.FallbackImage // 实际工程中这里应该先转存 OSS
+
+		// 保存降级照片到本地
+		fallbackPath, err := SaveBase64ToLocal(req.FallbackImage, "attendance/fallbacks", req.IDNumber)
+		if err != nil {
+			log.Errorf("Failed to save fallback image: %v", err)
+		}
+		record.FallbackImageURL = fallbackPath
 	} else {
 		// 4. 正常打卡：调用底层活体和 1:1 比对
 		log.Infof("Calling underlying KYC liveness and 1:1 face match for %s", req.IDNumber)
