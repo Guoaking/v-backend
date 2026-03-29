@@ -1,16 +1,19 @@
 package api
 
 import (
+	"kyc-service/internal/apps/attendance/middleware"
+
 	"github.com/gin-gonic/gin"
 )
 
 // RegisterRoutes 注册考勤微应用的所有路由
 // 这里展示了微应用的路由是如何从核心代码中物理隔离的。
-func RegisterRoutes(r *gin.RouterGroup) {
+// 我们将 jwtSecret 作为参数传入，保持了底层对配置的解耦。
+func RegisterRoutes(r *gin.RouterGroup, jwtSecret string) {
 	// 所有考勤 C端 (H5) 相关的路由，挂载在 /api/v1/attendance 下
 	// 这些路由不需要登录，但需要一个特殊的 Magic Link Token 中间件来提取 OrgID
 	attendanceGroup := r.Group("/attendance")
-	// TODO: 挂载 Magic Link Auth 中间件
+	attendanceGroup.Use(middleware.MagicLinkAuth(jwtSecret))
 	{
 		// 1. 注册相关
 		enrollGroup := attendanceGroup.Group("/enroll")

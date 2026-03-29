@@ -372,7 +372,7 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 	}
 
 	// 挂载考勤微应用路由 (BFF层，物理隔离)
-	attendanceApi.RegisterRoutes(v1)
+	attendanceApi.RegisterRoutes(v1, cfg.Security.JWTSecret)
 
 	return r, heartbeatManager
 }
