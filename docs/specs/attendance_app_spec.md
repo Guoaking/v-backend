@@ -119,6 +119,7 @@ type DataCollectionDocument struct {
 
 #### 3.2.1 `GET /api/v1/attendance/config`
 - **功能**：前端渲染打卡页前，拉取当前租户的打卡策略配置。
+- **设备信任验证 (Device Trust)**：前端可在此请求中带上 `localStorage` 中缓存的 `id_number`，如果存在，则直接进入极速 1:1 打卡界面；否则进入“身份确认”流程。
 - **响应体**：
   ```json
   {
@@ -131,7 +132,11 @@ type DataCollectionDocument struct {
   }
   ```
 
-#### 3.2.2 `POST /api/v1/attendance/punch`
+#### 3.2.2 `POST /api/v1/attendance/punch/identity` (可选：身份确认)
+- **功能**：当设备无缓存时，员工输入手机号后 4 位或姓名，后端返回模糊匹配的员工列表供其选择。
+- **安全防范**：只返回脱敏后的名字（如：`张*`，`李*明`）和 `id_number`，防止爬虫恶意拉取企业通讯录。
+
+#### 3.2.3 `POST /api/v1/attendance/punch`
 - **功能**：执行打卡操作（依据 `punch_mode` 决定是否调用底层模型）。
 - **去重防抖逻辑**：如果在 5 分钟内同一 `id_number` 重复提交相同的 `punch_type`，直接返回 HTTP 200 和上一次的记录状态，不扣减 Quota，不在 `attendance_records` 新增记录。
 - **降级逻辑**：前端在连续 2 次识别失败后，将 `fallback_mode` 设为 `true`，此时仅上传现场照片，跳过严格活体和比对，直接标记为 `manual_review`。
