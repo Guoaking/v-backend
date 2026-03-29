@@ -120,9 +120,10 @@ func (h *OAuthHandler) GoogleCallback(c *gin.Context) {
 	if frontendRedirectURL == "" {
 		frontendRedirectURL = "http://localhost:3000" // 由于我们已经移除了 HashRouter，登录成功后直接跳到 / (也就是 /console 或 /login 等路由处理的地方)，或者如果是回调带 token 的话直接跳转。
 	}
+	baseURL := strings.TrimRight(frontendRedirectURL, "/")
 
 	if code == "" || state == "" {
-		c.Redirect(http.StatusTemporaryRedirect, frontendRedirectURL+"/login?error=invalid_callback")
+		c.Redirect(http.StatusTemporaryRedirect, baseURL+"/login?error=invalid_callback")
 		return
 	}
 
@@ -130,7 +131,7 @@ func (h *OAuthHandler) GoogleCallback(c *gin.Context) {
 	stateKey := fmt.Sprintf("oauth_state:%s", state)
 	val, err := h.service.Redis.Get(c, stateKey).Result()
 	if err != nil || !strings.HasPrefix(val, "google") {
-		c.Redirect(http.StatusTemporaryRedirect, frontendRedirectURL+"/login?error=invalid_state")
+		c.Redirect(http.StatusTemporaryRedirect, baseURL+"/login?error=invalid_state")
 		return
 	}
 	h.service.Redis.Del(c, stateKey) // 验证通过后删除
@@ -148,7 +149,7 @@ func (h *OAuthHandler) GoogleCallback(c *gin.Context) {
 	tokenResp, err := h.exchangeGoogleToken(code)
 	if err != nil {
 		logger.GetLogger().Errorf("Failed to exchange google token: %v", err)
-		c.Redirect(http.StatusTemporaryRedirect, frontendRedirectURL+"?error=token_exchange_failed")
+		c.Redirect(http.StatusTemporaryRedirect, baseURL+"/login?error=token_exchange_failed")
 		return
 	}
 
@@ -156,12 +157,12 @@ func (h *OAuthHandler) GoogleCallback(c *gin.Context) {
 	userInfo, err := h.getGoogleUserInfo(tokenResp.AccessToken)
 	if err != nil {
 		logger.GetLogger().Errorf("Failed to get google user info: %v", err)
-		c.Redirect(http.StatusTemporaryRedirect, frontendRedirectURL+"?error=get_user_info_failed")
+		c.Redirect(http.StatusTemporaryRedirect, baseURL+"/login?error=get_user_info_failed")
 		return
 	}
 
 	if userInfo.Email == "" {
-		c.Redirect(http.StatusTemporaryRedirect, frontendRedirectURL+"?error=email_not_found")
+		c.Redirect(http.StatusTemporaryRedirect, baseURL+"/login?error=email_not_found")
 		return
 	}
 
@@ -172,50 +173,51 @@ func (h *OAuthHandler) GoogleCallback(c *gin.Context) {
 
 		// 判断是否是账号已被注销
 		if err.Error() == "account_deleted" {
-			c.Redirect(http.StatusTemporaryRedirect, frontendRedirectURL+"/login?error=account_deleted")
+			c.Redirect(http.StatusTemporaryRedirect, baseURL+"/login?error=account_deleted")
 			return
 		}
 
 		// 如果是绑定失败，应该跳回安全设置页并带上错误信息
 		if bindUserID != "" {
-			baseFrontendURL := strings.Split(frontendRedirectURL, "/console")[0]
-			c.Redirect(http.StatusTemporaryRedirect, baseFrontendURL+"/account/security?error="+url.QueryEscape(err.Error()))
+			c.Redirect(http.StatusTemporaryRedirect, baseURL+"/account/security?error="+url.QueryEscape(err.Error()))
 			return
 		}
-		c.Redirect(http.StatusTemporaryRedirect, frontendRedirectURL+"/login?error=user_creation_failed")
+		c.Redirect(http.StatusTemporaryRedirect, baseURL+"/login?error=user_creation_failed")
 		return
 	}
 
 	// 如果是单纯绑定操作，不需要重新签发 JWT，直接重定向回安全设置页
 	if bindUserID != "" {
-		// 为了防止写死 localhost:3000，这里也使用配置的 frontendRedirectURL 来拼接
-		baseFrontendURL := strings.Split(frontendRedirectURL, "/console")[0]
-		c.Redirect(http.StatusTemporaryRedirect, baseFrontendURL+"/account/security?bind_success=true")
+		c.Redirect(http.StatusTemporaryRedirect, baseURL+"/account/security?bind_success=true")
 		return
 	}
 
-	// 获取用户所属组织以签发完整 JWT
-	var org models.Organization
-	if err := h.service.DB.First(&org, "id = ?", user.OrgID).Error; err != nil {
-		logger.GetLogger().Errorf("Failed to fetch user organization: %v", err)
-		c.Redirect(http.StatusTemporaryRedirect, frontendRedirectURL+"?error=org_not_found")
-		return
+	// 获取用户所属组织以签发完整 JWT (如果用户有组织的话)
+	var org *models.Organization
+	if user.OrgID != "" {
+		var tempOrg models.Organization
+		// Ignore deleted organizations
+		if err := h.service.DB.Where("status = ?", "active").First(&tempOrg, "id = ?", user.OrgID).Error; err == nil {
+			org = &tempOrg
+		} else {
+			logger.GetLogger().Warnf("Failed to fetch user organization (might be deleted): %v", err)
+			// Don't fail the login, just let org be nil so the user logs in with 0 orgs
+		}
 	}
 
 	// 4. 签发 JWT
 	userAgent := c.Request.UserAgent()
 	ip := c.ClientIP()
-	token, err := h.authHandler.generateUserJWT(user, &org, userAgent, ip)
+	token, err := h.authHandler.generateUserJWT(user, org, userAgent, ip)
 	if err != nil {
 		logger.GetLogger().Errorf("Failed to generate JWT: %v", err)
-		c.Redirect(http.StatusTemporaryRedirect, frontendRedirectURL+"?error=jwt_generation_failed")
+		c.Redirect(http.StatusTemporaryRedirect, baseURL+"/login?error=jwt_generation_failed")
 		return
 	}
 
 	// 5. 重定向回前端带上 Token
 	// 因为现在前端已经使用了 BrowserRouter，不再有 #，我们可以直接将 token 放在 search params 里
 	// 确保 frontendRedirectURL 末尾没有多余的斜杠
-	baseURL := strings.TrimRight(frontendRedirectURL, "/")
 	finalRedirectURL := fmt.Sprintf("%s/login?token=%s", baseURL, token)
 	c.Redirect(http.StatusTemporaryRedirect, finalRedirectURL)
 }
