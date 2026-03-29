@@ -5,6 +5,7 @@ import (
 
 	"kyc-service/internal/api"
 	attendanceApi "kyc-service/internal/apps/attendance/api" // attendance 微应用路由
+	attendanceSvc "kyc-service/internal/apps/attendance/service"
 	"kyc-service/internal/config"
 	"kyc-service/internal/middleware"
 	"kyc-service/internal/models"
@@ -372,7 +373,8 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 	}
 
 	// 挂载考勤微应用路由 (BFF层，物理隔离)
-	attendanceApi.RegisterRoutes(v1, cfg.Security.JWTSecret)
+	attSvc := attendanceSvc.NewAttendanceService(kycService.DB, kycService)
+	attendanceApi.RegisterRoutes(v1, cfg.Security.JWTSecret, attSvc)
 
 	return r, heartbeatManager
 }

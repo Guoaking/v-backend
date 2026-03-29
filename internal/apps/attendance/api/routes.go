@@ -2,6 +2,7 @@ package api
 
 import (
 	"kyc-service/internal/apps/attendance/middleware"
+	"kyc-service/internal/apps/attendance/service"
 	"kyc-service/pkg/response"
 
 	"github.com/gin-gonic/gin"
@@ -10,7 +11,7 @@ import (
 // RegisterRoutes 注册考勤微应用的所有路由
 // 这里展示了微应用的路由是如何从核心代码中物理隔离的。
 // 我们将 jwtSecret 作为参数传入，保持了底层对配置的解耦。
-func RegisterRoutes(r *gin.RouterGroup, jwtSecret string) {
+func RegisterRoutes(r *gin.RouterGroup, jwtSecret string, svc *service.AttendanceService) {
 	// 所有考勤 C端 (H5) 相关的路由，挂载在 /api/v1/attendance 下
 	// 这些路由不需要登录，但需要一个特殊的 Magic Link Token 中间件来提取 OrgID
 	attendanceGroup := r.Group("/attendance")
@@ -19,20 +20,20 @@ func RegisterRoutes(r *gin.RouterGroup, jwtSecret string) {
 		// 1. 注册相关
 		enrollGroup := attendanceGroup.Group("/enroll")
 		{
-			enrollGroup.POST("/ocr", handleOCR)
-			enrollGroup.POST("/submit", handleSubmit)
+			enrollGroup.POST("/ocr", handleOCR(svc))
+			enrollGroup.POST("/submit", handleSubmit(svc))
 		}
 
 		// 2. 打卡相关
-		attendanceGroup.GET("/config", handleGetConfig)
-		attendanceGroup.POST("/punch/identity", handleIdentityMatch)
-		attendanceGroup.POST("/punch", handlePunch)
+		attendanceGroup.GET("/config", handleGetConfig(svc))
+		attendanceGroup.POST("/punch/identity", handleIdentityMatch(svc))
+		attendanceGroup.POST("/punch", handlePunch(svc))
 
 		// 3. 员工自助查询
 		selfGroup := attendanceGroup.Group("/self")
 		{
-			selfGroup.POST("/otp", handleRequestOTP)
-			selfGroup.GET("/records", handleGetSelfRecords)
+			selfGroup.POST("/otp", handleRequestOTP(svc))
+			selfGroup.GET("/records", handleGetSelfRecords(svc))
 		}
 	}
 
@@ -40,9 +41,9 @@ func RegisterRoutes(r *gin.RouterGroup, jwtSecret string) {
 	// 注意：这些路由应该在外部被现有的 Console JWT Auth 中间件保护
 	consoleAttendanceGroup := r.Group("/console/attendance")
 	{
-		consoleAttendanceGroup.GET("/records", handleConsoleGetRecords)
-		consoleAttendanceGroup.PUT("/records/:id/review", handleConsoleReviewRecord)
-		consoleAttendanceGroup.GET("/stats", handleConsoleGetStats)
+		consoleAttendanceGroup.GET("/records", handleConsoleGetRecords(svc))
+		consoleAttendanceGroup.PUT("/records/:id/review", handleConsoleReviewRecord(svc))
+		consoleAttendanceGroup.GET("/stats", handleConsoleGetStats(svc))
 	}
 }
 
@@ -50,14 +51,114 @@ func RegisterRoutes(r *gin.RouterGroup, jwtSecret string) {
 // 以下为 Handler 骨架 (待填充具体业务逻辑)
 // ==============================================================================
 
-func handleOCR(c *gin.Context)            { response.JSONSuccess(c, gin.H{"status": "ok"}) }
-func handleSubmit(c *gin.Context)         { response.JSONSuccess(c, gin.H{"status": "ok"}) }
-func handleGetConfig(c *gin.Context)      { response.JSONSuccess(c, gin.H{"status": "ok"}) }
-func handleIdentityMatch(c *gin.Context)  { response.JSONSuccess(c, gin.H{"status": "ok"}) }
-func handlePunch(c *gin.Context)          { response.JSONSuccess(c, gin.H{"status": "ok"}) }
-func handleRequestOTP(c *gin.Context)     { response.JSONSuccess(c, gin.H{"status": "ok"}) }
-func handleGetSelfRecords(c *gin.Context) { response.JSONSuccess(c, gin.H{"status": "ok"}) }
+func handleOCR(svc *service.AttendanceService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		orgID, exists := c.Get(middleware.AttendanceContextOrgID)
+		if !exists {
+			response.JSONError(c, response.CodeInvalidParameter, "Missing org_id in context")
+			return
+		}
 
-func handleConsoleGetRecords(c *gin.Context)   { response.JSONSuccess(c, gin.H{"status": "ok"}) }
-func handleConsoleReviewRecord(c *gin.Context) { response.JSONSuccess(c, gin.H{"status": "ok"}) }
-func handleConsoleGetStats(c *gin.Context)     { response.JSONSuccess(c, gin.H{"status": "ok"}) }
+		// 这里假设前端使用 multipart/form-data 上传
+		file, err := c.FormFile("image")
+		if err != nil {
+			response.JSONError(c, response.CodeInvalidParameter, "Missing image file")
+			return
+		}
+
+		idType := c.DefaultPostForm("id_type", "thai_id")
+
+		// 读取文件到内存
+		f, err := file.Open()
+		if err != nil {
+			response.JSONError(c, response.CodeInternalError, "Failed to open image file")
+			return
+		}
+		defer f.Close()
+
+		buf := make([]byte, file.Size)
+		if _, err := f.Read(buf); err != nil {
+			response.JSONError(c, response.CodeInternalError, "Failed to read image file")
+			return
+		}
+
+		res, err := svc.ProcessOCR(c.Request.Context(), orgID.(string), buf, idType)
+		if err != nil {
+			response.JSONError(c, response.CodeInternalError, err.Error())
+			return
+		}
+
+		response.JSONSuccess(c, res)
+	}
+}
+
+func handleSubmit(svc *service.AttendanceService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		orgID, exists := c.Get(middleware.AttendanceContextOrgID)
+		if !exists {
+			response.JSONError(c, response.CodeInvalidParameter, "Missing org_id in context")
+			return
+		}
+
+		var req service.EnrollRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			response.JSONError(c, response.CodeInvalidParameter, err.Error())
+			return
+		}
+
+		if err := svc.EnrollEmployee(c.Request.Context(), orgID.(string), &req); err != nil {
+			response.JSONError(c, response.CodeInternalError, err.Error())
+			return
+		}
+
+		response.JSONSuccess(c, gin.H{"status": "enrolled successfully"})
+	}
+}
+
+func handleGetConfig(svc *service.AttendanceService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		response.JSONSuccess(c, gin.H{"status": "ok"})
+	}
+}
+
+func handleIdentityMatch(svc *service.AttendanceService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		response.JSONSuccess(c, gin.H{"status": "ok"})
+	}
+}
+
+func handlePunch(svc *service.AttendanceService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		response.JSONSuccess(c, gin.H{"status": "ok"})
+	}
+}
+
+func handleRequestOTP(svc *service.AttendanceService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		response.JSONSuccess(c, gin.H{"status": "ok"})
+	}
+}
+
+func handleGetSelfRecords(svc *service.AttendanceService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		response.JSONSuccess(c, gin.H{"status": "ok"})
+	}
+}
+
+func handleConsoleGetRecords(svc *service.AttendanceService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		response.JSONSuccess(c, gin.H{"status": "ok"})
+	}
+}
+
+func handleConsoleReviewRecord(svc *service.AttendanceService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		response.JSONSuccess(c, gin.H{"status": "ok"})
+	}
+}
+
+func handleConsoleGetStats(svc *service.AttendanceService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		response.JSONSuccess(c, gin.H{"status": "ok"})
+	}
+}
