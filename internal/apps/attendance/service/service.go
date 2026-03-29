@@ -70,6 +70,9 @@ func (s *AttendanceService) ProcessOCR(ctx context.Context, orgID string, file *
 		Type:    idType,
 	}
 
+	// Inject the organization context into the context to satisfy the underlying OCR service's requirements
+	ctx = context.WithValue(ctx, "org_id", orgID)
+
 	// 2. 调用底层 OCR 服务
 	resp, err := s.kycService.OCR(ctx, req)
 	if err != nil {
