@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"kyc-service/internal/api"
+	attendanceApi "kyc-service/internal/apps/attendance/api" // attendance 微应用路由
 	"kyc-service/internal/config"
 	"kyc-service/internal/middleware"
 	"kyc-service/internal/models"
@@ -369,6 +370,9 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 		images.POST("", imageHandler.Upload)
 		images.GET(":id/image", imageHandler.GetImage)
 	}
+
+	// 挂载考勤微应用路由 (BFF层，物理隔离)
+	attendanceApi.RegisterRoutes(v1)
 
 	return r, heartbeatManager
 }

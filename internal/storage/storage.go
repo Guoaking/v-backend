@@ -7,8 +7,9 @@ import (
 	"os"
 	"time"
 
+	"kyc-service/internal/apps/attendance/models" // 引入 attendance 独立的 models
 	"kyc-service/internal/config"
-	"kyc-service/internal/models"
+	coreModels "kyc-service/internal/models" // 重命名核心 models 以防冲突
 
 	"kyc-service/pkg/logger"
 
@@ -133,29 +134,35 @@ func autoMigrate(db *gorm.DB) error {
 	// 直接让 GORM 自动管理表结构
 
 	modelsToMigrate := []interface{}{
-		&models.AuditLog{},
-		&models.User{},
-		&models.UserOAuthConnection{},
-		&models.OAuthClient{},
-		&models.OAuthToken{},
-		&models.Organization{},
-		&models.OrganizationMember{},
-		&models.APIKey{},
-		&models.UsageLog{},
-		&models.PasswordReset{},
-		&models.OrganizationInvitation{},
-		&models.Invitation{},
-		&models.Notification{},
-		&models.AuditAction{},
-		&models.Plan{},
-		&models.GlobalConfig{},
-		&models.APIRequestLog{},
-		&models.OrganizationQuotas{},
-		&models.FaceImageRef{},
-		&models.ImageAsset{},
-		&models.VideoAsset{},
-		&models.LivenessTask{},
-		&models.KYCRequest{}, // 确保 KYCRequest 模型被包含在自动迁移中
+		// --- 核心 SaaS 业务表 ---
+		&coreModels.AuditLog{},
+		&coreModels.User{},
+		&coreModels.UserOAuthConnection{},
+		&coreModels.OAuthClient{},
+		&coreModels.OAuthToken{},
+		&coreModels.Organization{},
+		&coreModels.OrganizationMember{},
+		&coreModels.APIKey{},
+		&coreModels.UsageLog{},
+		&coreModels.PasswordReset{},
+		&coreModels.OrganizationInvitation{},
+		&coreModels.Invitation{},
+		&coreModels.Notification{},
+		&coreModels.AuditAction{},
+		&coreModels.Plan{},
+		&coreModels.GlobalConfig{},
+		&coreModels.APIRequestLog{},
+		&coreModels.OrganizationQuotas{},
+		&coreModels.FaceImageRef{},
+		&coreModels.ImageAsset{},
+		&coreModels.VideoAsset{},
+		&coreModels.LivenessTask{},
+		&coreModels.KYCRequest{},
+
+		// --- Attendance 微应用独立业务表 ---
+		&models.OrganizationEmployee{},
+		&models.AttendanceRecord{},
+		&models.DataCollectionDocument{},
 	}
 
 	for _, m := range modelsToMigrate {
