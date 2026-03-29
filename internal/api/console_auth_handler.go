@@ -64,6 +64,7 @@ type ConsoleUserProfile struct {
 type OrganizationLite struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+	Role string `json:"role"`
 }
 
 // ConsoleRegisterRequest 注册请求

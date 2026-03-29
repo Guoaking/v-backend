@@ -93,17 +93,37 @@ func (h *ConsoleHandler) GetCurrentUser(c *gin.Context) {
 		return
 	}
 
+	// Fetch user's organizations
+	var memberships []models.OrganizationMember
+	h.service.DB.Where("user_id = ? AND status = ?", userID, "active").Find(&memberships)
+
+	var orgsLite []OrganizationLite
+	for _, m := range memberships {
+		var org models.Organization
+		if err := h.service.DB.First(&org, "id = ?", m.OrganizationID).Error; err == nil {
+			if org.Status != "active" {
+				continue
+			}
+			orgsLite = append(orgsLite, OrganizationLite{
+				ID:   org.ID,
+				Name: org.Name,
+				Role: m.Role,
+			})
+		}
+	}
+
 	response := UserMeResponse{
 		ID:              user.ID,
 		Email:           user.Email,
-		FullName:        user.FullName,
-		Name:            user.Name,
+		FullName:        user.FullName, // 确保 FullName 被返回
+		Name:            user.Name,     // 兼容前端可能有的 Name 依赖
 		AvatarURL:       user.AvatarURL,
 		Role:            user.Role,
 		OrgRole:         c.GetString("orgRole"),
 		CurrentOrgID:    currentOrg,
 		Permissions:     perms,
 		IsPlatformAdmin: user.IsPlatformAdmin,
+		Orgs:            orgsLite,
 	}
 
 	// 记录业务操作成功

@@ -21,16 +21,17 @@ type UpdateKeyScopesRequest struct {
 
 // UserMeResponse 用户信息响应
 type UserMeResponse struct {
-	ID              string   `json:"id"`
-	Email           string   `json:"email"`
-	FullName        string   `json:"full_name"`
-	Name            string   `json:"name"`
-	AvatarURL       string   `json:"avatar,omitempty"`
-	Role            string   `json:"role"`
-	OrgRole         string   `json:"org_role"`
-	CurrentOrgID    string   `json:"currentOrgId"`
-	Permissions     []string `json:"permissions"`
-	IsPlatformAdmin bool     `json:"is_platform_admin"`
+	ID              string             `json:"id"`
+	Email           string             `json:"email"`
+	FullName        string             `json:"full_name"`
+	Name            string             `json:"name"`
+	AvatarURL       string             `json:"avatar,omitempty"`
+	Role            string             `json:"role"`
+	OrgRole         string             `json:"org_role"`
+	CurrentOrgID    string             `json:"currentOrgId"`
+	Permissions     []string           `json:"permissions"`
+	IsPlatformAdmin bool               `json:"is_platform_admin"`
+	Orgs            []OrganizationLite `json:"orgs"` // Explicitly return organizations
 }
 
 // ConsoleUpdateUserRequest 更新用户请求
