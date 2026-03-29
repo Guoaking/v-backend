@@ -9,12 +9,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 	"kyc-service/internal/models"
 	"kyc-service/internal/service"
 	"kyc-service/pkg/logger"
 	"kyc-service/pkg/utils"
+
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type OAuthHandler struct {
@@ -398,9 +399,17 @@ func (h *OAuthHandler) handleOAuthUser(ctx context.Context, info *googleUserInfo
 			return nil, fmt.Errorf("failed to create oauth connection: %v", err)
 		}
 
-		// 可选：如果用户没有头像，更新头像
+		// 可选：如果用户没有头像，更新头像；如果用户没有名字，更新名字
+		updates := map[string]interface{}{}
 		if user.AvatarURL == "" && info.Picture != "" {
-			tx.Model(&user).Update("avatar_url", info.Picture)
+			updates["avatar_url"] = info.Picture
+		}
+		if user.Name == "" && info.Name != "" {
+			updates["name"] = info.Name
+			updates["full_name"] = info.Name
+		}
+		if len(updates) > 0 {
+			tx.Model(&user).Updates(updates)
 		}
 
 		// 更新最后登录时间
@@ -440,7 +449,7 @@ func (h *OAuthHandler) handleOAuthUser(ctx context.Context, info *googleUserInfo
 		return nil, err
 	}
 
-	// 3.2 创建用户 (注意：不需要再传 Provider 字段了，它在 models 中已经被去掉了)
+	// 3.2 创建用户
 	now := time.Now()
 	newUser := models.User{
 		ID:              userID,
@@ -448,12 +457,12 @@ func (h *OAuthHandler) handleOAuthUser(ctx context.Context, info *googleUserInfo
 		Name:            displayName,
 		FullName:        displayName,
 		AvatarURL:       info.Picture,
+		Status:          "active",
 		Role:            "user",
 		OrgID:           orgID,
 		OrgRole:         "owner",
 		CurrentOrgID:    orgID,
 		LastActiveOrgID: orgID,
-		Status:          "active",
 		LastLoginAt:     &now,
 	}
 
