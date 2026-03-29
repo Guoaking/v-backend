@@ -53,11 +53,35 @@
 
 ---
 
-## 3. 用户会话演进 (User Session / Human Auth)
+## 3. Google OAuth & Multi-Tenancy Architecture (New)
+
+随着第三方登录（Google OAuth）的接入，系统的认证与多租户架构进行了深度重构，确立了以下核心原则：
+
+### 4.1 "0组织" (Zero-Org) 状态的合法性
+在 B2B SaaS 中，用户（User）和租户/组织（Organization）必须严格解耦。
+- **背景**：早期设计中，如果用户没有任何组织（如刚删除了最后一个组织，或者刚注册未完成初始化），系统会触发 500 Panic 或被鉴权中间件硬拦截（`org_not_found`）。
+- **重构后**：**"0组织" 被视为一种合法的游魂状态。**
+  - `generateUserJWT` 现在允许 `org` 指针为 `nil`，此时签发的 JWT 仅包含 `user_id`，不包含任何组织权限（`org_id`, `plan_id` 等均为空）。
+  - 后端中间件会放行这种“裸 Token”访问个人设置接口（如 `/api/v1/users/me`），但会拒绝其访问任何带有 `RequireOrganizationHeader` 中间件的组织级接口。
+  - 前端路由根据这个状态，强制将用户拦截到 `/onboarding` 页面进行组织初始化。
+
+### 4.2 数据一致性与前端降级防范
+- **问题**：过去，当后端 `/me` 接口未返回组织列表时，前端会自作主张地捏造一个名为 "Default Org" 的幽灵组织，导致数据严重失真。
+- **重构后**：
+  - **后端必传**：`/api/v1/users/me` 接口现在会主动查询 `organization_members` 表，并显式返回用户加入的所有活跃组织列表（`Orgs` 数组）。
+  - **前端不捏造**：前端移除了所有的 Fallback 捏造逻辑，严格依赖后端返回的数据。如果 `Orgs` 为空，直接进入 0 组织状态。
+  - **字段映射对齐**：Google OAuth 提供的姓名被统一存入数据库的 `name` 和 `full_name` 字段，并在 `/me` 接口中显式返回，前端统一解析映射，消除了显示空白的问题。
+
+### 4.3 路由解耦 (Console vs Account)
+在架构层面，明确划分了个人上下文与组织上下文：
+- **`/console/*`**：组织上下文（Organization Context）。必须拥有至少一个活跃组织才能进入。所有操作（如账单、API Keys、使用量日志）均挂载在当前选择的组织下。
+- **`/account/*`**：个人上下文（Personal Context）。如 Profile、Security。即使在 "0组织" 状态下也必须可访问，以便用户能解绑第三方账号或彻底注销账号。前端已将这部分路由从 `ConsoleLayout` 中剥离，实现了物理级别的布局解耦。
+
+## 4. 用户会话演进 (User Session / Human Auth)
 
 目前的 Console Web 登录使用的是**完全无状态的单凭证 JWT (24小时过期)**，这在纯 Web SaaS 初期是足够轻量的。但在面向未来的多端客户端（Mobile App / Desktop App）以及高安全合规要求下，存在以下不足：
 
-### 3.1 现状与隐患 (Current Implementation & Flaws)
+### 4.1 现状与隐患 (Current Implementation & Flaws)
 
 在目前的 `v-frontend` 和 `v-backend` 中，采用的是**完全无状态的单凭证 JWT**：
 
@@ -71,7 +95,7 @@
 3. **缺乏会话强制注销 (Session Revocation)**: JWT 发出后无法撤回（除非改全局 Secret）。如果用户设备丢失或账号被盗，无法实现“踢人下线”或“登出所有设备”功能。
 4. **缺乏设备级管理**: 后端不知道同一个账号目前在多少台设备上登录，无法做并发登录限制（如限制单个账号最多同时在 3 台设备登录）。
 
-### 3.2 演进目标：状态化会话管理 (Stateful Session via OIDC/OAuth2)
+### 4.2 演进目标：状态化会话管理 (Stateful Session via OIDC/OAuth2)
 
 为了支持未来的多端生态和极高的安全性，用户鉴权需要向标准 OAuth2 授权码流程（或带有设备管理的 OIDC 扩展）演进。主流 B2B SaaS (如 Stripe, AWS, Vercel) 通常采用**混合双 Token 机制**：
 
