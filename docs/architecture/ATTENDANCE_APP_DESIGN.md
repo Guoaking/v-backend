@@ -16,9 +16,10 @@
 
 ## 2. 核心架构设计理念
 
-### 2.1 租户完全隔离 (Multi-Tenancy)
+### 2.1 租户完全隔离 (Multi-Tenancy) & Magic Link
 - 员工（Employee）不属于系统全局用户（User），而是从属于特定的租户（Organization）。
-- 员工不需要注册 SaaS 账号，不需要密码登录。打卡入口为一个带有 `org_id` 签名的专属 H5 链接/二维码。
+- 员工不需要注册 SaaS 账号，不需要密码登录。打卡入口为一个带有 `org_id` 签名的专属 H5 链接/二维码（Magic Link）。
+- **防错与关联**：员工扫码时，URL 中的 Token 强制绑定当前组织。如果员工进错组织，通过唯一索引 `(org_id, id_number)` 隔离，员工可直接扫描正确公司的二维码重新注册，原公司的异常记录由 HR 随时拉黑删除。
 
 ### 2.2 降级优于阻断 (Degradation over Blocking)
 考勤是高频且时间敏感的业务（早高峰）。
@@ -143,6 +144,9 @@ CREATE TABLE attendance_records (
 
 ### 4.3 算法数据反哺表 (`data_collection_documents`)
 核心资产表，专供算法团队“白嫖”高质量数据。
+- **解耦设计**：该表故意不包含 `employee_id`，只关联 `org_id`。这样当员工离职被物理删除时，其贡献的宝贵算法语料不会被级联删除，实现了合规与业务的完美解耦。
+- **冗余策略**：员工反复注册上传的证件，将被视为“多模态增量语料”全盘接收（产生多条记录），而不做去重。
+
 ```sql
 CREATE TABLE data_collection_documents (
     doc_id VARCHAR(64) PRIMARY KEY,
@@ -182,5 +186,7 @@ CREATE TABLE data_collection_documents (
 ## 7. 合规与安全 (Compliance & Security)
 
 1. **隐私政策挂载**：在员工首次扫码注册时，必须勾选包含数据脱敏与算法优化条款的《员工隐私授权协议》。
-2. **数据脱敏**：提供给算法团队的 `data_collection_documents` 数据，应在导出时执行脚本，抹除姓名等直接关联 PII 的字段，仅保留图像特征和文本排版特征。
-3. **离职清理**：当 HR 在控制台将员工标记为 `deleted` 时，必须同步清理其 `face_feature` 和相关证件原图，满足 GDPR/PDPA 的被遗忘权。
+2. **数据脱敏与存储策略 (Storage Policy)**：
+   - 为敏感生物数据（`face_image_url`, `fallback_image_url`, `raw_image_url`）开辟独立的云存储 Bucket。
+   - 必须配置严格的生命周期管理（例如：算法提取特征后 30 天自动硬删除），以应对 PDPA/GDPR 审计。
+3. **离职清理**：当 HR 在控制台将员工标记为 `deleted` 时，必须同步清理其 `face_feature`，满足被遗忘权。
