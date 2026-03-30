@@ -76,7 +76,7 @@ type OCRResult struct {
 }
 
 // ProcessOCR 处理证件 OCR 提取
-// 它调用核心的 KYCService，并将结果暂存，返回给前端供用户修改
+// 它调用核心的 KYCService，并将结果暂存，返回给前端供用户核对和修改
 func (s *AttendanceService) ProcessOCR(ctx context.Context, orgID string, file *multipart.FileHeader, idType string) (*OCRResult, error) {
 	// 映射前端传来的 id_type 到底层 OCR 支持的类型
 	// 底层支持: "id_card", "driver_license", "vehicle_license", "bank_card", "business_license", "general", "vat_certificate", "passport", "NPWP"
@@ -158,6 +158,17 @@ func (s *AttendanceService) ProcessOCR(ctx context.Context, orgID string, file *
 	result.RawJSON = string(rawBytes)
 
 	return result, nil
+}
+
+// EnrollOCR 调用底层 OCR 能力，提取证件信息
+func (s *AttendanceService) EnrollOCR(ctx context.Context, orgID string, file *multipart.FileHeader, idType string) (*OCRResult, error) {
+	// 直接复用我们刚刚编写的 ProcessOCR，因为底层逻辑是一样的
+	ocrResult, err := s.ProcessOCR(ctx, orgID, file, idType)
+	if err != nil {
+		return nil, err
+	}
+
+	return ocrResult, nil
 }
 
 // IdentityMatchRequest 身份匹配请求
@@ -262,20 +273,32 @@ func (s *AttendanceService) EnrollEmployee(ctx context.Context, orgID string, re
 			return ErrAlreadyEnrolled
 		}
 
-		// 2. 提取人脸特征 (暂时跳过，直接保存图片，因为底层 FaceCompare 需要两张图片)
-		// 实际业务中，注册时应该对 req.FaceImage 进行活体检测和质量检测
-
-		// 处理 Base64 图片，保存到本地文件系统
-		// 这里因为我们在改造 Punch，但 Enroll 还是传的 Base64，所以保留一个 Base64 解码的辅助逻辑或者让 Enroll 也改成 Multipart
-		// 为了不破坏现有的 Enroll，我们在 storage.go 里把 SaveBase64ToLocal 恢复或者直接在这里写个简单的解码
+		// 2. 将人脸照片从 Base64 提取并保存到本地
+		// 这里因为我们在改造 Punch，但 Enroll 还是传的 Base64，所以保留一个 Base64 解码的辅助逻辑
 		faceImagePath, err := saveBase64ToLocalHelper(req.FaceImage, "attendance/faces", req.IDNumber)
 		if err != nil {
-			log.Errorf("Failed to save face image: %v", err)
-			// 依然允许继续，不阻断主流程，只是存个空或原来的数据
-			faceImagePath = ""
+			return fmt.Errorf("failed to save face image: %w", err)
 		}
 
-		// 3. 落库或更新 models.OrganizationEmployee
+		// 3. 增强逻辑：在注册时强制调用一次底层的 FaceDetect (质量检测) 或 LivenessSilent
+		// 确保底库照片是一张合格的真人照片，而不是翻拍或者模糊的
+		faceHeader, err := ConvertLocalFileToMultipartHeader(faceImagePath)
+		if err == nil && faceHeader != nil {
+			// 复用 KYCService 的 FaceDetect
+			detectRes, detectErr := s.kycService.FaceDetect(ctx, faceHeader)
+			if detectErr != nil || detectRes == nil || detectRes.Code != 0 {
+				log.Warnf("Face detect failed during enrollment: %v", detectErr)
+				return fmt.Errorf("face detection failed: please upload a clear face image")
+			}
+			// 如果没有检测到人脸
+			if detectRes.DetectionResults.IsFaceExist == 0 || detectRes.DetectionResults.FaceNum == 0 {
+				return fmt.Errorf("no face detected in the image")
+			}
+		} else {
+			log.Warnf("Could not construct file header for face detection, skipping quality check")
+		}
+
+		// 4. 落库或更新 models.OrganizationEmployee
 		emp := models.OrganizationEmployee{
 			ID:           utils.GenerateID(),
 			OrgID:        orgID,
@@ -403,8 +426,25 @@ func (s *AttendanceService) PunchIn(ctx context.Context, orgID string, req *Punc
 		// 4. 正常打卡：调用底层活体和 1:1 比对
 		log.Infof("Calling underlying KYC liveness and 1:1 face match for %s", req.IDNumber)
 
-		// 直接使用从前端接收到的 multipart.FileHeader，不再需要 Base64 解码落盘！
+		// 直接使用从前端接收到的 multipart.FileHeader
 		punchFaceHeader := req.LivenessFile
+
+		// -------------------------------------------------------------
+		// 增强逻辑：集成真实的 LivenessSilent (静态活体检测)
+		// -------------------------------------------------------------
+		// 这里复用底层 KYCService 的 LivenessSilent 能力
+		// 在真实场景中，如果打卡策略是 liveness_silent，则必须先通过活体
+		livenessRes, err := s.kycService.LivenessSilent(ctx, punchFaceHeader, "zh-CN")
+		if err != nil {
+			log.Warnf("Liveness check failed or error returned: %v", err)
+			return fmt.Errorf("liveness check failed: %w", err)
+		}
+
+		// 如果活体未通过，直接拒绝
+		if livenessRes == nil || livenessRes.Code != 0 || livenessRes.LivenessResults.IsLiveness == 0 || livenessRes.LivenessResults.Confidence < 0.85 {
+			log.Warnf("Liveness score too low or failed: %v", livenessRes)
+			return fmt.Errorf("liveness detection failed: face not genuine")
+		}
 
 		// 将底库照片转为 multipart.FileHeader (底库由于历史原因还在本地，需要包装)
 		baseFaceHeader, err := ConvertLocalFileToMultipartHeader(emp.FaceImageURL)
@@ -450,10 +490,8 @@ func (s *AttendanceService) PunchIn(ctx context.Context, orgID string, req *Punc
 		// 真实调用成功
 		record.Status = "success"
 
-		// 活体得分应该从一个真正的 Liveness 接口获取，
-		// 目前架构设计中，我们将 Liveness 和 1:1 拆分为了两步或者合并。
-		// 这里假设后端的 KYC 引擎在 FaceCompare 中同时返回了活体置信度，或者我们暂时将其置为 0 (待真实活体引擎接入)
-		record.LivenessScore = 0 // TODO: 接入真实的 Liveness 引擎获取 Score
+		// 记录真实的活体得分和比对得分
+		record.LivenessScore = livenessRes.LivenessResults.Confidence
 		record.FaceScore = compareRes.ComparisonResults.Confidence
 	}
 

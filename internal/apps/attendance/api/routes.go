@@ -108,7 +108,7 @@ func handleOCR(svc *service.AttendanceService) gin.HandlerFunc {
 
 		idType := c.DefaultPostForm("id_type", "thai_id")
 
-		res, err := svc.ProcessOCR(c.Request.Context(), orgID.(string), file, idType)
+		res, err := svc.EnrollOCR(c.Request.Context(), orgID.(string), file, idType)
 		if err != nil {
 			response.JSONError(c, response.CodeInternalError, err.Error())
 			return
