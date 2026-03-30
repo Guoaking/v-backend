@@ -357,6 +357,22 @@ func (s *AttendanceService) PunchIn(ctx context.Context, orgID string, req *Punc
 			log.Errorf("Failed to save fallback image: %v", err)
 		}
 		record.FallbackImageURL = fallbackPath
+
+		// 收集降级照片供算法团队分析 (为什么活体会失败)
+		go func(oID, baseImg, fallbackImg string) {
+			faceDoc := models.DataCollectionFace{
+				ID:            utils.GenerateID(),
+				OrgID:         oID,
+				BaseImageURL:  baseImg,
+				PunchImageURL: fallbackImg,
+				Confidence:    0,
+				IsSameFace:    0,
+				IsFallback:    true,
+			}
+			if err := s.db.Create(&faceDoc).Error; err != nil {
+				log.Warnf("Failed to collect fallback face data: %v", err)
+			}
+		}(orgID, emp.FaceImageURL, fallbackPath)
 	} else {
 		// 4. 正常打卡：调用底层活体和 1:1 比对
 		log.Infof("Calling underlying KYC liveness and 1:1 face match for %s", req.IDNumber)
@@ -388,6 +404,22 @@ func (s *AttendanceService) PunchIn(ctx context.Context, orgID string, req *Punc
 			log.Warnf("Face compare failed or error returned: %v", err)
 			return fmt.Errorf("face verification failed: %w", err)
 		}
+
+		// 异步收集人脸比对数据反哺算法团队 (数据飞轮)
+		go func(oID, baseImg, punchImg string, conf float64, isSame int) {
+			faceDoc := models.DataCollectionFace{
+				ID:            utils.GenerateID(),
+				OrgID:         oID,
+				BaseImageURL:  baseImg,
+				PunchImageURL: punchImg,
+				Confidence:    conf,
+				IsSameFace:    isSame,
+				IsFallback:    false,
+			}
+			if err := s.db.Create(&faceDoc).Error; err != nil {
+				log.Warnf("Failed to collect face compare data: %v", err)
+			}
+		}(orgID, emp.FaceImageURL, punchImagePath, compareRes.ComparisonResults.Confidence, compareRes.ComparisonResults.IsSameFace)
 
 		if compareRes.Code != 0 || compareRes.ComparisonResults.IsSameFace == 0 {
 			return fmt.Errorf("face verification failed: not the same person (confidence: %.2f)", compareRes.ComparisonResults.Confidence)

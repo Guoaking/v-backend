@@ -40,7 +40,7 @@ type AttendanceRecord struct {
 	CreatedAt        time.Time `json:"created_at"`
 }
 
-// DataCollectionDocument 算法数据反哺表
+// DataCollectionDocument 算法数据反哺表 (OCR 注册域)
 // 核心资产表，专供算法团队优化模型设计的“Ground Truth”数据池。
 // 故意不关联 EmployeeID，以满足数据隐私脱敏和生命周期解耦。
 type DataCollectionDocument struct {
@@ -52,4 +52,18 @@ type DataCollectionDocument struct {
 	FinalUserInput datatypes.JSON `gorm:"type:jsonb" json:"final_user_input"` // 员工手动修正后的最终结果
 	IsCorrected    bool           `gorm:"index" json:"is_corrected"`          // 如果 Final != Raw，则为 true
 	CreatedAt      time.Time      `json:"created_at"`
+}
+
+// DataCollectionFace 算法数据反哺表 (人脸打卡域)
+// 收集极端光照、佩戴口罩等边缘场景下的人脸比对数据，供算法团队微调 FaceCompare 和 Liveness 模型。
+type DataCollectionFace struct {
+	ID             string    `gorm:"primaryKey;type:varchar(64)" json:"id"`
+	OrgID          string    `gorm:"index;not null;type:varchar(64)" json:"org_id"`
+	BaseImageURL   string    `gorm:"type:varchar(255)" json:"base_image_url"`  // 注册时的底库图
+	PunchImageURL  string    `gorm:"type:varchar(255)" json:"punch_image_url"` // 打卡时的现场图
+	Confidence     float64   `json:"confidence"`                               // 模型返回的相似度得分
+	IsSameFace     int       `json:"is_same_face"`                             // 1=是同一人, 0=不是同一人
+	IsFallback     bool      `json:"is_fallback"`                              // 是否因为多次失败触发了降级
+	EnvironmentEnv string    `gorm:"type:varchar(50)" json:"environment_env"`  // 可选: "dark", "backlight" (由人工审核后标注)
+	CreatedAt      time.Time `json:"created_at"`
 }
