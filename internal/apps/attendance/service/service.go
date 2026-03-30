@@ -590,18 +590,34 @@ func (s *AttendanceService) PunchIn(ctx context.Context, orgID string, req *Punc
 	return nil
 }
 
-// GetOrgRecords 获取组织所有员工的打卡记录（管理端）
-func (s *AttendanceService) GetOrgRecords(ctx context.Context, orgID string, limit int) ([]models.AttendanceRecord, error) {
-	var records []models.AttendanceRecord
+// OrgRecordResponse defines the enriched record format for the admin dashboard
+type OrgRecordResponse struct {
+	ID        string    `json:"id"`
+	PunchTime time.Time `json:"punch_time"`
+	PunchType string    `json:"punch_type"`
+	Status    string    `json:"status"`
+	Employee  struct {
+		Name     string `json:"name"`
+		IDNumber string `json:"id_number"`
+	} `json:"employee"`
+}
 
-	if err := s.db.Where("org_id = ?", orgID).
-		Order("punch_time DESC").
+// GetOrgRecords 获取组织所有员工的打卡记录（管理端），包含员工信息
+func (s *AttendanceService) GetOrgRecords(ctx context.Context, orgID string, limit int) ([]OrgRecordResponse, error) {
+	var results []OrgRecordResponse
+
+	// Use Joins to fetch the related employee information
+	if err := s.db.Table("attendance_records").
+		Select("attendance_records.id, attendance_records.punch_time, attendance_records.punch_type, attendance_records.status, organization_employees.name as \"employee__name\", organization_employees.id_number as \"employee__id_number\"").
+		Joins("LEFT JOIN organization_employees ON attendance_records.employee_id = organization_employees.id").
+		Where("attendance_records.org_id = ?", orgID).
+		Order("attendance_records.punch_time DESC").
 		Limit(limit).
-		Find(&records).Error; err != nil {
+		Find(&results).Error; err != nil {
 		return nil, fmt.Errorf("failed to fetch org records: %w", err)
 	}
 
-	return records, nil
+	return results, nil
 }
 func (s *AttendanceService) GetEmployeeRecords(ctx context.Context, orgID string, idNumber string, limit int) ([]models.AttendanceRecord, error) {
 	var records []models.AttendanceRecord
