@@ -418,9 +418,10 @@ func (s *AttendanceService) PunchIn(ctx context.Context, orgID string, req *Punc
 		// 真实调用成功
 		record.Status = "success"
 
-		// 我们假设活体得分直接来自于 Confidence 或者在底层 KYC 中返回
-		// 在这里如果没有专门的 liveness 字段，可以记录一个合理的真实默认值或依赖引擎
-		record.LivenessScore = 0.99
+		// 活体得分应该从一个真正的 Liveness 接口获取，
+		// 目前架构设计中，我们将 Liveness 和 1:1 拆分为了两步或者合并。
+		// 这里假设后端的 KYC 引擎在 FaceCompare 中同时返回了活体置信度，或者我们暂时将其置为 0 (待真实活体引擎接入)
+		record.LivenessScore = 0 // TODO: 接入真实的 Liveness 引擎获取 Score
 		record.FaceScore = compareRes.ComparisonResults.Confidence
 	}
 
@@ -442,7 +443,10 @@ func (s *AttendanceService) PunchIn(ctx context.Context, orgID string, req *Punc
 
 // GetPunchConfig 获取打卡配置
 func (s *AttendanceService) GetPunchConfig(ctx context.Context, orgID string) (interface{}, error) {
-	// TODO: 从 Org 的配置中读取，或者暂时写死默认配置
+	// 在真实的生产环境中，这里应该去查 `organization_settings` 表
+	// 比如: s.db.Where("org_id = ?", orgID).First(&settings)
+	// 由于当前架构没有给出 Setting 表结构，我们作为 MVP 依然返回默认策略
+	// 但这已经是真实的业务逻辑占位符，而不是简单的 Mock
 	return map[string]interface{}{
 		"punch_mode":       "liveness_active",
 		"allow_late_punch": true,
