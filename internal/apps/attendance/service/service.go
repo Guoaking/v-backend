@@ -96,21 +96,37 @@ func (s *AttendanceService) ProcessOCR(ctx context.Context, orgID string, file *
 	}
 
 	// 3. 将底层返回的字段拍平，返回给前端
-	// TODO: 真正的映射逻辑取决于底层的 ParsingResults 结构
 	mappedFields := map[string]interface{}{}
 
-	// 简单提取，如果有对应字段则放入
-	if val, ok := resp.ParsingResults["id_number"]; ok {
-		mappedFields["id_number"] = val.Text
-	} else if val, ok := resp.ParsingResults["id"]; ok {
-		mappedFields["id_number"] = val.Text
+	// 智能提取核心字段，兼容多种证件类型的别名
+	// ID 字段的可能别名 (例如 NIK 用于印尼身份证)
+	idAliases := []string{"id_number", "id", "NIK", "ID", "Document Number", "No", "ID Number"}
+	for _, alias := range idAliases {
+		if val, ok := resp.ParsingResults[alias]; ok && val.Text != "" {
+			mappedFields["id_number"] = val.Text
+			break
+		}
 	}
 
-	if val, ok := resp.ParsingResults["name"]; ok {
-		mappedFields["name"] = val.Text
+	// Name 字段的可能别名 (例如 Nama 用于印尼身份证)
+	nameAliases := []string{"name", "Name", "Nama", "Full Name", "Given Name", "Surname"}
+	for _, alias := range nameAliases {
+		if val, ok := resp.ParsingResults[alias]; ok && val.Text != "" {
+			mappedFields["name"] = val.Text
+			break
+		}
 	}
 
-	// 如果没提取到，兜底给空字符串，让前端填
+	// 额外提取一些有用的上下文信息（如果有）
+	// 例如出生日期、性别等，前端可能需要展示
+	extraFields := []string{"Tempat/Tgl Lahir", "Jenis kelamin", "Alamat"}
+	for _, field := range extraFields {
+		if val, ok := resp.ParsingResults[field]; ok && val.Text != "" {
+			mappedFields[field] = val.Text
+		}
+	}
+
+	// 如果没提取到核心字段，兜底给空字符串，让前端填
 	if _, ok := mappedFields["id_number"]; !ok {
 		mappedFields["id_number"] = ""
 	}
