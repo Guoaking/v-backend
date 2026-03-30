@@ -144,7 +144,15 @@ func handleSubmit(svc *service.AttendanceService) gin.HandlerFunc {
 
 func handleGetConfig(svc *service.AttendanceService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		response.JSONSuccess(c, gin.H{"status": "ok"})
+		// In a real system, this would fetch from the database `organization_settings`
+		// For MVP, we return the default config as per the spec
+		config := map[string]interface{}{
+			"punch_mode":       "liveness_active",
+			"allow_late_punch": true,
+			"require_location": false,
+		}
+
+		response.JSONSuccess(c, config)
 	}
 }
 
