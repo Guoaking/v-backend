@@ -72,6 +72,7 @@ func (s *AttendanceService) GenerateMagicLinkToken(orgID string, jwtSecret strin
 
 func (s *AttendanceService) GenerateAppToken(orgID string) (string, error) {
 	// Generate a 1-year valid token
+	// IMPORTANT: we must provide the "attendance_magic_link" scope to pass the middleware
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"org_id": orgID,
 		"scope":  "attendance_magic_link", // Required by middleware
@@ -589,7 +590,19 @@ func (s *AttendanceService) PunchIn(ctx context.Context, orgID string, req *Punc
 	return nil
 }
 
-// GetEmployeeRecords 获取员工自己的打卡记录
+// GetOrgRecords 获取组织所有员工的打卡记录（管理端）
+func (s *AttendanceService) GetOrgRecords(ctx context.Context, orgID string, limit int) ([]models.AttendanceRecord, error) {
+	var records []models.AttendanceRecord
+
+	if err := s.db.Where("org_id = ?", orgID).
+		Order("punch_time DESC").
+		Limit(limit).
+		Find(&records).Error; err != nil {
+		return nil, fmt.Errorf("failed to fetch org records: %w", err)
+	}
+
+	return records, nil
+}
 func (s *AttendanceService) GetEmployeeRecords(ctx context.Context, orgID string, idNumber string, limit int) ([]models.AttendanceRecord, error) {
 	var records []models.AttendanceRecord
 

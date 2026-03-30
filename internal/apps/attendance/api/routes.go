@@ -324,7 +324,19 @@ func handleGetSelfRecords(svc *service.AttendanceService) gin.HandlerFunc {
 
 func handleConsoleGetRecords(svc *service.AttendanceService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		response.JSONSuccess(c, gin.H{"status": "ok"})
+		orgID := c.Query("org_id")
+		if orgID == "" {
+			response.JSONError(c, response.CodeInvalidParameter, "Missing org_id parameter")
+			return
+		}
+
+		records, err := svc.GetOrgRecords(c.Request.Context(), orgID, 50)
+		if err != nil {
+			response.JSONError(c, response.CodeInternalError, "failed to get records")
+			return
+		}
+
+		response.JSONSuccess(c, records)
 	}
 }
 
