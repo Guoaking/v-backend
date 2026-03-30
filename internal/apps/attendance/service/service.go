@@ -214,32 +214,28 @@ func (s *AttendanceService) MatchIdentity(ctx context.Context, orgID string, que
 
 type EnrollRequest struct {
 	SessionID   string                 `json:"session_id"`
+	IDType      string                 `json:"id_type"`
 	IDNumber    string                 `json:"id_number" binding:"required"`
 	Name        string                 `json:"name" binding:"required"`
-	Phone       string                 `json:"phone"`
-	IDType      string                 `json:"id_type"`
-	FaceImage   string                 `json:"face_image" binding:"required"` // Base64 or URL
+	Phone       string                 `json:"phone" binding:"required,min=4"`
+	FaceImage   string                 `json:"face_image" binding:"required"` // base64
+	RawImageURL string                 `json:"raw_image_url"`                 // 之前存的 OCR 原图路径
+	RawOCRJSON  string                 `json:"raw_ocr_json"`
 	FinalFields map[string]interface{} `json:"final_fields"`
-	RawOCRJSON  string                 `json:"raw_ocr_json"` // 假设前端或者 Redis 传回来的原始 OCR 结果
-	RawImageURL string                 `json:"raw_image_url"`
 }
+
+var ErrAlreadyEnrolled = fmt.Errorf("employee already enrolled")
 
 // EnrollEmployee 员工注册提交
 func (s *AttendanceService) EnrollEmployee(ctx context.Context, orgID string, req *EnrollRequest) error {
 	log := logger.GetLogger().WithContext(ctx)
 
 	return s.db.Transaction(func(tx *gorm.DB) error {
-		// 1. 查重 (org_id, id_number)
+		// 1. 检查是否存在
 		var existing models.OrganizationEmployee
 		err := tx.Where("org_id = ? AND id_number = ?", orgID, req.IDNumber).First(&existing).Error
-		if err == nil {
-			if existing.Status == "active" {
-				return fmt.Errorf("employee already enrolled")
-			}
-			// 如果是被删除的，我们可以选择复用
-			log.Infof("Re-enrolling previously deleted employee: %s", req.IDNumber)
-		} else if err != gorm.ErrRecordNotFound {
-			return fmt.Errorf("database error during deduplication: %w", err)
+		if err == nil && existing.ID != "" {
+			return ErrAlreadyEnrolled
 		}
 
 		// 2. 提取人脸特征 (暂时跳过，直接保存图片，因为底层 FaceCompare 需要两张图片)

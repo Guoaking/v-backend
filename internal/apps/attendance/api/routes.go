@@ -130,6 +130,10 @@ func handleSubmit(svc *service.AttendanceService) gin.HandlerFunc {
 		}
 
 		if err := svc.EnrollEmployee(c.Request.Context(), orgID.(string), &req); err != nil {
+			if err == service.ErrAlreadyEnrolled {
+				response.JSONError(c, 409, "Employee already enrolled")
+				return
+			}
 			response.JSONError(c, response.CodeInternalError, err.Error())
 			return
 		}
