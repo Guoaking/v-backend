@@ -280,13 +280,33 @@ func handlePunch(svc *service.AttendanceService) gin.HandlerFunc {
 
 func handleRequestOTP(svc *service.AttendanceService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		response.JSONSuccess(c, gin.H{"status": "ok"})
+		// MVP 阶段不需要真实发送短信，前端也不依赖此接口的实际副作用
+		// 在完整版中，这里应该调用 SMS/Email 服务发送 OTP
+		response.JSONSuccess(c, gin.H{"status": "ok", "message": "OTP logic not implemented in MVP"})
 	}
 }
 
 func handleGetSelfRecords(svc *service.AttendanceService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		response.JSONSuccess(c, gin.H{"status": "ok"})
+		orgID, exists := c.Get(middleware.AttendanceContextOrgID)
+		if !exists {
+			response.JSONError(c, response.CodeUnauthorized, "missing org_id in context")
+			return
+		}
+
+		idNumber := c.Query("id_number")
+		if idNumber == "" {
+			response.JSONError(c, response.CodeInvalidParameter, "id_number is required")
+			return
+		}
+
+		records, err := svc.GetEmployeeRecords(c.Request.Context(), orgID.(string), idNumber, 10)
+		if err != nil {
+			response.JSONError(c, response.CodeInternalError, err.Error())
+			return
+		}
+
+		response.JSONSuccess(c, records)
 	}
 }
 

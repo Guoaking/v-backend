@@ -77,8 +77,8 @@ func (s *AttendanceService) GenerateAppToken(orgID string) (string, error) {
 		"exp":    time.Now().Add(365 * 24 * time.Hour).Unix(),
 	})
 
-	// TODO: Get JWT Secret from global config
-	secret := "your-secret-key-here-must-be-32-bytes-long"
+	// Get JWT Secret from global config instead of hardcoding
+	secret := s.kycService.Config.Security.JWTSecret
 
 	tokenStr, err := token.SignedString([]byte(secret))
 	if err != nil {
@@ -588,7 +588,26 @@ func (s *AttendanceService) PunchIn(ctx context.Context, orgID string, req *Punc
 	return nil
 }
 
-// GetPunchConfig 获取打卡配置
+// GetEmployeeRecords 获取员工自己的打卡记录
+func (s *AttendanceService) GetEmployeeRecords(ctx context.Context, orgID string, idNumber string, limit int) ([]models.AttendanceRecord, error) {
+	var records []models.AttendanceRecord
+
+	// 1. 验证员工是否存在
+	var emp models.OrganizationEmployee
+	if err := s.db.Where("org_id = ? AND id_number = ?", orgID, idNumber).First(&emp).Error; err != nil {
+		return nil, ErrIdentityNotFound
+	}
+
+	// 2. 查询最近的打卡记录
+	if err := s.db.Where("org_id = ? AND employee_id = ?", orgID, emp.ID).
+		Order("punch_time DESC").
+		Limit(limit).
+		Find(&records).Error; err != nil {
+		return nil, fmt.Errorf("failed to fetch records: %w", err)
+	}
+
+	return records, nil
+}
 func (s *AttendanceService) GetPunchConfig(ctx context.Context, orgID string) (*models.OrganizationSettings, error) {
 	var settings models.OrganizationSettings
 
