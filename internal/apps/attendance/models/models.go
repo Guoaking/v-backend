@@ -54,6 +54,16 @@ type DataCollectionDocument struct {
 	CreatedAt      time.Time      `json:"created_at"`
 }
 
+// OrganizationSettings 租户级别的考勤配置
+type OrganizationSettings struct {
+	OrgID           string    `gorm:"primaryKey;type:varchar(64)" json:"org_id"`
+	PunchMode       string    `gorm:"type:varchar(50);default:'liveness_active'" json:"punch_mode"` // photo_only, liveness_silent, liveness_active
+	AllowLatePunch  bool      `gorm:"default:true" json:"allow_late_punch"`
+	RequireLocation bool      `gorm:"default:false" json:"require_location"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
 // DataCollectionFace 算法数据反哺表 (人脸打卡域)
 // 收集极端光照、佩戴口罩等边缘场景下的人脸比对数据，供算法团队微调 FaceCompare 和 Liveness 模型。
 type DataCollectionFace struct {

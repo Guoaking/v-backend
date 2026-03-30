@@ -73,7 +73,8 @@ func handleConsoleGetMagicLink(svc *service.AttendanceService, jwtSecret string)
 			return
 		}
 
-		token, err := svc.GenerateMagicLinkToken(orgID, jwtSecret)
+		// 1. Get or Generate Active Token
+		token, err := svc.GetActiveAppToken(orgID)
 		if err != nil {
 			response.JSONError(c, response.CodeInternalError, "Failed to generate magic link")
 			return
@@ -82,9 +83,6 @@ func handleConsoleGetMagicLink(svc *service.AttendanceService, jwtSecret string)
 		// 2. Fetch the frontend return URL from the application config
 		// Use the dedicated App.FrontendBaseURL configuration
 		baseURL := svc.GetConfig().Config.App.FrontendBaseURL
-		if baseURL == "" {
-			baseURL = "http://localhost:3000" // Fallback
-		}
 		baseURL = strings.TrimRight(baseURL, "/")
 
 		// 拼接成完整的 H5 URL
@@ -180,12 +178,16 @@ func handleSubmit(svc *service.AttendanceService) gin.HandlerFunc {
 
 func handleGetConfig(svc *service.AttendanceService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// In a real system, this would fetch from the database `organization_settings`
-		// For MVP, we return the default config as per the spec
-		config := map[string]interface{}{
-			"punch_mode":       "liveness_active",
-			"allow_late_punch": true,
-			"require_location": false,
+		orgID, exists := c.Get(middleware.AttendanceContextOrgID)
+		if !exists {
+			response.JSONError(c, response.CodeUnauthorized, "missing org_id in context")
+			return
+		}
+
+		config, err := svc.GetPunchConfig(c.Request.Context(), orgID.(string))
+		if err != nil {
+			response.JSONError(c, response.CodeInternalError, "failed to get organization settings")
+			return
 		}
 
 		response.JSONSuccess(c, config)

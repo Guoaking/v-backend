@@ -73,6 +73,44 @@ func (s *AttendanceService) GenerateMagicLinkToken(orgID string, jwtSecret strin
 	return tokenString, nil
 }
 
+func (s *AttendanceService) GenerateAppToken(orgID string) (string, error) {
+	// Generate a 1-year valid token
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"org_id": orgID,
+		"exp":    time.Now().Add(365 * 24 * time.Hour).Unix(),
+	})
+
+	// TODO: Get JWT Secret from global config
+	secret := "your-secret-key-here-must-be-32-bytes-long"
+
+	tokenStr, err := token.SignedString([]byte(secret))
+	if err != nil {
+		return "", err
+	}
+
+	// 持久化到 Redis，确保 Admin 端可以随时拉取到当前激活的 Token
+	// 如果之前有，就会覆盖
+	ctx := context.Background()
+	err = s.redis.Set(ctx, fmt.Sprintf("attendance:magic_link:%s", orgID), tokenStr, 365*24*time.Hour).Err()
+	if err != nil {
+		logger.GetLogger().Warnf("Failed to persist magic link to redis: %v", err)
+	}
+
+	return tokenStr, nil
+}
+func (s *AttendanceService) GetActiveAppToken(orgID string) (string, error) {
+	ctx := context.Background()
+	token, err := s.redis.Get(ctx, fmt.Sprintf("attendance:magic_link:%s", orgID)).Result()
+	if err != nil {
+		if err == goRedis.Nil {
+			// If not found, generate a new one
+			return s.GenerateAppToken(orgID)
+		}
+		return "", err
+	}
+	return token, nil
+}
+
 // OCRResult 结构体
 type OCRResult struct {
 	SessionID  string                 `json:"session_id"`
@@ -519,14 +557,27 @@ func (s *AttendanceService) PunchIn(ctx context.Context, orgID string, req *Punc
 }
 
 // GetPunchConfig 获取打卡配置
-func (s *AttendanceService) GetPunchConfig(ctx context.Context, orgID string) (interface{}, error) {
-	// 在真实的生产环境中，这里应该去查 `organization_settings` 表
-	// 比如: s.db.Where("org_id = ?", orgID).First(&settings)
-	// 由于当前架构没有给出 Setting 表结构，我们作为 MVP 依然返回默认策略
-	// 但这已经是真实的业务逻辑占位符，而不是简单的 Mock
-	return map[string]interface{}{
-		"punch_mode":       "liveness_active",
-		"allow_late_punch": true,
-		"require_location": false,
-	}, nil
+func (s *AttendanceService) GetPunchConfig(ctx context.Context, orgID string) (*models.OrganizationSettings, error) {
+	var settings models.OrganizationSettings
+
+	// 尝试从数据库获取该租户的配置
+	err := s.db.Where("org_id = ?", orgID).First(&settings).Error
+
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			// 如果没有配置，返回默认配置，并且可以在这里选择将其落库初始化
+			settings = models.OrganizationSettings{
+				OrgID:           orgID,
+				PunchMode:       "liveness_active",
+				AllowLatePunch:  true,
+				RequireLocation: false,
+			}
+			// 自动初始化默认配置落库
+			s.db.Create(&settings)
+			return &settings, nil
+		}
+		return nil, fmt.Errorf("failed to fetch organization settings: %w", err)
+	}
+
+	return &settings, nil
 }
