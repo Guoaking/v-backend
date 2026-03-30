@@ -217,11 +217,11 @@ func (s *AttendanceService) MatchIdentity(ctx context.Context, orgID string, que
 type EnrollRequest struct {
 	SessionID   string                 `json:"session_id"`
 	IDType      string                 `json:"id_type"`
-	IDNumber    string                 `json:"id_number" binding:"required"`
-	Name        string                 `json:"name" binding:"required"`
-	Phone       string                 `json:"phone" binding:"required,min=4"`
-	FaceImage   string                 `json:"face_image" binding:"required"` // base64
-	RawImageURL string                 `json:"raw_image_url"`                 // 之前存的 OCR 原图路径
+	IDNumber    string                 `json:"id_number"`
+	Name        string                 `json:"name"`
+	Phone       string                 `json:"phone"`
+	FaceFile    *multipart.FileHeader  `json:"-"`             // 直接接收二进制文件头
+	RawImageURL string                 `json:"raw_image_url"` // 之前存的 OCR 原图路径
 	RawOCRJSON  string                 `json:"raw_ocr_json"`
 	FinalFields map[string]interface{} `json:"final_fields"`
 }
@@ -273,29 +273,28 @@ func (s *AttendanceService) EnrollEmployee(ctx context.Context, orgID string, re
 			return ErrAlreadyEnrolled
 		}
 
-		// 2. 将人脸照片从 Base64 提取并保存到本地
-		// 这里因为我们在改造 Punch，但 Enroll 还是传的 Base64，所以保留一个 Base64 解码的辅助逻辑
-		faceImagePath, err := saveBase64ToLocalHelper(req.FaceImage, "attendance/faces", req.IDNumber)
+		// 2. 保存人脸照片到底库
+		faceHeader := req.FaceFile
+		if faceHeader == nil {
+			return fmt.Errorf("face image is required")
+		}
+
+		faceImagePath, err := SaveMultipartToLocal(faceHeader, "attendance/faces", req.IDNumber)
 		if err != nil {
 			return fmt.Errorf("failed to save face image: %w", err)
 		}
 
 		// 3. 增强逻辑：在注册时强制调用一次底层的 FaceDetect (质量检测) 或 LivenessSilent
 		// 确保底库照片是一张合格的真人照片，而不是翻拍或者模糊的
-		faceHeader, err := ConvertLocalFileToMultipartHeader(faceImagePath)
-		if err == nil && faceHeader != nil {
-			// 复用 KYCService 的 FaceDetect
-			detectRes, detectErr := s.kycService.FaceDetect(ctx, faceHeader)
-			if detectErr != nil || detectRes == nil || detectRes.Code != 0 {
-				log.Warnf("Face detect failed during enrollment: %v", detectErr)
-				return fmt.Errorf("face detection failed: please upload a clear face image")
-			}
-			// 如果没有检测到人脸
-			if detectRes.DetectionResults.IsFaceExist == 0 || detectRes.DetectionResults.FaceNum == 0 {
-				return fmt.Errorf("no face detected in the image")
-			}
-		} else {
-			log.Warnf("Could not construct file header for face detection, skipping quality check")
+		// 复用 KYCService 的 FaceDetect
+		detectRes, detectErr := s.kycService.FaceDetect(ctx, faceHeader)
+		if detectErr != nil || detectRes == nil || detectRes.Code != 0 {
+			log.Warnf("Face detect failed during enrollment: %v", detectErr)
+			return fmt.Errorf("face detection failed: please upload a clear face image")
+		}
+		// 如果没有检测到人脸
+		if detectRes.DetectionResults.IsFaceExist == 0 || detectRes.DetectionResults.FaceNum == 0 {
+			return fmt.Errorf("no face detected in the image")
 		}
 
 		// 4. 落库或更新 models.OrganizationEmployee

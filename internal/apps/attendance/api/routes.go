@@ -122,13 +122,35 @@ func handleSubmit(svc *service.AttendanceService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		orgID, exists := c.Get(middleware.AttendanceContextOrgID)
 		if !exists {
-			response.JSONError(c, response.CodeInvalidParameter, "Missing org_id in context")
+			response.JSONError(c, response.CodeUnauthorized, "missing org_id in context")
 			return
 		}
 
-		var req service.EnrollRequest
-		if err := c.ShouldBindJSON(&req); err != nil {
-			response.JSONError(c, response.CodeInvalidParameter, err.Error())
+		if err := c.Request.ParseMultipartForm(10 << 20); err != nil {
+			response.JSONError(c, response.CodeBadRequest, "failed to parse multipart form")
+			return
+		}
+
+		req := service.EnrollRequest{
+			SessionID:   c.PostForm("session_id"),
+			IDNumber:    c.PostForm("id_number"),
+			Name:        c.PostForm("name"),
+			Phone:       c.PostForm("phone"),
+			IDType:      c.PostForm("id_type"),
+			RawImageURL: c.PostForm("raw_image_url"),
+			RawOCRJSON:  c.PostForm("raw_ocr_json"),
+		}
+
+		// 提取图片文件
+		file, err := c.FormFile("face_image")
+		if err != nil {
+			response.JSONError(c, response.CodeInvalidParameter, "face_image is required")
+			return
+		}
+		req.FaceFile = file
+
+		if req.IDNumber == "" || req.Name == "" || req.Phone == "" {
+			response.JSONError(c, response.CodeInvalidParameter, "missing required fields (id_number, name, phone)")
 			return
 		}
 
@@ -141,7 +163,9 @@ func handleSubmit(svc *service.AttendanceService) gin.HandlerFunc {
 			return
 		}
 
-		response.JSONSuccess(c, gin.H{"status": "enrolled successfully"})
+		response.JSONSuccess(c, map[string]string{
+			"status": "enrolled",
+		})
 	}
 }
 
