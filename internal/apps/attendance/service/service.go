@@ -64,10 +64,22 @@ type OCRResult struct {
 // ProcessOCR 处理证件 OCR 提取
 // 它调用核心的 KYCService，并将结果暂存，返回给前端供用户修改
 func (s *AttendanceService) ProcessOCR(ctx context.Context, orgID string, file *multipart.FileHeader, idType string) (*OCRResult, error) {
+	// 映射前端传来的 id_type 到底层 OCR 支持的类型
+	// 底层支持: "id_card", "driver_license", "vehicle_license", "bank_card", "business_license", "general", "vat_certificate", "passport", "NPWP"
+	backendOcrType := idType
+	switch idType {
+	case "thai_id", "id_card":
+		backendOcrType = "id_card"
+	case "driving_license":
+		backendOcrType = "driver_license"
+	case "voter_id":
+		backendOcrType = "general" // 暂时 fallback 到 general 或者其它合适的类型
+	}
+
 	// 1. 构建底层所需的请求
 	req := &coreService.OCRRequest{
 		Picture: file,
-		Type:    idType,
+		Type:    backendOcrType,
 	}
 
 	// Inject the organization context into the context to satisfy the underlying OCR service's requirements
