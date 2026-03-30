@@ -37,12 +37,9 @@ func (s *AttendanceService) GetConfig() *coreService.KYCService {
 }
 
 func NewAttendanceService(db *gorm.DB, kycService *coreService.KYCService) *AttendanceService {
-	// 初始化一个局部的 Redis Client 用于防抖
-	// 实际生产中应通过依赖注入传入全局的 Redis Client
-	rdb := goRedis.NewClient(&goRedis.Options{
-		Addr: "localhost:6379", // Default redis address
-		DB:   0,
-	})
+	// 直接使用主框架注入的 Redis Client
+	// 这样可以复用连接池，并确保连接配置正确 (而不是硬编码 localhost)
+	rdb := kycService.Redis
 
 	return &AttendanceService{
 		db:         db,
