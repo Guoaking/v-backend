@@ -287,7 +287,8 @@ func (s *AttendanceService) EnrollEmployee(ctx context.Context, orgID string, re
 		// 3. 增强逻辑：在注册时强制调用一次底层的 FaceDetect (质量检测) 或 LivenessSilent
 		// 确保底库照片是一张合格的真人照片，而不是翻拍或者模糊的
 		// 复用 KYCService 的 FaceDetect
-		detectRes, detectErr := s.kycService.FaceDetect(ctx, faceHeader)
+		ctxWithOrg := context.WithValue(ctx, "org_id", orgID) // 注入组织信息用于配额计费
+		detectRes, detectErr := s.kycService.FaceDetect(ctxWithOrg, faceHeader)
 		if detectErr != nil || detectRes == nil || detectRes.Code != 0 {
 			log.Warnf("Face detect failed during enrollment: %v", detectErr)
 			return fmt.Errorf("face detection failed: please upload a clear face image")
@@ -433,7 +434,8 @@ func (s *AttendanceService) PunchIn(ctx context.Context, orgID string, req *Punc
 		// -------------------------------------------------------------
 		// 这里复用底层 KYCService 的 LivenessSilent 能力
 		// 在真实场景中，如果打卡策略是 liveness_silent，则必须先通过活体
-		livenessRes, err := s.kycService.LivenessSilent(ctx, punchFaceHeader, "zh-CN")
+		ctxWithOrg := context.WithValue(ctx, "org_id", orgID) // 注入组织信息用于配额计费
+		livenessRes, err := s.kycService.LivenessSilent(ctxWithOrg, punchFaceHeader, "zh-CN")
 		if err != nil {
 			log.Warnf("Liveness check failed or error returned: %v", err)
 			return fmt.Errorf("liveness check failed: %w", err)
