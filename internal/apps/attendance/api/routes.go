@@ -164,6 +164,10 @@ func handleIdentityMatch(svc *service.AttendanceService) gin.HandlerFunc {
 
 		res, err := svc.MatchIdentity(c.Request.Context(), orgID.(string), req.Query)
 		if err != nil {
+			if err == service.ErrIdentityNotFound {
+				response.JSONError(c, 404, err.Error())
+				return
+			}
 			response.JSONError(c, response.CodeInternalError, err.Error())
 			return
 		}
@@ -187,6 +191,14 @@ func handlePunch(svc *service.AttendanceService) gin.HandlerFunc {
 		}
 
 		if err := svc.PunchIn(c.Request.Context(), orgID.(string), &req); err != nil {
+			if err == service.ErrIdentityNotFound {
+				response.JSONError(c, 404, err.Error())
+				return
+			}
+			if err == service.ErrFaceVerificationFailed {
+				response.JSONError(c, 401, err.Error())
+				return
+			}
 			response.JSONError(c, response.CodeInternalError, err.Error())
 			return
 		}

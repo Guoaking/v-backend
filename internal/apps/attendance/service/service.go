@@ -189,7 +189,7 @@ func (s *AttendanceService) MatchIdentity(ctx context.Context, orgID string, que
 	err := s.db.Where("org_id = ? AND status = ? AND phone LIKE ?", orgID, "active", "%"+query).First(&emp).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
-			return nil, fmt.Errorf("identity not found")
+			return nil, ErrIdentityNotFound
 		}
 		return nil, fmt.Errorf("database error: %w", err)
 	}
@@ -225,6 +225,8 @@ type EnrollRequest struct {
 }
 
 var ErrAlreadyEnrolled = fmt.Errorf("employee already enrolled")
+var ErrIdentityNotFound = fmt.Errorf("employee not found or inactive")
+var ErrFaceVerificationFailed = fmt.Errorf("face verification failed: not the same person")
 
 // EnrollEmployee 员工注册提交
 func (s *AttendanceService) EnrollEmployee(ctx context.Context, orgID string, req *EnrollRequest) error {
@@ -329,7 +331,7 @@ func (s *AttendanceService) PunchIn(ctx context.Context, orgID string, req *Punc
 	// 2. 查员工是否存在
 	var emp models.OrganizationEmployee
 	if err := s.db.Where("org_id = ? AND id_number = ? AND status = ?", orgID, req.IDNumber, "active").First(&emp).Error; err != nil {
-		return fmt.Errorf("employee not found or inactive")
+		return ErrIdentityNotFound
 	}
 
 	record := models.AttendanceRecord{
@@ -418,7 +420,7 @@ func (s *AttendanceService) PunchIn(ctx context.Context, orgID string, req *Punc
 		}(orgID, emp.FaceImageURL, punchImagePath, compareRes.ComparisonResults.Confidence, compareRes.ComparisonResults.IsSameFace)
 
 		if compareRes.Code != 0 || compareRes.ComparisonResults.IsSameFace == 0 {
-			return fmt.Errorf("face verification failed: not the same person (confidence: %.2f)", compareRes.ComparisonResults.Confidence)
+			return ErrFaceVerificationFailed
 		}
 
 		// 真实调用成功
