@@ -254,13 +254,10 @@ func handlePunch(svc *service.AttendanceService) gin.HandlerFunc {
 			return
 		}
 
-		// 提取图片文件
-		file, err := c.FormFile("liveness_image")
-		if err != nil {
-			response.JSONError(c, response.CodeInvalidParameter, "liveness_image is required")
-			return
-		}
+		// 提取图片文件 (如果不是动作活体模式)
+		file, _ := c.FormFile("liveness_image")
 		req.LivenessFile = file
+		req.LivenessTaskID = c.PostForm("liveness_task_id")
 
 		if err := svc.PunchIn(c.Request.Context(), orgID.(string), &req); err != nil {
 			if err == service.ErrIdentityNotFound {
