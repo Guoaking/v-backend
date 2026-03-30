@@ -63,10 +63,10 @@ func RegisterRoutes(r *gin.RouterGroup, jwtSecret string, svc *service.Attendanc
 func handleConsoleGetMagicLink(svc *service.AttendanceService, jwtSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 在真实的 Console 路由中，orgID 应该是从登录老板的 Context/Token 里拿到的
-		// 这里为了测试方便，我们先写死一个测试用的 orgID，或者从 query 拿
 		orgID := c.Query("org_id")
 		if orgID == "" {
-			orgID = "test_org_123" // Fallback for local testing
+			response.JSONError(c, response.CodeInvalidParameter, "Missing org_id parameter")
+			return
 		}
 
 		token, err := svc.GenerateMagicLinkToken(orgID, jwtSecret)
