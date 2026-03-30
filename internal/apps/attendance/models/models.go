@@ -12,9 +12,9 @@ import (
 type OrganizationEmployee struct {
 	ID           string    `gorm:"primaryKey;type:varchar(64)" json:"id"`
 	OrgID        string    `gorm:"index;not null;type:varchar(64)" json:"org_id"`
-	EmployeeNo   string    `gorm:"index;not null;type:varchar(20)" json:"employee_no"` // 随机生成的8位工号，用于日常打卡和记录查询
-	EmployeeSN   string    `gorm:"index;type:varchar(64)" json:"employee_sn"`          // 客户内部工号(可选)
-	IDNumber     string    `gorm:"index;not null;type:varchar(64)" json:"id_number"`   // 核心锚点：证件号(用于注册和底层唯一性校验)
+	EmployeeNo   string    `gorm:"index;type:varchar(20);default:''" json:"employee_no"` // 随机生成的8位工号，用于日常打卡和记录查询 (Removed not null to support backward compatibility migration)
+	EmployeeSN   string    `gorm:"index;type:varchar(64)" json:"employee_sn"`            // 客户内部工号(可选)
+	IDNumber     string    `gorm:"index;not null;type:varchar(64)" json:"id_number"`     // 核心锚点：证件号(用于注册和底层唯一性校验)
 	Name         string    `gorm:"not null;type:varchar(64)" json:"name"`
 	Phone        string    `gorm:"type:varchar(20)" json:"phone"`
 	FaceFeature  []byte    `gorm:"type:bytea" json:"-"`                             // 提取出的人脸特征向量，不对外暴露
