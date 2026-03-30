@@ -2,9 +2,13 @@ package service
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"mime/multipart"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"kyc-service/internal/apps/attendance/models"
@@ -215,6 +219,37 @@ var ErrAlreadyEnrolled = fmt.Errorf("employee already enrolled")
 var ErrIdentityNotFound = fmt.Errorf("employee not found or inactive")
 var ErrFaceVerificationFailed = fmt.Errorf("face verification failed: not the same person")
 
+// saveBase64ToLocalHelper is a temporary helper for the Enroll endpoint which still uses JSON Base64
+func saveBase64ToLocalHelper(base64Data, directory, prefix string) (string, error) {
+	if base64Data == "" {
+		return "", nil
+	}
+	parts := strings.SplitN(base64Data, ",", 2)
+	var rawBase64 string
+	var ext string
+	if len(parts) == 2 {
+		rawBase64 = parts[1]
+		if strings.Contains(parts[0], "image/png") {
+			ext = ".png"
+		} else {
+			ext = ".jpg"
+		}
+	} else {
+		rawBase64 = parts[0]
+		ext = ".jpg"
+	}
+	decodedBytes, err := base64.StdEncoding.DecodeString(rawBase64)
+	if err != nil {
+		return "", err
+	}
+	baseDir := filepath.Join(".", "uploads", directory)
+	os.MkdirAll(baseDir, os.ModePerm)
+	fileName := fmt.Sprintf("%s_%s%s", prefix, utils.GenerateID(), ext)
+	fullPath := filepath.Join(baseDir, fileName)
+	os.WriteFile(fullPath, decodedBytes, 0644)
+	return strings.ReplaceAll(filepath.Join("/uploads", directory, fileName), "\\", "/"), nil
+}
+
 // EnrollEmployee 员工注册提交
 func (s *AttendanceService) EnrollEmployee(ctx context.Context, orgID string, req *EnrollRequest) error {
 	log := logger.GetLogger().WithContext(ctx)
@@ -231,7 +266,9 @@ func (s *AttendanceService) EnrollEmployee(ctx context.Context, orgID string, re
 		// 实际业务中，注册时应该对 req.FaceImage 进行活体检测和质量检测
 
 		// 处理 Base64 图片，保存到本地文件系统
-		faceImagePath, err := SaveBase64ToLocal(req.FaceImage, "attendance/faces", req.IDNumber)
+		// 这里因为我们在改造 Punch，但 Enroll 还是传的 Base64，所以保留一个 Base64 解码的辅助逻辑或者让 Enroll 也改成 Multipart
+		// 为了不破坏现有的 Enroll，我们在 storage.go 里把 SaveBase64ToLocal 恢复或者直接在这里写个简单的解码
+		faceImagePath, err := saveBase64ToLocalHelper(req.FaceImage, "attendance/faces", req.IDNumber)
 		if err != nil {
 			log.Errorf("Failed to save face image: %v", err)
 			// 依然允许继续，不阻断主流程，只是存个空或原来的数据
@@ -290,13 +327,12 @@ func (s *AttendanceService) EnrollEmployee(ctx context.Context, orgID string, re
 // ==============================================================================
 
 type PunchRequest struct {
-	IDNumber      string  `json:"id_number" binding:"required"`
-	PunchType     string  `json:"punch_type" binding:"required"` // in, out
-	LivenessData  string  `json:"liveness_data"`                 // base64 video/image
-	FallbackMode  bool    `json:"fallback_mode"`
-	FallbackImage string  `json:"fallback_image"`
-	Latitude      float64 `json:"latitude"` // 从前端获取的 GPS 坐标
-	Longitude     float64 `json:"longitude"`
+	IDNumber     string                `json:"id_number"`
+	PunchType    string                `json:"punch_type"`
+	LivenessFile *multipart.FileHeader `json:"-"` // 直接接收二进制文件头
+	FallbackMode bool                  `json:"fallback_mode"`
+	Latitude     float64               `json:"latitude"` // 从前端获取的 GPS 坐标
+	Longitude    float64               `json:"longitude"`
 }
 
 // PunchIn 执行打卡
@@ -337,51 +373,44 @@ func (s *AttendanceService) PunchIn(ctx context.Context, orgID string, req *Punc
 		log.Infof("Processing punch-in in fallback mode for %s", req.IDNumber)
 		record.Status = "manual_review"
 
-		// 保存降级照片到本地
-		fallbackPath, err := SaveBase64ToLocal(req.FallbackImage, "attendance/fallbacks", req.IDNumber)
-		if err != nil {
-			log.Errorf("Failed to save fallback image: %v", err)
-		}
-		record.FallbackImageURL = fallbackPath
+		// 异步保存降级照片并收集数据
+		go func(oID, baseImg string, fileHeader *multipart.FileHeader) {
+			// 在生产环境中，这里应该将 fileHeader 的内容流式上传到 S3
+			// 作为 MVP，我们用辅助函数将其存入本地
+			fallbackPath, err := SaveMultipartToLocal(fileHeader, "attendance/fallbacks", req.IDNumber)
+			if err != nil {
+				log.Errorf("Failed to save fallback image: %v", err)
+				return
+			}
 
-		// 收集降级照片供算法团队分析 (为什么活体会失败)
-		go func(oID, baseImg, fallbackImg string) {
+			// 收集降级照片供算法团队分析 (为什么活体会失败)
 			faceDoc := models.DataCollectionFace{
 				ID:            utils.GenerateID(),
 				OrgID:         oID,
 				BaseImageURL:  baseImg,
-				PunchImageURL: fallbackImg,
+				PunchImageURL: fallbackPath,
 				Confidence:    0,
 				IsSameFace:    0,
 				IsFallback:    true,
 			}
-			// Safe copy of db for goroutine
 			dbCopy := s.db.Session(&gorm.Session{})
 			if err := dbCopy.Create(&faceDoc).Error; err != nil {
 				log.Warnf("Failed to collect fallback face data: %v", err)
 			}
-		}(orgID, emp.FaceImageURL, fallbackPath)
+		}(orgID, emp.FaceImageURL, req.LivenessFile)
+
 	} else {
 		// 4. 正常打卡：调用底层活体和 1:1 比对
 		log.Infof("Calling underlying KYC liveness and 1:1 face match for %s", req.IDNumber)
 
-		// 将前端传来的活体打卡照片落盘
-		punchImagePath, err := SaveBase64ToLocal(req.LivenessData, "attendance/punches", req.IDNumber)
-		if err != nil {
-			return fmt.Errorf("failed to save punch image: %w", err)
-		}
+		// 直接使用从前端接收到的 multipart.FileHeader，不再需要 Base64 解码落盘！
+		punchFaceHeader := req.LivenessFile
 
-		// 将底库照片和打卡照片转为 multipart.FileHeader，因为底层 FaceCompare 接口需要这个类型
+		// 将底库照片转为 multipart.FileHeader (底库由于历史原因还在本地，需要包装)
 		baseFaceHeader, err := ConvertLocalFileToMultipartHeader(emp.FaceImageURL)
 		if err != nil {
 			log.Errorf("Failed to read base face image: %v", err)
 			return fmt.Errorf("system error: unable to load employee base image")
-		}
-
-		punchFaceHeader, err := ConvertLocalFileToMultipartHeader(punchImagePath)
-		if err != nil {
-			log.Errorf("Failed to read punch face image: %v", err)
-			return fmt.Errorf("system error: unable to load punch image")
 		}
 
 		// 调用底层 FaceCompare 服务
@@ -394,12 +423,15 @@ func (s *AttendanceService) PunchIn(ctx context.Context, orgID string, req *Punc
 		}
 
 		// 异步收集人脸比对数据反哺算法团队 (数据飞轮)
-		go func(oID, baseImg, punchImg string, conf float64, isSame int) {
+		go func(oID, baseImg string, fileHeader *multipart.FileHeader, conf float64, isSame int) {
+			// 将刚才没落盘的现场图异步落盘
+			punchImagePath, _ := SaveMultipartToLocal(fileHeader, "attendance/faces", req.IDNumber)
+
 			faceDoc := models.DataCollectionFace{
 				ID:            utils.GenerateID(),
 				OrgID:         oID,
 				BaseImageURL:  baseImg,
-				PunchImageURL: punchImg,
+				PunchImageURL: punchImagePath,
 				Confidence:    conf,
 				IsSameFace:    isSame,
 				IsFallback:    false,
@@ -409,7 +441,7 @@ func (s *AttendanceService) PunchIn(ctx context.Context, orgID string, req *Punc
 			if err := dbCopy.Create(&faceDoc).Error; err != nil {
 				log.Warnf("Failed to collect face compare data: %v", err)
 			}
-		}(orgID, emp.FaceImageURL, punchImagePath, compareRes.ComparisonResults.Confidence, compareRes.ComparisonResults.IsSameFace)
+		}(orgID, emp.FaceImageURL, req.LivenessFile, compareRes.ComparisonResults.Confidence, compareRes.ComparisonResults.IsSameFace)
 
 		if compareRes.Code != 0 || compareRes.ComparisonResults.IsSameFace == 0 {
 			return ErrFaceVerificationFailed

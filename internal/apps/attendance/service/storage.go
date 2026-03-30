@@ -2,69 +2,48 @@ package service
 
 import (
 	"bytes"
-	"encoding/base64"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"kyc-service/pkg/utils"
 )
 
-// SaveBase64ToLocal 截取 base64 的头部并保存为本地文件，返回相对路径
-func SaveBase64ToLocal(base64Data, directory, prefix string) (string, error) {
-	if base64Data == "" {
-		return "", nil
-	}
-
-	// 1. 分离前缀 (e.g. data:image/jpeg;base64,.....)
-	parts := strings.SplitN(base64Data, ",", 2)
-	var rawBase64 string
-	var ext string
-
-	if len(parts) == 2 {
-		rawBase64 = parts[1]
-		// 尝试提取扩展名
-		if strings.Contains(parts[0], "image/png") {
-			ext = ".png"
-		} else if strings.Contains(parts[0], "image/jpeg") || strings.Contains(parts[0], "image/jpg") {
-			ext = ".jpg"
-		} else {
-			ext = ".jpg" // 默认 fallback
-		}
-	} else {
-		rawBase64 = parts[0]
-		ext = ".jpg"
-	}
-
-	// 2. Base64 解码
-	decodedBytes, err := base64.StdEncoding.DecodeString(rawBase64)
+// SaveMultipartToLocal reads a multipart.FileHeader and saves it to a local directory.
+func SaveMultipartToLocal(fileHeader *multipart.FileHeader, dir, prefix string) (string, error) {
+	file, err := fileHeader.Open()
 	if err != nil {
-		return "", fmt.Errorf("failed to decode base64: %w", err)
+		return "", fmt.Errorf("failed to open multipart file: %w", err)
 	}
+	defer file.Close()
 
-	// 3. 确保目录存在 (为了本地演示，存放在项目的 uploads 目录下)
-	baseDir := filepath.Join(".", "uploads", directory)
-	if err := os.MkdirAll(baseDir, os.ModePerm); err != nil {
+	// Ensure the directory exists
+	uploadDir := filepath.Join(".", "uploads", dir)
+	if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
 		return "", fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	// 4. 生成唯一文件名
-	fileName := fmt.Sprintf("%s_%s%s", prefix, utils.GenerateID(), ext)
-	fullPath := filepath.Join(baseDir, fileName)
+	// Generate a unique filename
+	filename := fmt.Sprintf("%s_%s.jpg", prefix, utils.GenerateID())
+	savePath := filepath.Join(uploadDir, filename)
 
-	// 5. 写入文件
-	if err := os.WriteFile(fullPath, decodedBytes, 0644); err != nil {
-		return "", fmt.Errorf("failed to write file: %w", err)
+	// Create the destination file
+	dst, err := os.Create(savePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to create destination file: %w", err)
+	}
+	defer dst.Close()
+
+	// Copy the contents
+	if _, err := io.Copy(dst, file); err != nil {
+		return "", fmt.Errorf("failed to save file: %w", err)
 	}
 
-	// 6. 返回相对路径供前端访问 (例如 /uploads/attendance/faces/xxx.jpg)
-	relativePath := filepath.Join("/uploads", directory, fileName)
-	// Ensure URL forward slash consistency
-	relativePath = strings.ReplaceAll(relativePath, "\\", "/")
-	return relativePath, nil
+	// Return the relative path to store in DB
+	return fmt.Sprintf("/uploads/%s/%s", dir, filename), nil
 }
 
 // ConvertLocalFileToMultipartHeader reads a local file and constructs a *multipart.FileHeader.

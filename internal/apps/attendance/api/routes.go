@@ -191,15 +191,41 @@ func handlePunch(svc *service.AttendanceService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		orgID, exists := c.Get(middleware.AttendanceContextOrgID)
 		if !exists {
-			response.JSONError(c, response.CodeInvalidParameter, "Missing org_id in context")
+			response.JSONError(c, response.CodeUnauthorized, "missing org_id in context")
 			return
 		}
 
-		var req service.PunchRequest
-		if err := c.ShouldBindJSON(&req); err != nil {
-			response.JSONError(c, response.CodeInvalidParameter, err.Error())
+		// 解析 multipart form
+		if err := c.Request.ParseMultipartForm(10 << 20); err != nil {
+			response.JSONError(c, response.CodeBadRequest, "failed to parse multipart form")
 			return
 		}
+
+		req := service.PunchRequest{
+			IDNumber:     c.PostForm("id_number"),
+			PunchType:    c.PostForm("punch_type"),
+			FallbackMode: c.PostForm("fallback_mode") == "true",
+		}
+
+		if lat := c.PostForm("latitude"); lat != "" {
+			fmt.Sscanf(lat, "%f", &req.Latitude)
+		}
+		if lng := c.PostForm("longitude"); lng != "" {
+			fmt.Sscanf(lng, "%f", &req.Longitude)
+		}
+
+		if req.IDNumber == "" || req.PunchType == "" {
+			response.JSONError(c, response.CodeInvalidParameter, "id_number and punch_type are required")
+			return
+		}
+
+		// 提取图片文件
+		file, err := c.FormFile("liveness_image")
+		if err != nil {
+			response.JSONError(c, response.CodeInvalidParameter, "liveness_image is required")
+			return
+		}
+		req.LivenessFile = file
 
 		if err := svc.PunchIn(c.Request.Context(), orgID.(string), &req); err != nil {
 			if err == service.ErrIdentityNotFound {
@@ -214,7 +240,9 @@ func handlePunch(svc *service.AttendanceService) gin.HandlerFunc {
 			return
 		}
 
-		response.JSONSuccess(c, gin.H{"status": "punch successful"})
+		response.JSONSuccess(c, map[string]string{
+			"status": "punch successful",
+		})
 	}
 }
 
