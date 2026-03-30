@@ -73,8 +73,20 @@ func handleConsoleGetMagicLink(svc *service.AttendanceService, jwtSecret string)
 			return
 		}
 
-		// 1. Get or Generate Active Token
-		token, err := svc.GetActiveAppToken(orgID)
+		// Check if it's a forced rotation request
+		forceRotate := c.Query("rotate") == "true"
+
+		var token string
+		var err error
+
+		if forceRotate {
+			// 强制生成新的 Token，覆盖 Redis 缓存
+			token, err = svc.GenerateAppToken(orgID)
+		} else {
+			// 1. Get or Generate Active Token
+			token, err = svc.GetActiveAppToken(orgID)
+		}
+
 		if err != nil {
 			response.JSONError(c, response.CodeInternalError, "Failed to generate magic link")
 			return
