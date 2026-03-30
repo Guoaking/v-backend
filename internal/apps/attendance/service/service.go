@@ -74,6 +74,7 @@ func (s *AttendanceService) GenerateAppToken(orgID string) (string, error) {
 	// Generate a 1-year valid token
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"org_id": orgID,
+		"scope":  "attendance_magic_link", // Required by middleware
 		"exp":    time.Now().Add(365 * 24 * time.Hour).Unix(),
 	})
 
