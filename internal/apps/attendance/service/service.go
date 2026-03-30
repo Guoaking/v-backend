@@ -30,6 +30,12 @@ type AttendanceService struct {
 	redis      *goRedis.Client // 注入真实的 Redis 客户端
 }
 
+// GetConfig 返回后端的全局配置，用于构建魔术链接等
+func (s *AttendanceService) GetConfig() *coreService.KYCService {
+	// 由于目前的架构中 Config 挂载在 KYCService 上
+	return s.kycService
+}
+
 func NewAttendanceService(db *gorm.DB, kycService *coreService.KYCService) *AttendanceService {
 	// 初始化一个局部的 Redis Client 用于防抖
 	// 实际生产中应通过依赖注入传入全局的 Redis Client

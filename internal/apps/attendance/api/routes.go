@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"strings"
 
 	"kyc-service/internal/apps/attendance/middleware"
 	"kyc-service/internal/apps/attendance/service"
@@ -78,10 +79,18 @@ func handleConsoleGetMagicLink(svc *service.AttendanceService, jwtSecret string)
 			return
 		}
 
+		// 2. Fetch the frontend return URL from the application config
+		// Fallback to localhost for local development if not configured
+		baseURL := svc.GetConfig().Config.OAuth.Google.FrontendReturnURL
+		if baseURL == "" {
+			baseURL = "http://localhost:3000"
+		}
+		baseURL = strings.TrimRight(baseURL, "/")
+
 		// 拼接成完整的 H5 URL
 		// 注意：实际部署时，域名应该从配置中读取
-		enrollURL := fmt.Sprintf("http://localhost:3000/attendance/enroll?token=%s", token)
-		punchURL := fmt.Sprintf("http://localhost:3000/attendance/punch?token=%s", token)
+		enrollURL := fmt.Sprintf("%s/attendance/enroll?token=%s", baseURL, token)
+		punchURL := fmt.Sprintf("%s/attendance/punch?token=%s", baseURL, token)
 
 		response.JSONSuccess(c, gin.H{
 			"token":      token,
