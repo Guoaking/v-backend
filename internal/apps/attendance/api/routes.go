@@ -17,6 +17,10 @@ func RegisterRoutes(r *gin.RouterGroup, jwtSecret string, svc *service.Attendanc
 	// 所有考勤 C端 (H5) 相关的路由，挂载在 /api/v1/attendance 下
 	// 这些路由不需要登录，但需要一个特殊的 Magic Link Token 中间件来提取 OrgID
 	attendanceGroup := r.Group("/attendance")
+
+	// 这里挂载打卡的限流中间件 (Rate Limiter)，防止高并发或恶意请求打挂底层 GPU
+	// 根据架构设计，限制为 10 QPS，触发限流时直接返回 429 降级
+	attendanceGroup.Use(middleware.RateLimitMiddleware(10))
 	attendanceGroup.Use(middleware.MagicLinkAuth(jwtSecret))
 	{
 		// 1. 注册相关

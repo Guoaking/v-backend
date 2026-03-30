@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"mime/multipart"
+	"sync"
 	"time"
 
 	"kyc-service/internal/apps/attendance/models"
@@ -16,6 +17,28 @@ import (
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
+
+// ==============================================================================
+// 简单的内存防抖机制 (用于演示 5 分钟去重逻辑，生产环境请使用 Redis)
+// ==============================================================================
+var (
+	debounceCache sync.Map
+)
+
+func isDebounced(key string) bool {
+	if val, ok := debounceCache.Load(key); ok {
+		expiry := val.(time.Time)
+		if time.Now().Before(expiry) {
+			return true
+		}
+		debounceCache.Delete(key) // 过期清理
+	}
+	return false
+}
+
+func setDebounce(key string, duration time.Duration) {
+	debounceCache.Store(key, time.Now().Add(duration))
+}
 
 // AttendanceService 考勤微应用的核心服务层
 // 它内部可以调用核心的 KYCService 来完成活体、OCR、比对等底层能力。
@@ -295,9 +318,17 @@ type PunchRequest struct {
 func (s *AttendanceService) PunchIn(ctx context.Context, orgID string, req *PunchRequest) error {
 	log := logger.GetLogger().WithContext(ctx)
 
-	// 1. 查缓存，防抖 (Debounce)
-	// TODO: 使用 Redis 检查 `attendance:punch:debounce:{orgID}:{idNumber}:{punchType}` 是否存在
-	// 如果存在，直接 return nil (视为成功)
+	// 1. 查缓存，防抖 (Debounce) 5-minute deduplication
+	// 这里使用简单的内存防抖逻辑（在实际生产中应该使用 Redis）
+	// 由于我们这里没有引入完整的 Redis 组件，使用 sync.Map 做一个简单的内存防抖演示
+	debounceKey := fmt.Sprintf("attendance:punch:debounce:%s:%s:%s", orgID, req.IDNumber, req.PunchType)
+
+	// 简单的内存缓存用于防抖 (生产环境替换为 Redis)
+	if isDebounced(debounceKey) {
+		log.Infof("Punch-in debounced for %s", req.IDNumber)
+		return nil // 直接返回成功，不扣减 Quota，不落库
+	}
+	setDebounce(debounceKey, 5*time.Minute)
 
 	// 2. 查员工是否存在
 	var emp models.OrganizationEmployee
