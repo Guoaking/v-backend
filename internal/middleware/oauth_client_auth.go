@@ -113,6 +113,20 @@ func APIOrOAuthAuth(svc *service.KYCService) gin.HandlerFunc {
 				clientID, _ := claims["client_id"].(string)
 				scopeStr, _ := claims["scope"].(string)
 				claimOrgID, _ := claims["org_id"].(string)
+
+				// -------------------------------------------------------------
+				// HACK/FIX for Attendance Magic Link:
+				// If the token is a magic link token (has attendance_magic_link scope),
+				// bypass the strict OAuth client_id check, because magic links are generated
+				// directly by the attendance micro-app, not by an OAuth client.
+				// -------------------------------------------------------------
+				if scopeStr == "attendance_magic_link" && claimOrgID != "" {
+					c.Set("orgID", claimOrgID)
+					c.Set("scopes", scopeStr)
+					c.Next()
+					return
+				}
+
 				if clientID == "" {
 					response.JSONError(c, response.CodeUnauthorized, "invalid token claims")
 					c.Abort()
