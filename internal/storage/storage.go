@@ -163,6 +163,8 @@ func autoMigrate(db *gorm.DB) error {
 		&models.OrganizationEmployee{},
 		&models.AttendanceRecord{},
 		&models.DataCollectionDocument{},
+		&models.OrganizationSettings{}, // 新增
+		&models.DataCollectionFace{},   // 新增
 	}
 
 	for _, m := range modelsToMigrate {
