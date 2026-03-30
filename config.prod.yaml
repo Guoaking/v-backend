@@ -4,7 +4,7 @@ log_level: "warn"
 use_mock: false
 
 app:
-  frontend_base_url: "https://your-production-frontend-domain.com"
+  frontend_base_url: "https://open.verilocale.com"
 
 storage:
   upload:

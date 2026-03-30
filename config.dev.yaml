@@ -4,7 +4,7 @@ log_level: info
 use_mock: false
 
 app:
-  frontend_base_url: "http://localhost:3000"
+  frontend_base_url: "https://beta.verilocale.com:3003"
 
 storage:
   upload:

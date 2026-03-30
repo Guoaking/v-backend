@@ -18,6 +18,8 @@ send_files() {
   scp -i "$SSH_KEY" -r docker-compose.yml "$REMOTE:$REMOTE_DIR/"
   # Optional: send configs if needed, though usually managed on server or via env
   [ -f config.prod.yaml ] && scp -i "$SSH_KEY" config.prod.yaml "$REMOTE:$REMOTE_DIR/config.yaml"
+  [ -f config.prod.yaml ] && scp -i "$SSH_KEY" config.prod.yaml "$REMOTE:$REMOTE_DIR/config.prod.yaml"
+  [ -f config.dev.yaml ] && scp -i "$SSH_KEY" config.dev.yaml "$REMOTE:$REMOTE_DIR/config.dev.yaml"
 }
 
 remote() {

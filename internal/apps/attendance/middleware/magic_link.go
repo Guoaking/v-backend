@@ -35,7 +35,7 @@ func MagicLinkAuth(jwtSecret string) gin.HandlerFunc {
 			return
 		}
 
-		tokenString := parts[1]
+		tokenString := strings.TrimSpace(parts[1])
 
 		// 2. 解析 JWT
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {

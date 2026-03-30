@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	mrand "math/rand"
 	"mime/multipart"
 	"os"
 	"path/filepath"
@@ -221,8 +222,9 @@ type IdentityMatchRequest struct {
 
 // IdentityMatchResult 身份匹配结果
 type IdentityMatchResult struct {
-	IDNumber string `json:"id_number"`
-	Name     string `json:"name"`
+	IDNumber   string `json:"id_number"`
+	EmployeeNo string `json:"employee_no"`
+	Name       string `json:"name"`
 }
 
 // MatchIdentity 根据手机号后4位匹配员工身份
@@ -252,8 +254,9 @@ func (s *AttendanceService) MatchIdentity(ctx context.Context, orgID string, que
 	}
 
 	return &IdentityMatchResult{
-		IDNumber: emp.IDNumber,
-		Name:     maskedName,
+		IDNumber:   emp.IDNumber,
+		EmployeeNo: emp.EmployeeNo,
+		Name:       maskedName,
 	}, nil
 }
 
@@ -305,14 +308,17 @@ func saveBase64ToLocalHelper(base64Data, directory, prefix string) (string, erro
 }
 
 // EnrollEmployee 员工注册提交
-func (s *AttendanceService) EnrollEmployee(ctx context.Context, orgID string, req *EnrollRequest) error {
+func (s *AttendanceService) EnrollEmployee(ctx context.Context, orgID string, req *EnrollRequest) (*models.OrganizationEmployee, error) {
 	log := logger.GetLogger().WithContext(ctx)
 
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	var newEmp models.OrganizationEmployee
+
+	err := s.db.Transaction(func(tx *gorm.DB) error {
 		// 1. 检查是否存在
 		var existing models.OrganizationEmployee
 		err := tx.Where("org_id = ? AND id_number = ?", orgID, req.IDNumber).First(&existing).Error
 		if err == nil && existing.ID != "" {
+			newEmp = existing // If already enrolled, return existing
 			return ErrAlreadyEnrolled
 		}
 
@@ -341,10 +347,27 @@ func (s *AttendanceService) EnrollEmployee(ctx context.Context, orgID string, re
 			return fmt.Errorf("no face detected in the image")
 		}
 
-		// 4. 落库或更新 models.OrganizationEmployee
+		// 4. Generate unique 8-digit employee number
+		var employeeNo string
+		for i := 0; i < 10; i++ {
+			// Generate 8 digit random number. utils.GenerateRandomNumbers generates up to max. So if max is 100000000, it generates 1-100000000
+			// Let's use a standard Go way to generate a fixed 8 digit number to be safe
+			employeeNo = fmt.Sprintf("%08d", mrand.Intn(100000000))
+			var count int64
+			tx.Model(&models.OrganizationEmployee{}).Where("org_id = ? AND employee_no = ?", orgID, employeeNo).Count(&count)
+			if count == 0 {
+				break
+			}
+			if i == 9 {
+				return fmt.Errorf("failed to generate unique employee number")
+			}
+		}
+
+		// 5. 落库或更新 models.OrganizationEmployee
 		emp := models.OrganizationEmployee{
 			ID:           utils.GenerateID(),
 			OrgID:        orgID,
+			EmployeeNo:   employeeNo,
 			IDNumber:     req.IDNumber,
 			Name:         req.Name,
 			Phone:        req.Phone,
@@ -363,6 +386,8 @@ func (s *AttendanceService) EnrollEmployee(ctx context.Context, orgID string, re
 				return err
 			}
 		}
+
+		newEmp = emp
 
 		// 4. 落库 models.DataCollectionDocument (数据飞轮核心！)
 		// 计算 is_corrected
@@ -386,6 +411,15 @@ func (s *AttendanceService) EnrollEmployee(ctx context.Context, orgID string, re
 
 		return nil
 	})
+
+	if err != nil {
+		if err == ErrAlreadyEnrolled {
+			return &newEmp, err
+		}
+		return nil, err
+	}
+
+	return &newEmp, nil
 }
 
 // ==============================================================================
@@ -419,9 +453,17 @@ func (s *AttendanceService) PunchIn(ctx context.Context, orgID string, req *Punc
 		return nil // 直接返回成功，不扣减 Quota，不落库
 	}
 
-	// 2. 查员工是否存在
+	// 2. 查员工是否存在 (Support both EmployeeNo and IDNumber for backward compatibility)
 	var emp models.OrganizationEmployee
-	if err := s.db.Where("org_id = ? AND id_number = ? AND status = ?", orgID, req.IDNumber, "active").First(&emp).Error; err != nil {
+
+	// If the id_number provided is exactly 8 digits, we assume it's the new employee_no
+	if len(req.IDNumber) == 8 && !strings.ContainsAny(req.IDNumber, "xX") {
+		err = s.db.Where("org_id = ? AND employee_no = ? AND status = ?", orgID, req.IDNumber, "active").First(&emp).Error
+	} else {
+		err = s.db.Where("org_id = ? AND id_number = ? AND status = ?", orgID, req.IDNumber, "active").First(&emp).Error
+	}
+
+	if err != nil {
 		return ErrIdentityNotFound
 	}
 
@@ -672,6 +714,25 @@ func (s *AttendanceService) GetEmployeeRecords(ctx context.Context, orgID string
 
 	return records, nil
 }
+
+// GetEmployeeRecordsByNo 获取员工自己的打卡记录 (by Employee No)
+func (s *AttendanceService) GetEmployeeRecordsByNo(ctx context.Context, orgID string, employeeNo string, limit int) ([]models.AttendanceRecord, error) {
+	var emp models.OrganizationEmployee
+	if err := s.db.Where("org_id = ? AND employee_no = ?", orgID, employeeNo).First(&emp).Error; err != nil {
+		return nil, fmt.Errorf("employee not found: %w", err)
+	}
+
+	var records []models.AttendanceRecord
+	if err := s.db.Where("org_id = ? AND employee_id = ?", orgID, emp.ID).
+		Order("punch_time DESC").
+		Limit(limit).
+		Find(&records).Error; err != nil {
+		return nil, fmt.Errorf("failed to fetch records: %w", err)
+	}
+
+	return records, nil
+}
+
 func (s *AttendanceService) GetPunchConfig(ctx context.Context, orgID string) (*models.OrganizationSettings, error) {
 	var settings models.OrganizationSettings
 

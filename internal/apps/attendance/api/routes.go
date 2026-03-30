@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 
 	"kyc-service/internal/apps/attendance/middleware"
@@ -173,17 +174,27 @@ func handleSubmit(svc *service.AttendanceService) gin.HandlerFunc {
 			return
 		}
 
-		if err := svc.EnrollEmployee(c.Request.Context(), orgID.(string), &req); err != nil {
+		emp, err := svc.EnrollEmployee(c.Request.Context(), orgID.(string), &req)
+		if err != nil {
 			if err == service.ErrAlreadyEnrolled {
-				response.JSONError(c, response.CodeAlreadyEnrolled, err.Error())
+				// return 2009 code to let frontend know it's a conflict
+				// And also return the employee_no so the frontend can cache it
+				c.JSON(http.StatusConflict, gin.H{
+					"code":    2009,
+					"message": "already enrolled",
+					"data": gin.H{
+						"employee_no": emp.EmployeeNo,
+					},
+				})
 				return
 			}
 			response.JSONError(c, response.CodeInternalError, err.Error())
 			return
 		}
 
-		response.JSONSuccess(c, map[string]string{
-			"status": "enrolled",
+		response.JSONSuccess(c, gin.H{
+			"message":     "enrollment success",
+			"employee_no": emp.EmployeeNo,
 		})
 	}
 }
@@ -307,14 +318,25 @@ func handleGetSelfRecords(svc *service.AttendanceService) gin.HandlerFunc {
 		}
 
 		idNumber := c.Query("id_number")
-		if idNumber == "" {
-			response.JSONError(c, response.CodeInvalidParameter, "id_number is required")
+		employeeNo := c.Query("employee_no")
+
+		if idNumber == "" && employeeNo == "" {
+			response.JSONError(c, response.CodeInvalidParameter, "Missing identity parameter (id_number or employee_no)")
 			return
 		}
 
-		records, err := svc.GetEmployeeRecords(c.Request.Context(), orgID.(string), idNumber, 10)
+		// Prefer employee_no if provided, otherwise fallback to id_number
+		var records interface{}
+		var err error
+
+		if employeeNo != "" {
+			records, err = svc.GetEmployeeRecordsByNo(c.Request.Context(), orgID.(string), employeeNo, 20)
+		} else {
+			records, err = svc.GetEmployeeRecords(c.Request.Context(), orgID.(string), idNumber, 20)
+		}
+
 		if err != nil {
-			response.JSONError(c, response.CodeInternalError, err.Error())
+			response.JSONError(c, response.CodeInternalError, "failed to get records")
 			return
 		}
 
