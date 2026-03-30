@@ -370,6 +370,18 @@ func handleConsoleReviewRecord(svc *service.AttendanceService) gin.HandlerFunc {
 
 func handleConsoleGetStats(svc *service.AttendanceService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		response.JSONSuccess(c, gin.H{"status": "ok"})
+		orgID := c.Query("org_id")
+		if orgID == "" {
+			response.JSONError(c, response.CodeInvalidParameter, "Missing org_id parameter")
+			return
+		}
+
+		stats, err := svc.GetOrgStats(c.Request.Context(), orgID)
+		if err != nil {
+			response.JSONError(c, response.CodeInternalError, "failed to get stats")
+			return
+		}
+
+		response.JSONSuccess(c, stats)
 	}
 }

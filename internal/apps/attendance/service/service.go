@@ -645,6 +645,41 @@ type OrgRecordResponse struct {
 	} `json:"employee"`
 }
 
+// GetOrgStats 获取组织的考勤大盘统计数据
+func (s *AttendanceService) GetOrgStats(ctx context.Context, orgID string) (map[string]interface{}, error) {
+	// 获取今天开始和结束的时间
+	now := time.Now()
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	endOfDay := startOfDay.Add(24 * time.Hour)
+
+	var todaysPunches int64
+	if err := s.db.Model(&models.AttendanceRecord{}).
+		Where("org_id = ? AND punch_time >= ? AND punch_time < ?", orgID, startOfDay, endOfDay).
+		Count(&todaysPunches).Error; err != nil {
+		return nil, fmt.Errorf("failed to count today's punches: %w", err)
+	}
+
+	var manualReviews int64
+	if err := s.db.Model(&models.AttendanceRecord{}).
+		Where("org_id = ? AND status = ?", orgID, "manual_review").
+		Count(&manualReviews).Error; err != nil {
+		return nil, fmt.Errorf("failed to count manual reviews: %w", err)
+	}
+
+	var totalEmployees int64
+	if err := s.db.Model(&models.OrganizationEmployee{}).
+		Where("org_id = ? AND status = ?", orgID, "active").
+		Count(&totalEmployees).Error; err != nil {
+		return nil, fmt.Errorf("failed to count employees: %w", err)
+	}
+
+	return map[string]interface{}{
+		"todays_punches":  todaysPunches,
+		"manual_reviews":  manualReviews,
+		"total_employees": totalEmployees,
+	}, nil
+}
+
 // GetOrgRecords 获取组织所有员工的打卡记录（管理端），包含员工信息
 func (s *AttendanceService) GetOrgRecords(ctx context.Context, orgID string, limit int) ([]OrgRecordResponse, error) {
 	var results []OrgRecordResponse
