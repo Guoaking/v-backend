@@ -131,7 +131,7 @@ func handleSubmit(svc *service.AttendanceService) gin.HandlerFunc {
 
 		if err := svc.EnrollEmployee(c.Request.Context(), orgID.(string), &req); err != nil {
 			if err == service.ErrAlreadyEnrolled {
-				response.JSONError(c, 409, "Employee already enrolled")
+				response.JSONError(c, response.CodeAlreadyEnrolled, err.Error())
 				return
 			}
 			response.JSONError(c, response.CodeInternalError, err.Error())
@@ -165,7 +165,7 @@ func handleIdentityMatch(svc *service.AttendanceService) gin.HandlerFunc {
 		res, err := svc.MatchIdentity(c.Request.Context(), orgID.(string), req.Query)
 		if err != nil {
 			if err == service.ErrIdentityNotFound {
-				response.JSONError(c, 404, err.Error())
+				response.JSONError(c, response.CodeIdentityNotFound, err.Error())
 				return
 			}
 			response.JSONError(c, response.CodeInternalError, err.Error())
@@ -192,11 +192,11 @@ func handlePunch(svc *service.AttendanceService) gin.HandlerFunc {
 
 		if err := svc.PunchIn(c.Request.Context(), orgID.(string), &req); err != nil {
 			if err == service.ErrIdentityNotFound {
-				response.JSONError(c, 404, err.Error())
+				response.JSONError(c, response.CodeIdentityNotFound, err.Error())
 				return
 			}
 			if err == service.ErrFaceVerificationFailed {
-				response.JSONError(c, 401, err.Error())
+				response.JSONError(c, response.CodeFaceVerifyFailed, err.Error())
 				return
 			}
 			response.JSONError(c, response.CodeInternalError, err.Error())

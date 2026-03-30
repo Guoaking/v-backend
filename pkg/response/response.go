@@ -32,6 +32,8 @@ const (
 	CodeIDCardNotMatch   ResponseCode = 2005 // id card information not matched
 	CodeFaceNotMatch     ResponseCode = 2006 // face not matched
 	CodeConflict         ResponseCode = 2007 // resource conflict
+	CodeIdentityNotFound ResponseCode = 2008 // identity not found
+	CodeAlreadyEnrolled  ResponseCode = 2009 // employee already enrolled
 
 	// 支付相关 4xxx
 	CodePaymentRequired ResponseCode = 40201 // quota exceeded, please upgrade your plan
@@ -63,6 +65,8 @@ var ResponseMessage = map[ResponseCode]string{
 	CodeIDCardNotMatch:     "ID card information not matched",
 	CodeFaceNotMatch:       "Face not matched",
 	CodeConflict:           "Resource conflict",
+	CodeIdentityNotFound:   "Identity not found. Are you enrolled?",
+	CodeAlreadyEnrolled:    "Employee already enrolled",
 	CodePaymentRequired:    "Quota exceeded, please upgrade your plan",
 	CodeInternalError:      "Internal server error",
 	CodeDatabaseError:      "Database operation failed",
@@ -243,6 +247,15 @@ func GetHTTPStatusCode(code ResponseCode) int {
 		}
 		return http.StatusBadRequest
 	case code >= 2000 && code < 3000:
+		if code == CodeIdentityNotFound {
+			return http.StatusNotFound
+		}
+		if code == CodeFaceVerifyFailed || code == CodeLivenessFailed || code == CodeKYCFailed || code == CodeFaceNotMatch {
+			return http.StatusUnauthorized
+		}
+		if code == CodeConflict || code == CodeAlreadyEnrolled {
+			return http.StatusConflict
+		}
 		return http.StatusBadRequest
 	case code >= 5000:
 		return http.StatusInternalServerError
