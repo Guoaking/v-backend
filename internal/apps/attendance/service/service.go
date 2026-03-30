@@ -639,8 +639,9 @@ type OrgRecordResponse struct {
 	PunchType string    `json:"punch_type"`
 	Status    string    `json:"status"`
 	Employee  struct {
-		Name     string `json:"name"`
-		IDNumber string `json:"id_number"`
+		Name       string `json:"name"`
+		IDNumber   string `json:"id_number"`
+		EmployeeNo string `json:"employee_no"`
 	} `json:"employee"`
 }
 
@@ -652,17 +653,18 @@ func (s *AttendanceService) GetOrgRecords(ctx context.Context, orgID string, lim
 	// However, we are using the 'attendance_records' table and selecting into a nested struct. GORM's raw scan can be tricky with nested structs.
 	// It's safer to use a temporary flat struct to scan the JOIN query results, then map it to the nested struct.
 	type flatRecord struct {
-		ID        string
-		PunchTime time.Time
-		PunchType string
-		Status    string
-		Name      string
-		IDNumber  string
+		ID         string
+		PunchTime  time.Time
+		PunchType  string
+		Status     string
+		Name       string
+		IDNumber   string
+		EmployeeNo string
 	}
 	var flatResults []flatRecord
 
 	if err := s.db.Table("attendance_records").
-		Select("attendance_records.id, attendance_records.punch_time, attendance_records.punch_type, attendance_records.status, organization_employees.name, organization_employees.id_number").
+		Select("attendance_records.id, attendance_records.punch_time, attendance_records.punch_type, attendance_records.status, organization_employees.name, organization_employees.id_number, organization_employees.employee_no").
 		Joins("LEFT JOIN organization_employees ON attendance_records.employee_id = organization_employees.id").
 		Where("attendance_records.org_id = ?", orgID).
 		Order("attendance_records.punch_time DESC").
@@ -680,11 +682,13 @@ func (s *AttendanceService) GetOrgRecords(ctx context.Context, orgID string, lim
 			PunchType: fr.PunchType,
 			Status:    fr.Status,
 			Employee: struct {
-				Name     string `json:"name"`
-				IDNumber string `json:"id_number"`
+				Name       string `json:"name"`
+				IDNumber   string `json:"id_number"`
+				EmployeeNo string `json:"employee_no"`
 			}{
-				Name:     fr.Name,
-				IDNumber: fr.IDNumber,
+				Name:       fr.Name,
+				IDNumber:   fr.IDNumber,
+				EmployeeNo: fr.EmployeeNo,
 			},
 		})
 	}
