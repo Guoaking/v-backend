@@ -31,9 +31,12 @@ func RegisterRoutes(r *gin.RouterGroup, jwtSecret string, svc *service.Attendanc
 		}
 
 		// 2. 打卡相关
-		attendanceGroup.GET("/config", handleGetConfig(svc))
-		attendanceGroup.POST("/punch/identity", handleIdentityMatch(svc))
-		attendanceGroup.POST("/punch", handlePunch(svc))
+		punchGroup := attendanceGroup.Group("/punch")
+		{
+			punchGroup.GET("/config", handleGetConfig(svc))
+			punchGroup.GET("/identity", handleIdentityMatch(svc))
+			punchGroup.POST("", handlePunch(svc))
+		}
 
 		// 3. 员工自助查询
 		selfGroup := attendanceGroup.Group("/self")
