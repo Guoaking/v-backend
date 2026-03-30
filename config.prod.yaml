@@ -1,11 +1,47 @@
 port: 8082
-gin_mode: debug
-log_level: info
+gin_mode: "release"
+log_level: "warn"
 use_mock: false
 
+app:
+  frontend_base_url: "https://your-production-frontend-domain.com"
+
 storage:
-  ingest_dir: /data/videos/
-  image_dir: /opt/test
+  upload:
+    mode: local
+    base_dir: /data/misc
+    rules:
+      # 规则 1: 视频上传路由 (原 ingest_dir 逻辑)
+      - name: "liveness_videos"
+        prefix: "videos/"
+        target_dir: "/data/videos"
+
+      # 规则 2: 图片上传路由
+      - name: "identity_pics"
+        prefix: "images/"
+        target_dir: "/data/pic"
+  access:
+    # 默认保底策略：如果没匹配到规则，直接流式输出（适合本地开发）
+    default_strategy: local_stream
+    rules:
+      # 业务 1: 人脸搜索数据
+      - name: "face_search"
+        match_prefix: "/data/dataset/"
+        strategy: nginx_internal
+        internal_prefix: "/_protected/storage/"
+        strip_prefix: "/data/"
+
+      # 业务 2: OCR 识别数据
+      - name: "ocr_search"
+        match_prefix: "/data/ocrset/"
+        strategy: nginx_internal
+        internal_prefix: "/_protected/storage/"
+        strip_prefix: "/data/"
+
+      # 业务 3: 远程 S3 资源 (未来扩展)
+      - name: "remote_s3"
+        match_prefix: "s3://"
+        strategy: redirect
 
 database:
   host: database
@@ -30,13 +66,20 @@ redis:
   read_timeout: 3s
   write_timeout: 3s
 
+oauth:
+  google:
+    client_id: "481475455679-arokubdmn2dr9sv5999lavnbinpf5mct.apps.googleusercontent.com"
+    client_secret: "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"
+    redirect_url: "https://open.verilocale.com/api/v1/auth/google/callback"
+    frontend_return_url: "https://open.verilocale.com/console"
+
 security:
   jwt_secret: "your-secret-key-here-must-be-32-bytes-long"
   jwt_expiration: 24h
   rate_limit_per_second: 100
   rate_limit_burst: 200
-  kong_shared_secret: "kong-shared-secret-key-2024"      # Kong网关共享密钥
-  service_secret_key: "kyc-service-secret-key-2024"      # 服务签名密钥
+  kong_shared_secret: "kong-shared-secret-key-2024" # Kong网关共享密钥
+  service_secret_key: "kyc-service-secret-key-2024" # 服务签名密钥
   encryption_key: "oM9P4o6b8ib+dO1oh571cyfuJPdGqi6W"
 
 third_party:

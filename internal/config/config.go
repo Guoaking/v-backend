@@ -15,6 +15,8 @@ type Config struct {
 	LogLevel string `mapstructure:"log_level"`
 	UseMock  bool   `mapstructure:"use_mock"`
 
+	App AppConfig `mapstructure:"app"`
+
 	Database DatabaseConfig `mapstructure:"database"`
 	Redis    RedisConfig    `mapstructure:"redis"`
 
@@ -33,6 +35,10 @@ type MonitoringConfig struct {
 	Metrics  MetricsConfig  `mapstructure:"metrics"`
 	Tracing  TracingConfig  `mapstructure:"tracing"`
 	Alerting AlertingConfig `mapstructure:"alerting"`
+}
+
+type AppConfig struct {
+	FrontendBaseURL string `mapstructure:"frontend_base_url"` // The base URL of the frontend application (e.g., https://kyc.yourdomain.com)
 }
 
 type DatabaseConfig struct {
@@ -186,6 +192,7 @@ func setDefaults() {
 	viper.SetDefault("port", 8080)
 	viper.SetDefault("gin_mode", "release")
 	viper.SetDefault("log_level", "info")
+	viper.SetDefault("app.frontend_base_url", "http://localhost:3000") // Default to local dev server
 
 	// 数据库默认值
 	viper.SetDefault("database.host", "localhost")

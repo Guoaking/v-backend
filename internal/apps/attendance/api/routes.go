@@ -80,10 +80,10 @@ func handleConsoleGetMagicLink(svc *service.AttendanceService, jwtSecret string)
 		}
 
 		// 2. Fetch the frontend return URL from the application config
-		// Fallback to localhost for local development if not configured
-		baseURL := svc.GetConfig().Config.OAuth.Google.FrontendReturnURL
+		// Use the dedicated App.FrontendBaseURL configuration
+		baseURL := svc.GetConfig().Config.App.FrontendBaseURL
 		if baseURL == "" {
-			baseURL = "http://localhost:3000"
+			baseURL = "http://localhost:3000" // Fallback
 		}
 		baseURL = strings.TrimRight(baseURL, "/")
 
