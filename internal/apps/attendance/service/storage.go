@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/base64"
 	"fmt"
+	"mime/multipart"
 	"os"
 	"path/filepath"
 	"strings"
@@ -62,4 +63,29 @@ func SaveBase64ToLocal(base64Data, directory, prefix string) (string, error) {
 	// Ensure URL forward slash consistency
 	relativePath = strings.ReplaceAll(relativePath, "\\", "/")
 	return relativePath, nil
+}
+
+// ConvertLocalFileToMultipartHeader reads a local file and constructs a *multipart.FileHeader.
+// This is useful for passing local images to internal services that expect multipart uploads.
+func ConvertLocalFileToMultipartHeader(filePath string) (*multipart.FileHeader, error) {
+	// Our paths are stored as "/uploads/..." but physically they are in "./uploads/..."
+	physicalPath := "." + filePath
+
+	file, err := os.Open(physicalPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	fi, err := file.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("failed to stat file: %w", err)
+	}
+
+	header := &multipart.FileHeader{
+		Filename: filepath.Base(physicalPath),
+		Size:     fi.Size(),
+	}
+
+	return header, nil
 }

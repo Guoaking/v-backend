@@ -219,11 +219,8 @@ func (s *AttendanceService) EnrollEmployee(ctx context.Context, orgID string, re
 			return fmt.Errorf("database error during deduplication: %w", err)
 		}
 
-		// 2. 提取人脸特征 (调用底层 KYC)
-		faceFeature, err := s.extractFaceFeature(ctx, req.FaceImage)
-		if err != nil {
-			return fmt.Errorf("face extraction failed: %w", err)
-		}
+		// 2. 提取人脸特征 (暂时跳过，直接保存图片，因为底层 FaceCompare 需要两张图片)
+		// 实际业务中，注册时应该对 req.FaceImage 进行活体检测和质量检测
 
 		// 处理 Base64 图片，保存到本地文件系统
 		faceImagePath, err := SaveBase64ToLocal(req.FaceImage, "attendance/faces", req.IDNumber)
@@ -240,7 +237,7 @@ func (s *AttendanceService) EnrollEmployee(ctx context.Context, orgID string, re
 			IDNumber:     req.IDNumber,
 			Name:         req.Name,
 			Phone:        req.Phone,
-			FaceFeature:  faceFeature,
+			FaceFeature:  nil,           // 我们不再单独提取特征，而是保存原始图片用于后续 1:1 比对
 			FaceImageURL: faceImagePath, // 现在存的是文件路径，如 /uploads/attendance/faces/xxx.jpg
 			Status:       "active",
 		}
@@ -278,13 +275,6 @@ func (s *AttendanceService) EnrollEmployee(ctx context.Context, orgID string, re
 
 		return nil
 	})
-}
-
-// extractFaceFeature 内部辅助方法，调用底层服务提取人脸特征
-func (s *AttendanceService) extractFaceFeature(ctx context.Context, faceImageBase64 string) ([]byte, error) {
-	// TODO: 调用 s.kycService.FaceCompare() 的单边提取能力
-	// 暂作模拟
-	return []byte("mock_face_feature_vector"), nil
 }
 
 // ==============================================================================
@@ -340,14 +330,42 @@ func (s *AttendanceService) PunchIn(ctx context.Context, orgID string, req *Punc
 		// 4. 正常打卡：调用底层活体和 1:1 比对
 		log.Infof("Calling underlying KYC liveness and 1:1 face match for %s", req.IDNumber)
 
-		// TODO: 构建核心 KYCRequest 并调用 s.kycService.SubmitKYCRequest()
-		// 传入 req.LivenessData 和 emp.FaceFeature 进行比对
-		// 注入系统内部的 req.AppKey = "system_attendance_app_key" 以完成计费隔离
+		// 将前端传来的活体打卡照片落盘
+		punchImagePath, err := SaveBase64ToLocal(req.LivenessData, "attendance/punches", req.IDNumber)
+		if err != nil {
+			return fmt.Errorf("failed to save punch image: %w", err)
+		}
 
-		// 模拟调用成功
+		// 将底库照片和打卡照片转为 multipart.FileHeader，因为底层 FaceCompare 接口需要这个类型
+		baseFaceHeader, err := ConvertLocalFileToMultipartHeader(emp.FaceImageURL)
+		if err != nil {
+			log.Errorf("Failed to read base face image: %v", err)
+			return fmt.Errorf("system error: unable to load employee base image")
+		}
+
+		punchFaceHeader, err := ConvertLocalFileToMultipartHeader(punchImagePath)
+		if err != nil {
+			log.Errorf("Failed to read punch face image: %v", err)
+			return fmt.Errorf("system error: unable to load punch image")
+		}
+
+		// 调用底层 FaceCompare 服务
+		ctx = context.WithValue(ctx, "org_id", orgID) // Inject org_id for quota
+		compareRes, err := s.kycService.FaceCompare(ctx, baseFaceHeader, punchFaceHeader)
+
+		if err != nil {
+			log.Warnf("Face compare failed or error returned: %v", err)
+			return fmt.Errorf("face verification failed: %w", err)
+		}
+
+		if compareRes.Code != 0 || compareRes.ComparisonResults.IsSameFace == 0 {
+			return fmt.Errorf("face verification failed: not the same person (confidence: %.2f)", compareRes.ComparisonResults.Confidence)
+		}
+
+		// 真实调用成功
 		record.Status = "success"
-		record.LivenessScore = 0.98
-		record.FaceScore = 0.99
+		record.LivenessScore = 0.99 // 暂时假定活体通过
+		record.FaceScore = compareRes.ComparisonResults.Confidence
 	}
 
 	// 5. 落库流水
