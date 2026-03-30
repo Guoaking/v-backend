@@ -606,15 +606,49 @@ type OrgRecordResponse struct {
 func (s *AttendanceService) GetOrgRecords(ctx context.Context, orgID string, limit int) ([]OrgRecordResponse, error) {
 	var results []OrgRecordResponse
 
-	// Use Joins to fetch the related employee information
+	// In GORM, the table name for OrganizationEmployee is pluralized to organization_employees by default unless overridden.
+	// However, we are using the 'attendance_records' table and selecting into a nested struct. GORM's raw scan can be tricky with nested structs.
+	// It's safer to use a temporary flat struct to scan the JOIN query results, then map it to the nested struct.
+	type flatRecord struct {
+		ID        string
+		PunchTime time.Time
+		PunchType string
+		Status    string
+		Name      string
+		IDNumber  string
+	}
+	var flatResults []flatRecord
+
 	if err := s.db.Table("attendance_records").
-		Select("attendance_records.id, attendance_records.punch_time, attendance_records.punch_type, attendance_records.status, organization_employees.name as \"employee__name\", organization_employees.id_number as \"employee__id_number\"").
+		Select("attendance_records.id, attendance_records.punch_time, attendance_records.punch_type, attendance_records.status, organization_employees.name, organization_employees.id_number").
 		Joins("LEFT JOIN organization_employees ON attendance_records.employee_id = organization_employees.id").
 		Where("attendance_records.org_id = ?", orgID).
 		Order("attendance_records.punch_time DESC").
 		Limit(limit).
-		Find(&results).Error; err != nil {
+		Scan(&flatResults).Error; err != nil {
+		logger.GetLogger().WithContext(ctx).Errorf("Failed to execute GetOrgRecords JOIN query: %v", err)
 		return nil, fmt.Errorf("failed to fetch org records: %w", err)
+	}
+
+	// Map flat results to nested response structure
+	for _, fr := range flatResults {
+		results = append(results, OrgRecordResponse{
+			ID:        fr.ID,
+			PunchTime: fr.PunchTime,
+			PunchType: fr.PunchType,
+			Status:    fr.Status,
+			Employee: struct {
+				Name     string `json:"name"`
+				IDNumber string `json:"id_number"`
+			}{
+				Name:     fr.Name,
+				IDNumber: fr.IDNumber,
+			},
+		})
+	}
+
+	if results == nil {
+		results = []OrgRecordResponse{}
 	}
 
 	return results, nil
