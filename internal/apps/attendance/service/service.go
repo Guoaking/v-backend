@@ -367,7 +367,9 @@ func (s *AttendanceService) PunchIn(ctx context.Context, orgID string, req *Punc
 				IsSameFace:    0,
 				IsFallback:    true,
 			}
-			if err := s.db.Create(&faceDoc).Error; err != nil {
+			// Safe copy of db for goroutine
+			dbCopy := s.db.Session(&gorm.Session{})
+			if err := dbCopy.Create(&faceDoc).Error; err != nil {
 				log.Warnf("Failed to collect fallback face data: %v", err)
 			}
 		}(orgID, emp.FaceImageURL, fallbackPath)
@@ -414,7 +416,9 @@ func (s *AttendanceService) PunchIn(ctx context.Context, orgID string, req *Punc
 				IsSameFace:    isSame,
 				IsFallback:    false,
 			}
-			if err := s.db.Create(&faceDoc).Error; err != nil {
+			// Safe copy of db for goroutine
+			dbCopy := s.db.Session(&gorm.Session{})
+			if err := dbCopy.Create(&faceDoc).Error; err != nil {
 				log.Warnf("Failed to collect face compare data: %v", err)
 			}
 		}(orgID, emp.FaceImageURL, punchImagePath, compareRes.ComparisonResults.Confidence, compareRes.ComparisonResults.IsSameFace)
