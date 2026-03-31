@@ -168,7 +168,6 @@ func (s *KYCService) IngestImage(ctx context.Context, orgID string, file *multip
 	}
 
 	// 提前创建一条记录，状态可以是 pending 或者由具体的 file_path 决定
-	uploadName := "images/" + safe
 	asset.FilePath = "pending_upload"
 	if err := s.DB.Create(asset).Error; err != nil {
 		return nil, err
@@ -181,21 +180,28 @@ func (s *KYCService) IngestImage(ctx context.Context, orgID string, file *multip
 			reqID = sReqID
 		}
 	}
-	// For traceability, include request_id in the safe filename if available
-	if reqID != "" {
-		asset.SafeFilename = reqID + "_" + asset.SafeFilename
-		uploadName = "images/" + asset.SafeFilename
+
+	// Create hierarchical path: images/YYYY/MM/DD/reqID_shortHash.ext
+	now := time.Now()
+	shortHash := sum
+	if len(sum) > 16 {
+		shortHash = sum[:16]
 	}
 
-	// Try to get the pre-saved temp path from context
-	tempPathCtxKey := "async_temp_path_picture" // Assuming field is usually 'picture'
-	// The exact field name might vary, but in most KYC/Face APIs it's 'picture', 'image', 'source_image', etc.
-	// This is a simplified lookup. A more robust way would be mapping by filename.
-	var tempPath string
+	uploadName := fmt.Sprintf("images/%04d/%02d/%02d/", now.Year(), now.Month(), now.Day())
+	if reqID != "" {
+		asset.SafeFilename = fmt.Sprintf("%s_%s%s", reqID, shortHash, filepath.Ext(file.Filename))
+	} else {
+		asset.SafeFilename = fmt.Sprintf("%s_%s%s", utils.GenerateID(), shortHash, filepath.Ext(file.Filename))
+	}
+	uploadName += asset.SafeFilename
 
-	// Fast lookup in context (gin.Context passes values if set)
-	if val := ctx.Value(tempPathCtxKey); val != nil {
-		tempPath = val.(string)
+	// Try to get the pre-saved temp path from context
+	var tempPath string
+	if val := ctx.Value("async_temp_files"); val != nil {
+		if tempFileMap, ok := val.(map[string]string); ok {
+			tempPath = tempFileMap[file.Filename]
+		}
 	}
 
 	// If the middleware successfully saved it to disk, queue the task
@@ -347,17 +353,15 @@ func (s *KYCService) IngestVideo(ctx context.Context, orgID string, sessionID st
 		}
 	}
 	if reqID != "" {
-		asset.SafeFilename = reqID + "_" + asset.SafeFilename
-		relativePath = reqID + "_" + relativePath
+		asset.SafeFilename = fmt.Sprintf("%s_%s", reqID, asset.SafeFilename)
+		relativePath = fmt.Sprintf("videos/%04d/%02d/%02d/%s", now.Year(), now.Month(), now.Day(), asset.SafeFilename)
 	}
 
-	tempPathCtxKey := "async_temp_path_video" // Assuming field is usually 'video' or 'liveness_file'
 	var tempPath string
-	if val := ctx.Value(tempPathCtxKey); val != nil {
-		tempPath = val.(string)
-	}
-	if val := ctx.Value("async_temp_path_liveness_file"); val != nil && tempPath == "" {
-		tempPath = val.(string)
+	if val := ctx.Value("async_temp_files"); val != nil {
+		if tempFileMap, ok := val.(map[string]string); ok {
+			tempPath = tempFileMap[file.Filename]
+		}
 	}
 
 	if tempPath != "" {

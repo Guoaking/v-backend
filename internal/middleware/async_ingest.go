@@ -45,6 +45,11 @@ func AsyncMediaIngest(kycService *service.KYCService) gin.HandlerFunc {
 			reqID = c.GetHeader("X-Request-ID")
 		}
 
+		// Store a map of filename to tempFilePath in the context
+		// This makes it easy for the service layer to find the right temp file
+		// regardless of what the form field name was.
+		tempFileMap := make(map[string]string)
+
 		for fieldName, fileHeaders := range c.Request.MultipartForm.File {
 			for _, fileHeader := range fileHeaders {
 				// We create a permanent local temp file to hold the data,
@@ -88,10 +93,15 @@ func AsyncMediaIngest(kycService *service.KYCService) gin.HandlerFunc {
 					"temp_path":  tempFilePath,
 				}).Info("AsyncMediaIngest: Safely copied file to disk for background ingestion")
 
-				// Inject the safe persistent file path into context for downstream async workers
-				c.Set("async_temp_path_"+fieldName, tempFilePath)
+				// Map the original filename (and fieldName) to the temp path
+				tempFileMap[fileHeader.Filename] = tempFilePath
 			}
 		}
+
+		if len(tempFileMap) > 0 {
+			c.Set("async_temp_files", tempFileMap)
+		}
+
 		c.Next()
 	}
 }
