@@ -216,7 +216,7 @@ func (s *KYCService) IngestImage(ctx context.Context, orgID string, file *multip
 			Service:   s,
 		}
 	} else {
-		// Fallback: If the middleware didn't run or field name mismatched, do synchronous upload
+		// Fallback: If the middleware didn't run or field name mismatched, do fallback asynchronous upload
 		// Read all file data into memory to pass to the goroutine
 		if _, err := f.Seek(0, io.SeekStart); err != nil {
 			return nil, err
@@ -227,7 +227,7 @@ func (s *KYCService) IngestImage(ctx context.Context, orgID string, file *multip
 		}
 
 		// Start ad-hoc goroutine for actual storage upload and DB update
-		go func(assetID string, oID string, fileName string, data []byte) {
+		go func(assetID string, fileName string, data []byte) {
 			bgCtx := context.Background()
 			reader := bytes.NewReader(data)
 
@@ -242,7 +242,7 @@ func (s *KYCService) IngestImage(ctx context.Context, orgID string, file *multip
 			}
 
 			s.RecordAuditLog(bgCtx, "image.ingest.async", "image", assetID, "success", "")
-		}(asset.ID, orgID, uploadName, fileData)
+		}(asset.ID, uploadName, fileData)
 	}
 
 	return asset, nil

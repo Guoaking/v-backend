@@ -42,6 +42,7 @@ kyc-service-new
 
 # Test storage and artifacts
 test_storage/
+uploads/
 tests/integration/test_storage/
 coverage/
 *.png
