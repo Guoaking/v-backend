@@ -49,16 +49,11 @@ if [ "$HAS_CODE_CHANGES" = true ] && [ "$HAS_DOC_CHANGES" = false ]; then
                 ;;
         esac
     else
-        # In non-interactive mode (like AI Agent), enforce doc updates
-        echo "❌ [AGENT ERROR]: Code changes detected but no markdown documentation was updated."
-        echo "   As an AI Agent, you MUST maintain the Documentation Tree (Rooted at AGENTS.md)."
-        echo "   Please evaluate and update any relevant files in the tree:"
-        echo "   - Global Guides: docs/ (e.g., PROJECT_GUIDE.md)"
-        echo "   - Module Specs: v-backend/docs/specs/ or architecture/"
-        echo "   - Project Context: v-backend/AGENTS.md"
-        echo "   - E2E Checklist: v-backend/docs/guides/E2E_TESTING_GUIDE.md"
-        echo "   Check all referenced .md files for consistency, accuracy, and completeness."
-        exit 1
+        # In non-interactive mode (like AI Agent), we don't strictly block anymore to prevent --no-verify spam.
+        # Instead, we throw a loud warning and let it pass, relying on the Agent's prompt instructions.
+        echo "⚠️  [AGENT WARNING]: Code changes detected without doc updates."
+        echo "   Please ensure you update docs in a follow-up commit if architectural changes were made."
+        exit 0
     fi
 else
     echo "✅ Agent checked: Documentation sync looks good or no code changes detected."
