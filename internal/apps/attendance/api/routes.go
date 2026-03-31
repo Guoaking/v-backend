@@ -7,6 +7,7 @@ import (
 
 	"kyc-service/internal/apps/attendance/middleware"
 	"kyc-service/internal/apps/attendance/service"
+	coreMiddleware "kyc-service/internal/middleware"
 	"kyc-service/pkg/response"
 
 	"github.com/gin-gonic/gin"
@@ -24,6 +25,10 @@ func RegisterRoutes(r *gin.RouterGroup, jwtSecret string, svc *service.Attendanc
 	// 根据架构设计，限制为 10 QPS，触发限流时直接返回 429 降级
 	attendanceGroup.Use(middleware.RateLimitMiddleware(10))
 	attendanceGroup.Use(middleware.MagicLinkAuth(jwtSecret))
+
+	// 这里也挂载通用的异步媒体落盘中间件，因为考勤打卡和注册同样包含大量人脸图片上传
+	// 复用 KYC Service 的底层存储能力
+	attendanceGroup.Use(coreMiddleware.AsyncMediaIngest(svc.GetKYCService()))
 	{
 		// 1. 注册相关
 		enrollGroup := attendanceGroup.Group("/enroll")

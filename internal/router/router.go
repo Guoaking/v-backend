@@ -322,6 +322,7 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 		kyc := v1.Group("/kyc")
 		kyc.Use(middleware.APIOrOAuthAuth(kycService)) // 支持OAuth2客户端凭证或API Key
 		kyc.Use(middleware.InjectOrgContext())
+		kyc.Use(middleware.AsyncMediaIngest(kycService)) // 【新增】拦截 multipart 表单并安全落盘到临时目录
 		// kyc.Use(middleware.RequestBodyLogger()) // 暂时移除，待统一重构
 		// kyc.Use(middleware.ResponseCapture())   // 暂时移除，待统一重构
 		kyc.Use(middleware.Idempotency(redisClient))

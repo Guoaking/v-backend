@@ -37,6 +37,10 @@ func (s *AttendanceService) GetConfig() *coreService.KYCService {
 	return s.kycService
 }
 
+func (s *AttendanceService) GetKYCService() *coreService.KYCService {
+	return s.kycService
+}
+
 func NewAttendanceService(db *gorm.DB, kycService *coreService.KYCService) *AttendanceService {
 	// 直接使用主框架注入的 Redis Client
 	// 这样可以复用连接池，并确保连接配置正确 (而不是硬编码 localhost)
