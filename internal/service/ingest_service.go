@@ -33,9 +33,16 @@ type AsyncUploadTask struct {
 
 var (
 	asyncUploadQueue chan AsyncUploadTask
+	workersStarted   bool
 )
 
-func init() {
+// InitAsyncUploadWorkers explicitly initializes and starts the worker pool
+// for background storage uploads. It should be called during service initialization.
+func InitAsyncUploadWorkers() {
+	if workersStarted {
+		return
+	}
+
 	// Initialize a buffered channel for async uploads
 	asyncUploadQueue = make(chan AsyncUploadTask, 1000)
 
@@ -43,6 +50,9 @@ func init() {
 	for i := 0; i < 5; i++ {
 		go asyncUploadWorker()
 	}
+
+	workersStarted = true
+	logger.GetLogger().Info("Initialized Async Upload Worker Pool with 5 workers")
 }
 
 func asyncUploadWorker() {

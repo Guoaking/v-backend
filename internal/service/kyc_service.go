@@ -135,6 +135,9 @@ func NewKYCService(db *gorm.DB, redis *redis.Client, cfg *config.Config, logWork
 	}
 	service.Storage = storageService
 
+	// Initialize the asynchronous media ingest worker pool explicitly
+	InitAsyncUploadWorkers()
+
 	// 初始化OTel指标
 	if cfg.Monitoring.Metrics.Enabled {
 		meter := tracing.GetMeter()
