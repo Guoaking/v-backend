@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"kyc-service/internal/models"
+	"kyc-service/pkg/logger"
 	"kyc-service/pkg/metrics"
 	"kyc-service/pkg/tracing"
 
@@ -88,6 +89,12 @@ func (s *KYCService) FaceSearch(ctx context.Context, file *multipart.FileHeader)
 		}
 		metrics.RecordBusinessOperation(ctx, "face_search", false, time.Since(start), "quota_error")
 		return nil, err
+	}
+
+	// === 新增结构化落盘 (Image Ingestion) ===
+	if _, err := s.IngestImage(ctx, orgID, file); err != nil {
+		// Log error but do not block business process
+		logger.GetLogger().WithError(err).Warn("Failed to ingest face search image")
 	}
 
 	f, err := file.Open()
@@ -176,6 +183,15 @@ func (s *KYCService) FaceCompare(ctx context.Context, src, dst *multipart.FileHe
 		metrics.RecordBusinessOperation(ctx, "face_compare", false, time.Since(start), "quota_error")
 		return nil, err
 	}
+
+	// === 新增结构化落盘 (Image Ingestion) ===
+	if _, err := s.IngestImage(ctx, orgID, src); err != nil {
+		logger.GetLogger().WithError(err).Warn("Failed to ingest face compare src image")
+	}
+	if _, err := s.IngestImage(ctx, orgID, dst); err != nil {
+		logger.GetLogger().WithError(err).Warn("Failed to ingest face compare dst image")
+	}
+
 	f1, err := src.Open()
 	if err != nil {
 		return nil, fmt.Errorf("open image1 failed: %w", err)
@@ -227,6 +243,15 @@ func (s *KYCService) FaceIdMatch(ctx context.Context, src, dst *multipart.FileHe
 		metrics.RecordBusinessOperation(ctx, "face_id_match", false, time.Since(start), "quota_error")
 		return nil, err
 	}
+
+	// === 新增结构化落盘 (Image Ingestion) ===
+	if _, err := s.IngestImage(ctx, orgID, src); err != nil {
+		logger.GetLogger().WithError(err).Warn("Failed to ingest face id match src image")
+	}
+	if _, err := s.IngestImage(ctx, orgID, dst); err != nil {
+		logger.GetLogger().WithError(err).Warn("Failed to ingest face id match dst image")
+	}
+
 	f1, err := src.Open()
 	if err != nil {
 		return nil, fmt.Errorf("open image1 failed: %w", err)

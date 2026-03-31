@@ -98,6 +98,16 @@ func (s *KYCService) OCR(ctx context.Context, req *OCRRequest) (*OCRResponse, er
 		attribute.String("org.id", orgID),
 	)
 
+	// === 新增结构化落盘 (Image Ingestion) ===
+	// 将前端通过 form 表单直接传过来的媒体数据进行本地化、结构化沉淀，方便后续查找和归档
+	asset, err := s.IngestImage(ctx, orgID, req.Picture)
+	if err != nil {
+		logger.GetLogger().WithError(err).Warn("Failed to ingest OCR image, continuing without archiving")
+	} else {
+		// 可将 AssetID 注入上下文供后续链路使用
+		ctx = context.WithValue(ctx, "asset_id", asset.ID)
+	}
+
 	var ocrResult *OCRResponse
 	serviceType := "ocr"
 	now1 := time.Now()
