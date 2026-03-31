@@ -1,35 +1,34 @@
 package middleware
 
 import (
+	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"kyc-service/internal/service"
 	"kyc-service/pkg/logger"
+	"kyc-service/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 )
 
-// AsyncMediaIngest 是一个工程化中间件
-// 当请求类型为 multipart/form-data 时，自动拦截请求中的文件
-// 并将它们缓冲到内存中，以备后续异步落盘，保证不阻塞主业务流程
+// AsyncMediaIngest is a middleware to intercept and log multipart/form-data files.
+// It safely copies the uploaded temp file to a persistent local temp file,
+// avoiding loading the entire file into memory (preventing memory spikes).
 func AsyncMediaIngest(kycService *service.KYCService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 只有 POST/PUT 请求才处理
 		if c.Request.Method != http.MethodPost && c.Request.Method != http.MethodPut {
 			c.Next()
 			return
 		}
-
-		contentType := c.Request.Header.Get("Content-Type")
-		if !strings.Contains(contentType, "multipart/form-data") {
+		if !strings.Contains(c.Request.Header.Get("Content-Type"), "multipart/form-data") {
 			c.Next()
 			return
 		}
-
 		if err := c.Request.ParseMultipartForm(32 << 20); err != nil {
-			logger.GetLogger().WithError(err).Warn("AsyncMediaIngest: Failed to parse multipart form")
 			c.Next()
 			return
 		}
@@ -39,40 +38,60 @@ func AsyncMediaIngest(kycService *service.KYCService) gin.HandlerFunc {
 			orgID = "unknown_org"
 		}
 
-		// 遍历所有的文件字段
+		// The UnifiedContextMiddleware uses "X-Request-ID" context key
+		// internally it sets models.ContextKeyRequestID, which is typically "request_id"
+		reqID := c.GetString("request_id")
+		if reqID == "" {
+			reqID = c.GetHeader("X-Request-ID")
+		}
+
 		for fieldName, fileHeaders := range c.Request.MultipartForm.File {
 			for _, fileHeader := range fileHeaders {
-				// 将文件内容复制到内存，因为请求结束后底层临时文件会被删除
-				f, err := fileHeader.Open()
+				// We create a permanent local temp file to hold the data,
+				// avoiding OOM (Out Of Memory) issues that `io.ReadAll` would cause on large videos.
+				srcFile, err := fileHeader.Open()
 				if err != nil {
 					logger.GetLogger().WithError(err).Warn("AsyncMediaIngest: Failed to open file header")
 					continue
 				}
 
-				fileData, err := io.ReadAll(f)
-				f.Close()
+				// Create a temporary directory if it doesn't exist
+				tempDir := filepath.Join(os.TempDir(), "kyc_async_uploads")
+				os.MkdirAll(tempDir, os.ModePerm)
+
+				// Generate a unique filename embedding the RequestID for traceability
+				tempFilePath := filepath.Join(tempDir, fmt.Sprintf("%s_%s_%s", reqID, utils.GenerateID(), fileHeader.Filename))
+
+				dstFile, err := os.Create(tempFilePath)
 				if err != nil {
-					logger.GetLogger().WithError(err).Warn("AsyncMediaIngest: Failed to read file data")
+					srcFile.Close()
+					logger.GetLogger().WithError(err).Warn("AsyncMediaIngest: Failed to create temp file")
 					continue
 				}
 
-				// 将文件数据通过 Context 传递给下游，或者在这里直接异步调用 Storage
-				// 这里为了不侵入具体的 IngestImage (它强依赖 multipart.FileHeader)
-				// 我们记录下这一动作。实际生产中，我们可以将 IngestImage 改造为接收 []byte 或者 io.Reader。
-				logger.GetLogger().WithFields(map[string]interface{}{
-					"org_id":   orgID,
-					"field":    fieldName,
-					"filename": fileHeader.Filename,
-					"size":     len(fileData),
-				}).Info("AsyncMediaIngest: Captured file for background ingestion")
+				// Stream copy, memory efficient
+				size, err := io.Copy(dstFile, srcFile)
+				dstFile.Close()
+				srcFile.Close()
 
-				// 示例：将缓冲后的数据存入 Context 供后续需要异步落盘的服务直接使用
-				// 防止业务层再次调用 fileHeader.Open() 时发现文件已丢失
-				key := "async_file_" + fieldName
-				c.Set(key, fileData)
+				if err != nil {
+					logger.GetLogger().WithError(err).Warn("AsyncMediaIngest: Failed to copy file data")
+					os.Remove(tempFilePath)
+					continue
+				}
+
+				logger.GetLogger().WithFields(map[string]interface{}{
+					"field":      fieldName,
+					"filename":   fileHeader.Filename,
+					"size":       size,
+					"request_id": reqID,
+					"temp_path":  tempFilePath,
+				}).Info("AsyncMediaIngest: Safely copied file to disk for background ingestion")
+
+				// Inject the safe persistent file path into context for downstream async workers
+				c.Set("async_temp_path_"+fieldName, tempFilePath)
 			}
 		}
-
 		c.Next()
 	}
 }

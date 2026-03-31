@@ -10,6 +10,7 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -18,6 +19,72 @@ import (
 	"kyc-service/pkg/logger"
 	"kyc-service/pkg/utils"
 )
+
+// AsyncUploadTask represents a task for background ingestion
+type AsyncUploadTask struct {
+	AssetID   string
+	OrgID     string
+	RequestID string
+	FileName  string
+	TempPath  string
+	IsVideo   bool
+	Service   *KYCService
+}
+
+var (
+	asyncUploadQueue chan AsyncUploadTask
+)
+
+func init() {
+	// Initialize a buffered channel for async uploads
+	asyncUploadQueue = make(chan AsyncUploadTask, 1000)
+
+	// Start a bounded number of worker goroutines (e.g., 5)
+	for i := 0; i < 5; i++ {
+		go asyncUploadWorker()
+	}
+}
+
+func asyncUploadWorker() {
+	for task := range asyncUploadQueue {
+		processAsyncUpload(task)
+	}
+}
+
+func processAsyncUpload(task AsyncUploadTask) {
+	bgCtx := context.Background()
+
+	// Open the persistent temp file
+	f, err := os.Open(task.TempPath)
+	if err != nil {
+		logger.GetLogger().WithError(err).Warnf("Async storage worker failed to open temp file for %s", task.AssetID)
+		return
+	}
+
+	absPath, _, err := task.Service.Storage.Upload(bgCtx, task.FileName, f)
+	f.Close()
+
+	// Clean up the temp file
+	os.Remove(task.TempPath)
+
+	if err != nil {
+		logger.GetLogger().WithError(err).Warnf("Async storage upload failed for asset %s", task.AssetID)
+		return
+	}
+
+	// Update the asset with the actual absolute path
+	if task.IsVideo {
+		if err := task.Service.DB.Model(&models.VideoAsset{}).Where("id = ?", task.AssetID).Update("file_path", absPath).Error; err != nil {
+			logger.GetLogger().WithError(err).Warnf("Failed to update video asset file_path for %s", task.AssetID)
+		}
+		task.Service.RecordAuditLog(bgCtx, "video.ingest.async", "video", task.AssetID, "success", "")
+	} else {
+		if err := task.Service.DB.Model(&models.ImageAsset{}).Where("id = ?", task.AssetID).Update("file_path", absPath).Error; err != nil {
+			logger.GetLogger().WithError(err).Warnf("Failed to update asset file_path for %s", task.AssetID)
+		}
+		task.Service.RecordAuditLog(bgCtx, "image.ingest.async", "image", task.AssetID, "success", "")
+	}
+}
 
 func (s *KYCService) IngestImage(ctx context.Context, orgID string, file *multipart.FileHeader) (*models.ImageAsset, error) {
 	f, err := file.Open()
@@ -91,46 +158,76 @@ func (s *KYCService) IngestImage(ctx context.Context, orgID string, file *multip
 	}
 
 	// 提前创建一条记录，状态可以是 pending 或者由具体的 file_path 决定
-	// 为了不阻塞，这里先给一个预期的相对路径
 	uploadName := "images/" + safe
-	// Assuming local base path or storage specific path.
-	// We will update FilePath later if needed, but for now we can put a placeholder or the expected uploadName.
 	asset.FilePath = "pending_upload"
 	if err := s.DB.Create(asset).Error; err != nil {
 		return nil, err
 	}
 
-	// Read all file data into memory (or a temp file) to pass to the goroutine
-	// because the multipart.FileHeader's underlying temp file might be deleted when the request ends
-	if _, err := f.Seek(0, io.SeekStart); err != nil {
-		return nil, err
+	// Try to get the persistent temp path from the context (injected by AsyncMediaIngest middleware)
+	reqID := ""
+	if reqIDCtx := ctx.Value("request_id"); reqIDCtx != nil {
+		if sReqID, ok := reqIDCtx.(string); ok {
+			reqID = sReqID
+		}
 	}
-	fileData, err := io.ReadAll(f)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file data for async upload: %w", err)
+	// For traceability, include request_id in the safe filename if available
+	if reqID != "" {
+		asset.SafeFilename = reqID + "_" + asset.SafeFilename
+		uploadName = "images/" + asset.SafeFilename
 	}
 
-	// Start goroutine for actual storage upload and DB update
-	go func(assetID string, oID string, fileName string, data []byte) {
-		// Create a new context for the goroutine since the request ctx will be cancelled
-		bgCtx := context.Background()
+	// Try to get the pre-saved temp path from context
+	tempPathCtxKey := "async_temp_path_picture" // Assuming field is usually 'picture'
+	// The exact field name might vary, but in most KYC/Face APIs it's 'picture', 'image', 'source_image', etc.
+	// This is a simplified lookup. A more robust way would be mapping by filename.
+	var tempPath string
 
-		// Create a reader from the in-memory data
-		reader := bytes.NewReader(data)
+	// Fast lookup in context (gin.Context passes values if set)
+	if val := ctx.Value(tempPathCtxKey); val != nil {
+		tempPath = val.(string)
+	}
 
-		absPath, _, err := s.Storage.Upload(bgCtx, fileName, reader)
+	// If the middleware successfully saved it to disk, queue the task
+	if tempPath != "" {
+		asyncUploadQueue <- AsyncUploadTask{
+			AssetID:   asset.ID,
+			OrgID:     orgID,
+			RequestID: reqID,
+			FileName:  uploadName,
+			TempPath:  tempPath,
+			IsVideo:   false,
+			Service:   s,
+		}
+	} else {
+		// Fallback: If the middleware didn't run or field name mismatched, do synchronous upload
+		// Read all file data into memory to pass to the goroutine
+		if _, err := f.Seek(0, io.SeekStart); err != nil {
+			return nil, err
+		}
+		fileData, err := io.ReadAll(f)
 		if err != nil {
-			logger.GetLogger().WithError(err).Warnf("Async storage upload failed for asset %s", assetID)
-			return
+			return nil, fmt.Errorf("failed to read file data for async upload: %w", err)
 		}
 
-		// Update the asset with the actual absolute path
-		if err := s.DB.Model(&models.ImageAsset{}).Where("id = ?", assetID).Update("file_path", absPath).Error; err != nil {
-			logger.GetLogger().WithError(err).Warnf("Failed to update asset file_path for %s", assetID)
-		}
+		// Start ad-hoc goroutine for actual storage upload and DB update
+		go func(assetID string, oID string, fileName string, data []byte) {
+			bgCtx := context.Background()
+			reader := bytes.NewReader(data)
 
-		s.RecordAuditLog(bgCtx, "image.ingest.async", "image", assetID, "success", "")
-	}(asset.ID, orgID, uploadName, fileData)
+			absPath, _, err := s.Storage.Upload(bgCtx, fileName, reader)
+			if err != nil {
+				logger.GetLogger().WithError(err).Warnf("Async storage upload failed for asset %s", assetID)
+				return
+			}
+
+			if err := s.DB.Model(&models.ImageAsset{}).Where("id = ?", assetID).Update("file_path", absPath).Error; err != nil {
+				logger.GetLogger().WithError(err).Warnf("Failed to update asset file_path for %s", assetID)
+			}
+
+			s.RecordAuditLog(bgCtx, "image.ingest.async", "image", assetID, "success", "")
+		}(asset.ID, orgID, uploadName, fileData)
+	}
 
 	return asset, nil
 }
@@ -233,32 +330,64 @@ func (s *KYCService) IngestVideo(ctx context.Context, orgID string, sessionID st
 		return nil, err
 	}
 
-	// Read all file data into memory
-	if _, err := f.Seek(0, io.SeekStart); err != nil {
-		return nil, err
+	reqID := ""
+	if reqIDCtx := ctx.Value("request_id"); reqIDCtx != nil {
+		if sReqID, ok := reqIDCtx.(string); ok {
+			reqID = sReqID
+		}
 	}
-	fileData, err := io.ReadAll(f)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file data for async upload: %w", err)
+	if reqID != "" {
+		asset.SafeFilename = reqID + "_" + asset.SafeFilename
+		relativePath = reqID + "_" + relativePath
 	}
 
-	// Start goroutine for actual storage upload and DB update
-	go func(assetID string, oID string, fileName string, data []byte) {
-		bgCtx := context.Background()
-		reader := bytes.NewReader(data)
+	tempPathCtxKey := "async_temp_path_video" // Assuming field is usually 'video' or 'liveness_file'
+	var tempPath string
+	if val := ctx.Value(tempPathCtxKey); val != nil {
+		tempPath = val.(string)
+	}
+	if val := ctx.Value("async_temp_path_liveness_file"); val != nil && tempPath == "" {
+		tempPath = val.(string)
+	}
 
-		absPath, _, err := s.Storage.Upload(bgCtx, fileName, reader)
+	if tempPath != "" {
+		asyncUploadQueue <- AsyncUploadTask{
+			AssetID:   asset.ID,
+			OrgID:     orgID,
+			RequestID: reqID,
+			FileName:  relativePath,
+			TempPath:  tempPath,
+			IsVideo:   true,
+			Service:   s,
+		}
+	} else {
+		// Read all file data into memory
+		if _, err := f.Seek(0, io.SeekStart); err != nil {
+			return nil, err
+		}
+		fileData, err := io.ReadAll(f)
 		if err != nil {
-			logger.GetLogger().WithError(err).Warnf("Async storage upload failed for video asset %s", assetID)
-			return
+			return nil, fmt.Errorf("failed to read file data for async upload: %w", err)
 		}
 
-		if err := s.DB.Model(&models.VideoAsset{}).Where("id = ?", assetID).Update("file_path", absPath).Error; err != nil {
-			logger.GetLogger().WithError(err).Warnf("Failed to update video asset file_path for %s", assetID)
-		}
+		// Start goroutine for actual storage upload and DB update
+		go func(assetID string, oID string, fileName string, data []byte) {
+			bgCtx := context.Background()
+			reader := bytes.NewReader(data)
 
-		s.RecordAuditLog(bgCtx, "video.ingest.async", "video", assetID, "success", "")
-	}(asset.ID, orgID, relativePath, fileData)
+			absPath, _, err := s.Storage.Upload(bgCtx, fileName, reader)
+			if err != nil {
+				logger.GetLogger().WithError(err).Warnf("Async storage upload failed for video asset %s", assetID)
+				return
+			}
+
+			if err := s.DB.Model(&models.VideoAsset{}).Where("id = ?", assetID).Update("file_path", absPath).Error; err != nil {
+				logger.GetLogger().WithError(err).Warnf("Failed to update video asset file_path for %s", assetID)
+			}
+
+			s.RecordAuditLog(bgCtx, "video.ingest.async", "video", assetID, "success", "")
+		}(asset.ID, orgID, relativePath, fileData)
+	}
 
 	return asset, nil
 }
