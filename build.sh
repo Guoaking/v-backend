@@ -26,6 +26,18 @@ remote() {
   ssh "$REMOTE" -i "$SSH_KEY" "$1"
 }
 
+local_image_id() {
+  docker image inspect "$1" --format '{{.Id}}' 2>/dev/null || true
+}
+
+remove_local_image_if_unused() {
+  image_id="$1"
+  [ -z "$image_id" ] && return 0
+  running_ref=$(docker ps -aq --filter "ancestor=$image_id" 2>/dev/null || true)
+  [ -n "$running_ref" ] && return 0
+  docker rmi "$image_id" >/dev/null 2>&1 || true
+}
+
 health_wait() {
   NAME="$1"
   LIM="$2"
@@ -76,6 +88,7 @@ case "$CMD" in
   dev)
     DEV_TAG="${DEV_TAG:-dev}"
     IMG="$IMAGE_NAME:$DEV_TAG"
+    OLD_LOCAL_IMAGE_ID=$(local_image_id "$IMG")
     mkdir -p "$LOCAL_DEV_DIR"
     OUT="$LOCAL_DEV_DIR/${IMAGE_NAME##*/}_dev_$TS.tar.gz"
     OUT_BASE="$(basename "$OUT")"
@@ -90,14 +103,23 @@ case "$CMD" in
     
     # Build Docker Image (Use pre-built binary)
     docker buildx build --platform linux/amd64 -f Dockerfile.dev -t "$IMG" .
+    NEW_LOCAL_IMAGE_ID=$(local_image_id "$IMG")
+    if [ -n "$OLD_LOCAL_IMAGE_ID" ] && [ "$OLD_LOCAL_IMAGE_ID" != "$NEW_LOCAL_IMAGE_ID" ]; then
+      remove_local_image_if_unused "$OLD_LOCAL_IMAGE_ID"
+    fi
     docker save "$IMG" | gzip > "$OUT"
     send_files "$OUT"
+    OLD_REMOTE_IMAGE_ID=$(remote "docker image inspect '$IMG' --format '{{.Id}}' 2>/dev/null || true")
     remote "docker load -i $REMOTE_OUT"
     remote "mkdir -p $REMOTE_BASE/backups/dev; mv -f $REMOTE_OUT $REMOTE_BASE/backups/dev/"
     prune_remote_tars "$REMOTE_BASE/backups/dev" 2
     prune_local_tars "$LOCAL_DEV_DIR" 2
     remote "cd $REMOTE_DIR; DEV_TAG=$DEV_TAG docker compose up -d dev-backend"
     health_wait "verilocale-backend-dev" 60
+    NEW_REMOTE_IMAGE_ID=$(remote "docker image inspect '$IMG' --format '{{.Id}}' 2>/dev/null || true")
+    if [ -n "$OLD_REMOTE_IMAGE_ID" ] && [ "$OLD_REMOTE_IMAGE_ID" != "$NEW_REMOTE_IMAGE_ID" ]; then
+      remote "cid=\$(docker ps -aq --filter ancestor=$OLD_REMOTE_IMAGE_ID 2>/dev/null || true); [ -n \"\$cid\" ] || docker rmi '$OLD_REMOTE_IMAGE_ID' >/dev/null 2>&1 || true"
+    fi
     ;;
   prod)
     PROD_TAG_IN="${PROD_TAG:-prod-$TS}"
