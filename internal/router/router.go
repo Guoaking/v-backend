@@ -80,6 +80,7 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 	// API路由组
 	v1 := r.Group("/api/v1")
 	v1.Use(middleware.InjectOrgContext())
+	attSvc := attendanceSvc.NewAttendanceService(kycService.DB, kycService)
 	// v1.Use(middleware.APIRequestLogMiddleware(kycService)) // 已废弃，由 SystemLoggerMiddleware 替代
 	{
 		meta := api.NewMetaHandler(kycService)
@@ -158,6 +159,8 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 			clients.POST(":id/transfer", middleware.RequirePermission(models.PermOAuthWrite), clientHandler.TransferClientOwnership)
 			clients.PATCH(":id/status", middleware.RequirePermission(models.PermOAuthWrite), clientHandler.UpdateClientStatus)
 			clients.GET(":id/secret", middleware.JWTAuth(kycService), middleware.RequireOrganizationHeader(kycService), middleware.InjectOrgContext(), clientHandler.GetClientSecret)
+
+			attendanceApi.RegisterConsoleRoutes(orgConsole, attSvc, kycService)
 
 		}
 
@@ -374,7 +377,6 @@ func New(cfg *config.Config, kycService *service.KYCService, redisClient *redis.
 	}
 
 	// 挂载考勤微应用路由 (BFF层，物理隔离)
-	attSvc := attendanceSvc.NewAttendanceService(kycService.DB, kycService)
 	attendanceApi.RegisterRoutes(v1, cfg.Security.JWTSecret, attSvc)
 
 	return r, heartbeatManager

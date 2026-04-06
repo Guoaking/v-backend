@@ -54,6 +54,12 @@ func SetupApp(ctx context.Context, configFile string) (*App, func(), error) {
 	return app, tracerCleanup, nil
 }
 
+// LoadConfigOnly just loads the config without initializing other dependencies
+// Useful for pre-flight checks like port availability
+func LoadConfigOnly(configFile string) (*config.Config, error) {
+	return config.Load(configFile), nil
+}
+
 // Init initializes the application dependencies
 func Init(ctx context.Context, configFile string) (*App, func(), error) {
 	// 加载配置

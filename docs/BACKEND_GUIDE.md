@@ -8,11 +8,13 @@
 | Category           | Document                                                                               | Description                               |
 | ------------------ | -------------------------------------------------------------------------------------- | ----------------------------------------- |
 | **Architecture**   | [architecture/AUTH_UNIFICATION.md](architecture/AUTH_UNIFICATION.md)                   | Auth unification plan (API Key + OAuth2)  |
-|                    | [architecture/PLAYGROUND_AUTH_EVOLUTION.md](architecture/PLAYGROUND_AUTH_EVOLUTION.md) | Playground STS & Secret Visibility Design |
+|                    | [architecture/ATTENDANCE_APP_DESIGN.md](architecture/ATTENDANCE_APP_DESIGN.md)         | Attendance pilot background and design    |
 |                    | [architecture/RBAC_DESIGN.md](architecture/RBAC_DESIGN.md)                             | Role-Based Access Control implementation  |
 |                    | [architecture/OTEL_MONITORING.md](architecture/OTEL_MONITORING.md)                     | OpenTelemetry & Monitoring setup          |
 | **Specs**          | [specs/action_liveness_backend_spec.md](specs/action_liveness_backend_spec.md)         | Action Liveness logic specification       |
-| **API**            | [api/swagger.json](api/swagger.json)                                                   | OpenAPI 3.0 definition                    |
+|                    | [specs/attendance_app_spec.md](specs/attendance_app_spec.md)                           | Attendance BFF current contract           |
+|                    | [specs/attendance_p00_blueprint.md](specs/attendance_p00_blueprint.md)                 | Attendance domain-boundary baseline       |
+| **API**            | [swagger.json](swagger.json)                                                           | OpenAPI 3.0 definition                    |
 | **Storage**        | `internal/storage/storage_service.go`                                                  | Policy-based Storage Resolver             |
 | **Guides**         | [guides/CI_SETUP.md](guides/CI_SETUP.md)                                               | CI/CD pipeline setup                      |
 | **Knowledge Base** | [kb/AI_KNOWLEDGE_BASE.md](kb/AI_KNOWLEDGE_BASE.md)                                     | Code snippets and how-tos                 |

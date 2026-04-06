@@ -3,48 +3,11 @@ package service
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
-
-	"kyc-service/pkg/utils"
 )
-
-// SaveMultipartToLocal reads a multipart.FileHeader and saves it to a local directory.
-func SaveMultipartToLocal(fileHeader *multipart.FileHeader, dir, prefix string) (string, error) {
-	file, err := fileHeader.Open()
-	if err != nil {
-		return "", fmt.Errorf("failed to open multipart file: %w", err)
-	}
-	defer file.Close()
-
-	// Ensure the directory exists
-	uploadDir := filepath.Join(".", "uploads", dir)
-	if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
-		return "", fmt.Errorf("failed to create directory: %w", err)
-	}
-
-	// Generate a unique filename
-	filename := fmt.Sprintf("%s_%s.jpg", prefix, utils.GenerateID())
-	savePath := filepath.Join(uploadDir, filename)
-
-	// Create the destination file
-	dst, err := os.Create(savePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to create destination file: %w", err)
-	}
-	defer dst.Close()
-
-	// Copy the contents
-	if _, err := io.Copy(dst, file); err != nil {
-		return "", fmt.Errorf("failed to save file: %w", err)
-	}
-
-	// Return the relative path to store in DB
-	return fmt.Sprintf("/uploads/%s/%s", dir, filename), nil
-}
 
 // ConvertLocalFileToMultipartHeader reads a local file and constructs a *multipart.FileHeader.
 // This is useful for passing local images to internal services that expect multipart uploads.

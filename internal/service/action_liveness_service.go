@@ -96,13 +96,20 @@ func (s *KYCService) UploadVideo(ctx context.Context, sessionID string, file *mu
 	serviceType := "liveness"
 	err := s.checkAndConsumeQuota(ctx, orgID, serviceType, func() error {
 		// 2. Ingest Video
-		asset, err := s.IngestVideo(ctx, orgID, sessionID, file)
+		// Force synchronous upload for Liveness because the next step (SubmitThirdParty)
+		// requires the file to be completely written to the local disk before it can read it.
+		syncCtx := context.WithValue(ctx, "sync_upload", true)
+		asset, err := s.IngestVideo(syncCtx, orgID, sessionID, file)
 		if err != nil {
 			return err
 		}
+
+		// IngestVideo 即使是异步落盘，现在也已经预先计算并填入了真实的绝对物理路径
+		// 我们直接关联 Asset 即可
 		task.VideoAssetID = &asset.ID
 		task.Status = "uploaded"
 		task.UpdatedAt = time.Now()
+
 		if err := s.DB.Save(&task).Error; err != nil {
 			return err
 		}

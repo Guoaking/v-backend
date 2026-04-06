@@ -161,10 +161,19 @@ func autoMigrate(db *gorm.DB) error {
 
 		// --- Attendance 微应用独立业务表 ---
 		&models.OrganizationEmployee{},
-		&models.AttendanceRecord{},
+		&models.AttendancePunchEvent{},
 		&models.DataCollectionDocument{},
-		&models.OrganizationSettings{}, // 新增
-		&models.DataCollectionFace{},   // 新增
+		&models.AttendancePolicy{},
+		&models.DataCollectionFace{}, // 新增
+		&models.AttendanceGroup{},
+		&models.AttendanceGroupMembership{},
+		&models.AttendanceSite{},
+		&models.AttendanceShiftTemplate{},
+		&models.AttendanceShiftAssignment{},
+		&models.AttendancePunchReview{},
+		&models.AttendanceStatusSnapshot{},
+		&models.AttendanceDailyReport{},
+		&models.AttendanceMonthlyReport{},
 	}
 
 	for _, m := range modelsToMigrate {

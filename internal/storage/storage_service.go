@@ -22,6 +22,7 @@ type StorageService interface {
 	Upload(ctx context.Context, filename string, content io.Reader) (string, string, error)
 	ResolveAccess(fullPath string) (*ResolvedPath, error)
 	GetPublicURL(fullPath string) string
+	GetAbsolutePath(filename string) string
 }
 
 // NewStorageService 根据配置创建存储服务
@@ -80,8 +81,8 @@ func (s *LocalStorage) Upload(ctx context.Context, filename string, content io.R
 	for _, rule := range s.Config.Upload.Rules {
 		if strings.HasPrefix(filename, rule.Prefix) {
 			baseDir = rule.TargetDir
-			// 剥离规则前缀，使文件名在目标目录下更简洁（可选，根据业务决定）
-			// finalFilename = strings.TrimPrefix(filename, rule.Prefix)
+			// 既然配置了 target_dir=/data，那么 filename(如 videos/...) 原封不动拼上去即可
+			// 也就是 /data + videos/... = /data/videos/...
 			break
 		}
 	}
@@ -103,4 +104,19 @@ func (s *LocalStorage) Upload(ctx context.Context, filename string, content io.R
 	}
 
 	return fullPath, "", nil
+}
+
+// GetAbsolutePath returns the final absolute path on disk for a given relative filename
+func (s *LocalStorage) GetAbsolutePath(filename string) string {
+	baseDir := s.Config.Upload.BaseDir
+	finalFilename := filename
+
+	for _, rule := range s.Config.Upload.Rules {
+		if strings.HasPrefix(filename, rule.Prefix) {
+			baseDir = rule.TargetDir
+			break
+		}
+	}
+
+	return filepath.Join(baseDir, finalFilename)
 }

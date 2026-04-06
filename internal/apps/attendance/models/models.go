@@ -12,9 +12,9 @@ import (
 type OrganizationEmployee struct {
 	ID           string    `gorm:"primaryKey;type:varchar(64)" json:"id"`
 	OrgID        string    `gorm:"index;not null;type:varchar(64)" json:"org_id"`
-	EmployeeNo   string    `gorm:"index;type:varchar(20);default:''" json:"employee_no"` // 随机生成的8位工号，用于日常打卡和记录查询 (Removed not null to support backward compatibility migration)
-	EmployeeSN   string    `gorm:"index;type:varchar(64)" json:"employee_sn"`            // 客户内部工号(可选)
-	IDNumber     string    `gorm:"index;not null;type:varchar(64)" json:"id_number"`     // 核心锚点：证件号(用于注册和底层唯一性校验)
+	EmployeeNo   string    `gorm:"index;type:varchar(20);default:''" json:"employee_no"` // 组织内稳定业务工号，用于日常打卡和记录查询
+	EmployeeSN   string    `gorm:"index;type:varchar(64)" json:"employee_sn"`            // Deprecated: legacy external employee code placeholder
+	IDNumber     string    `gorm:"index;not null;type:varchar(64)" json:"id_number"`     // 实名证件号锚点，用于注册与唯一性校验，不作为日常业务主键
 	Name         string    `gorm:"not null;type:varchar(64)" json:"name"`
 	Phone        string    `gorm:"type:varchar(20)" json:"phone"`
 	FaceFeature  []byte    `gorm:"type:bytea" json:"-"`                             // 提取出的人脸特征向量，不对外暴露
@@ -24,9 +24,9 @@ type OrganizationEmployee struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
-// AttendanceRecord 考勤记录表
-// 记录员工打卡流水，Append-Only 设计。
-type AttendanceRecord struct {
+// AttendancePunchEvent 打卡事件表
+// 记录员工打卡事实事件，Append-Only 设计。
+type AttendancePunchEvent struct {
 	ID               string    `gorm:"primaryKey;type:varchar(64)" json:"id"`
 	OrgID            string    `gorm:"index:idx_org_time;not null;type:varchar(64)" json:"org_id"`
 	EmployeeID       string    `gorm:"index;not null;type:varchar(64)" json:"employee_id"`
@@ -39,6 +39,10 @@ type AttendanceRecord struct {
 	Latitude         float64   `json:"latitude"`                                              // 打卡时的纬度
 	Longitude        float64   `json:"longitude"`                                             // 打卡时的经度
 	CreatedAt        time.Time `json:"created_at"`
+}
+
+func (AttendancePunchEvent) TableName() string {
+	return "attendance_punch_events"
 }
 
 // DataCollectionDocument 算法数据反哺表 (OCR 注册域)
@@ -55,8 +59,8 @@ type DataCollectionDocument struct {
 	CreatedAt      time.Time      `json:"created_at"`
 }
 
-// OrganizationSettings 租户级别的考勤配置
-type OrganizationSettings struct {
+// AttendancePolicy 组织级默认考勤策略
+type AttendancePolicy struct {
 	OrgID           string    `gorm:"primaryKey;type:varchar(64)" json:"org_id"`
 	PunchMode       string    `gorm:"type:varchar(50);default:'liveness_active'" json:"punch_mode"` // photo_only, liveness_silent, liveness_active
 	AllowLatePunch  bool      `gorm:"default:true" json:"allow_late_punch"`
@@ -64,6 +68,41 @@ type OrganizationSettings struct {
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
 }
+
+func (AttendancePolicy) TableName() string {
+	return "attendance_policies"
+}
+
+// CollectionScenario 数据飞轮收集场景标签
+type CollectionScenario string
+
+const (
+	ScenarioEnrollDetectFailed CollectionScenario = "enroll_detect_failed"
+	ScenarioEnrollNoFace       CollectionScenario = "enroll_no_face"
+	ScenarioSilentLivenessFail CollectionScenario = "silent_liveness_failed"
+	ScenarioFaceCompareFail    CollectionScenario = "face_compare_failed"
+	ScenarioFaceCompareSuccess CollectionScenario = "face_compare_success"
+	ScenarioActiveLivenessSucc CollectionScenario = "active_liveness_success"
+	ScenarioFallbackPunch      CollectionScenario = "fallback_punch"
+)
+
+// PunchStatus 打卡记录状态
+type PunchStatus string
+
+const (
+	PunchStatusSuccess      PunchStatus = "success"
+	PunchStatusFailed       PunchStatus = "failed"
+	PunchStatusManualReview PunchStatus = "manual_review"
+)
+
+// PunchMode 打卡模式配置
+type PunchMode string
+
+const (
+	PunchModePhotoOnly      PunchMode = "photo_only"
+	PunchModeLivenessSilent PunchMode = "liveness_silent"
+	PunchModeLivenessActive PunchMode = "liveness_active"
+)
 
 // DataCollectionFace 算法数据反哺表 (人脸打卡域)
 // 收集极端光照、佩戴口罩等边缘场景下的人脸比对数据，供算法团队微调 FaceCompare 和 Liveness 模型。

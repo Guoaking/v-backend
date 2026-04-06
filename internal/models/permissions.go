@@ -6,12 +6,16 @@ package models
 
 const (
 	// Organization & Team
-	PermOrgRead    = "org.read"
-	PermOrgUpdate  = "org.update"
-	PermOrgDelete  = "org.delete"
-	PermTeamRead   = "team.read"
-	PermTeamInvite = "team.invite"
-	PermTeamWrite  = "team.write"
+	PermOrgRead          = "org.read"
+	PermOrgUpdate        = "org.update"
+	PermOrgDelete        = "org.delete"
+	PermTeamRead         = "team.read"
+	PermTeamInvite       = "team.invite"
+	PermTeamWrite        = "team.write"
+	PermAttendanceRead   = "attendance.read"
+	PermAttendanceWrite  = "attendance.write"
+	PermAttendanceReview = "attendance.review"
+	PermAttendanceReport = "attendance.report"
 
 	// Billing
 	PermBillingRead    = "billing.read"

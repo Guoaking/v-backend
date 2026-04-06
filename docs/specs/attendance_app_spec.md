@@ -1,205 +1,410 @@
-# 考勤打卡微应用技术方案设计 (Time & Attendance Tech Spec)
+# 考勤打卡微应用当前实现说明 (Time & Attendance Current Spec)
 
-## 1. 架构定位 (BFF 层设计)
+> 本文档优先描述当前代码中的客观事实，并在必要处标记“目标态 / 待补齐能力”。
+> 若与历史设计文档不一致，以当前实现为准。
 
-为了不污染现有的 API Key 鉴权体系和核心服务的纯粹性，考勤应用作为“第一方应用”接入，采用 **BFF (Backend for Frontend)** 架构。
+## 1. 模块定位
 
-### 1.1 路由前缀
-所有前端 H5 发起的请求均通过 `/api/v1/attendance/*` 路由。
+- 考勤模块是后端内的一个 BFF 子模块，代码位于 `internal/apps/attendance/`。
+- 该模块复用主 KYC 服务的 OCR、人脸检测、活体、人脸比对、存储和 Redis 能力。
+- 当前定位是一个真实客户试点场景下的轻量打卡系统，不是已经完备的 HR / Attendance 平台。
 
-### 1.2 鉴权与上下文签名 (The "Magic Link")
-员工端不需要登录，但请求必须携带合法的 `OrgID` 以确保数据隔离。
-- **机制**：老板在控制台生成“打卡二维码”时，后端使用全局 JWT Secret 签发一个特殊的短效或长效 Token（如 `attendance_token`），该 Token 内部仅包含 `org_id`。
-- **前端携带**：员工扫码后，H5 页面从 URL 参数中提取该 Token，并在后续所有 `/api/v1/attendance/*` 请求的 Header 中携带：`Authorization: Bearer <attendance_token>`。
-- **BFF 拦截器**：拦截该路由，解析 Token，向 Context 中注入 `OrgID`，但不注入 `UserID`。
+## 2. 当前路由与鉴权
 
----
+### 2.1 员工端路由
 
-## 2. 数据库设计 (Database Schema)
+- 路由前缀：`/api/v1/attendance/*`
+- 中间件：
+  - `RateLimitMiddleware(10)`
+  - `MagicLinkAuth(jwtSecret)`
+  - `AsyncMediaIngest(svc.GetKYCService())`
+- 员工端请求依赖 Magic Link Token，在 Header 中携带 `Authorization: Bearer <attendance_token>`。
 
-在 `v-backend/internal/models` 中新增以下三个实体。所有表必须以 `org_id` 为核心隔离字段。
+### 2.2 管理端路由
 
-### 2.1 员工表 (`OrganizationEmployee`)
-记录员工身份和用于比对的底库。
-```go
-type OrganizationEmployee struct {
-    ID             string    `gorm:"primaryKey" json:"id"`
-    OrgID          string    `gorm:"index;not null" json:"org_id"`
-    EmployeeSN     string    `gorm:"index" json:"employee_sn"` // 客户内部工号(可选)
-    IDNumber       string    `gorm:"index;not null" json:"id_number"` // 核心锚点：证件号
-    Name           string    `gorm:"not null" json:"name"`
-    Phone          string    `json:"phone"`
-    FaceFeature    []byte    `gorm:"type:bytea" json:"-"` // 提取出的人脸特征向量，不对外暴露
-    FaceImageURL   string    `json:"face_image_url"`      // 原始人脸图(用于HR查看)
-    Status         string    `gorm:"default:'active'" json:"status"` // active, inactive, deleted
-    CreatedAt      time.Time `json:"created_at"`
-    UpdatedAt      time.Time `json:"updated_at"`
-}
-// 联合唯一索引：同一个租户下，证件号必须唯一
-// gorm:"uniqueIndex:idx_org_id_number"
-```
+- 路由前缀：`/api/v1/console/attendance/*`
+- 当前实现说明：
+  - attendance 管理端路由已挂入 Console 认证链路；
+  - 当前依赖 `JWTAuth + RequireOrganizationHeader + InjectOrgContext` 获取组织上下文；
+  - 当前已切换到 attendance 专项权限：`attendance.read / attendance.write / attendance.review / attendance.report`
+  - 当前已提供基础主数据管理接口：`groups`、`sites`、`shift-templates`、`shift-assignments`
 
-### 2.2 考勤记录表 (`AttendanceRecord`)
-记录每一次打卡行为。
-```go
-type AttendanceRecord struct {
-    ID               string    `gorm:"primaryKey" json:"id"`
-    OrgID            string    `gorm:"index;not null" json:"org_id"`
-    EmployeeID       string    `gorm:"index;not null" json:"employee_id"`
-    PunchTime        time.Time `gorm:"index;not null" json:"punch_time"`
-    PunchType        string    `json:"punch_type"` // "in", "out"
-    LivenessScore    float64   `json:"liveness_score"`
-    FaceScore        float64   `json:"face_score"`
-    Status           string    `json:"status"` // "success", "manual_review" (需人工复核)
-    FallbackImageURL string    `json:"fallback_image_url,omitempty"` // 失败降级时的现场照片
-    CreatedAt        time.Time `json:"created_at"`
-}
-```
+### 2.3 Magic Link Token 当前行为
 
-### 2.3 数据反哺表 (`DataCollectionDocument`)
-专为算法团队优化模型设计的“Ground Truth”数据池。
-```go
-type DataCollectionDocument struct {
-    ID             string         `gorm:"primaryKey" json:"id"`
-    OrgID          string         `gorm:"index;not null" json:"org_id"`
-    IDType         string         `json:"id_type"` // passport, thai_id 等
-    RawImageURL    string         `json:"raw_image_url"`
-    RawOCRResult   datatypes.JSON `gorm:"type:jsonb" json:"raw_ocr_result"` // 模型原始输出
-    FinalUserInput datatypes.JSON `gorm:"type:jsonb" json:"final_user_input"` // 员工手动修正后的最终结果
-    IsCorrected    bool           `gorm:"index" json:"is_corrected"` // 如果 Final != Raw，则为 true
-    CreatedAt      time.Time      `json:"created_at"`
-}
-```
+- 当前代码会为组织生成带 `scope=attendance_magic_link` 的 JWT。
+- `GetActiveAppToken` / `GenerateAppToken` 当前会将 token 缓存在 Redis 中，缓存时长为 365 天。
+- 历史文档中“30 天有效”的描述不是当前实现事实。
 
----
+## 3. 当前数据模型
 
-## 3. API 接口契约 (API Specification)
+当前代码中的 attendance 相关模型位于 `internal/apps/attendance/models/models.go`。
 
-### 3.1 员工注册与信息采集
+### 3.1 已实现实体
 
-#### 3.1.1 `POST /api/v1/attendance/enroll/ocr`
-- **功能**：上传证件，调用底层 OCR 提取信息。
-- **请求体**：`multipart/form-data` (包含图片文件 `image` 和 `id_type`)
-- **响应体**：
-  ```json
-  {
-      "code": 0,
-      "data": {
-          "session_id": "req_12345", // 用于后续追踪
-          "fields": {
-              "id_number": "A12345678",
-              "name": "John Doe",
-              "dob": "1990-01-01"
-          },
-          "confidence": 0.98
-      }
-  }
-  ```
+- `OrganizationEmployee`
+  - 核心字段：`org_id`、`employee_no`、`employee_sn`、`id_number`、`name`、`phone`
+  - 用途：组织员工身份信息和注册底库
+- `AttendancePunchEvent`
+  - 核心字段：`org_id`、`employee_id`、`punch_time`、`punch_type`、`status`
+  - 当前额外记录：`liveness_score`、`face_score`、`fallback_image_url`、`latitude`、`longitude`
+- `AttendancePolicy`
+  - 核心字段：`punch_mode`、`allow_late_punch`、`require_location`
+- `DataCollectionDocument`
+  - 用途：保留 OCR 原始结果与用户修正后的最终输入
+- `DataCollectionFace`
+  - 用途：保留人脸比对 / 打卡相关样本，用于算法数据回流
 
-#### 3.1.2 `POST /api/v1/attendance/enroll/submit`
-- **功能**：提交员工核对后的最终信息及人脸照片，完成注册。
-- **逻辑**：
-  1. 校验 `OrgID` + `id_number` 是否已存在。若存在，返回状态码提示前端直接跳转打卡。
-  2. 调用内部 `service.FaceExtract()` 提取人脸特征并进行质量检测。
-  3. 质量不合格则阻断，返回要求重拍。
-  4. 质量合格则落库 `OrganizationEmployee`。
-  5. 异步落库 `DataCollectionDocument`（对比 OCR 结果与当前提交结果，计算 `is_corrected`）。
-- **请求体**：
-  ```json
-  {
-      "session_id": "req_12345", // 关联之前的 OCR 请求
-      "id_number": "A12345678",
-      "name": "John Doe",
-      "phone": "13800138000",
-      "face_image": "<base64_or_url>"
-  }
-  ```
+### 3.2 当前模型现状说明
 
-### 3.2 员工打卡 (Punch)
+- 当前实现同时存在 `employee_no`、`employee_sn`、`id_number` 三种员工身份字段。
+- 当前收口方向是：`employee_no` 作为组织内稳定业务工号，`id_number` 作为实名证件号锚点，`employee_sn` 进入废弃状态，不再作为后续业务设计依赖字段。
+- 当前前端设备信任缓存以 `employee_no` 为主；旧的 `id_number` 本地缓存仅作兼容读取，不再作为新的默认持久化字段。
+- `AttendancePunchEvent` 已支持经纬度记录，这一点早期设计文档未完全反映。
+- 当前不仅存在 `DataCollectionDocument`，还存在 `DataCollectionFace`；因此算法回流已不止 OCR 场景。
 
-#### 3.2.1 `GET /api/v1/attendance/config`
-- **功能**：前端渲染打卡页前，拉取当前租户的打卡策略配置。
-- **设备信任验证 (Device Trust)**：前端可在此请求中带上 `localStorage` 中缓存的 `id_number`，如果存在，则直接进入极速 1:1 打卡界面；否则进入“身份确认”流程。
-- **响应体**：
-  ```json
-  {
-      "code": 0,
-      "data": {
-          "punch_mode": "liveness_active", // 枚举：photo_only, liveness_silent, liveness_active
-          "allow_late_punch": true,
-          "require_location": false
-      }
-  }
-  ```
+## 4. 当前接口契约
 
-#### 3.2.2 `POST /api/v1/attendance/punch/identity` (可选：身份确认)
-- **功能**：当设备无缓存时，员工输入手机号后 4 位或姓名，后端返回模糊匹配的员工列表供其选择。
-- **安全防范**：只返回脱敏后的名字（如：`张*`，`李*明`）和 `id_number`，防止爬虫恶意拉取企业通讯录。
+### 4.0 管理端主数据接口
 
-#### 3.2.3 `POST /api/v1/attendance/punch`
-- **功能**：执行打卡操作（依据 `punch_mode` 决定是否调用底层模型）。
-- **去重防抖逻辑**：如果在 5 分钟内同一 `id_number` 重复提交相同的 `punch_type`，直接返回 HTTP 200 和上一次的记录状态，不扣减 Quota，不在 `attendance_records` 新增记录。
-- **降级逻辑**：前端在连续 2 次识别失败后，将 `fallback_mode` 设为 `true`，此时仅上传现场照片，跳过严格活体和比对，直接标记为 `manual_review`。
-- **请求体**：
-  ```json
-  {
-      "id_number": "A12345678",      // 核心锚点 (1:1 比对前提)
-      "punch_type": "in",            // in/out
-      "liveness_data": "<payload>",  // 活体数据 (动作视频或静默照片)
-      "fallback_mode": false,        // 是否为降级模式
-      "fallback_image": "<base64>"   // 仅在 fallback_mode=true 时有效
-  }
-  ```
-- **响应体**：
-  ```json
-  {
-      "code": 0,
-      "data": {
-          "status": "success", // 或 "manual_review"
-          "punch_time": "2023-10-27T08:55:00Z",
-          "message": "打卡成功"
-      }
-  }
-  ```
+### `GET /api/v1/console/attendance/groups`
 
-### 3.3 员工自助查询 (Self-Service)
+- 说明：返回当前组织下的 attendance groups 列表。
 
-#### 3.3.1 `POST /api/v1/attendance/self/otp`
-- **功能**：请求查看个人信息的验证码（通过手机号或企业内通知）。
+### `POST /api/v1/console/attendance/groups`
 
-#### 3.3.2 `GET /api/v1/attendance/self/records`
-- **功能**：员工凭验证码换取的临时 Session 查询自己当周/当月的打卡记录。
+### `PUT /api/v1/console/attendance/groups/:id`
 
----
+- 当前字段：
+  - `code`
+  - `name`
+  - `description`
+  - `parent_group_id`
+  - `manager_employee_id`
+  - `status`
 
-## 4. 管理端接口 (Admin API)
+### `GET /api/v1/console/attendance/sites`
 
-这些接口供企业老板/HR在 Console 控制台使用（复用现有的 Console JWT 鉴权）。
+- 说明：返回当前组织下的 attendance sites 列表。
 
-#### 4.1 `GET /api/v1/console/attendance/records`
-- **功能**：分页查询考勤记录，支持按员工、日期、状态（如 `manual_review`）过滤。
+### `POST /api/v1/console/attendance/sites`
 
-#### 4.2 `PUT /api/v1/console/attendance/records/:id/review`
-- **功能**：处理降级的异常打卡。
-- **请求体**：`{ "action": "approve" | "reject" }`
+### `PUT /api/v1/console/attendance/sites/:id`
 
-#### 4.3 `GET /api/v1/console/attendance/stats`
-- **功能**：考勤大盘聚合数据（今日迟到人数、当月工时统计等）。
+- 当前字段：
+  - `site_code`
+  - `name`
+  - `description`
+  - `address_line_1`
+  - `address_line_2`
+  - `city`
+  - `state`
+  - `country_code`
+  - `postal_code`
+  - `latitude`
+  - `longitude`
+  - `radius_meters`
+  - `timezone`
+  - `status`
 
----
+### `GET /api/v1/console/attendance/shift-templates`
 
-## 5. 关键技术点对齐 (Alignment Required)
+- 说明：返回当前组织下的班次模板列表。
 
-在正式编码前，请确认以下技术决策：
+### `POST /api/v1/console/attendance/shift-templates`
 
-### 4.1 计费耦合点对齐
-- **方案**：在 `attendance/punch` 接口内部，我们会硬编码一个属于我们自己平台（Service Provider）的 `SystemAppKey` 去调用 `service.Liveness()` 和 `service.FaceCompare()`，并显式将这笔账记在请求上下文中的 `OrgID` 头上。
-- **确认点**：客户的 `Org` 必须内置分配一个免费的套餐（例如：`PlanID = 'free_attendance'`，包含每月 5000 次调用额度）。如果额度耗尽，打卡接口会报错，以此复用现有的计费和 Quota 限制逻辑。
+### `PUT /api/v1/console/attendance/shift-templates/:id`
 
-### 4.2 数据存储合规对齐
-- **方案**：`face_image_url` 和 `fallback_image_url` 将存储在系统的标准 OSS/S3 中。
-- **确认点**：考虑到这部分是高度敏感的 C 端生物数据，是否需要为其单独开辟一个 Bucket 并设置严格的生命周期（如 30 天后自动转入冷存储或删除）？目前暂定复用现有 Storage 策略，由租户自己负责删除。
+- 当前字段：
+  - `shift_code`
+  - `name`
+  - `description`
+  - `start_time`
+  - `end_time`
+  - `crosses_day_boundary`
+  - `check_in_window_before_minutes`
+  - `check_in_window_after_minutes`
+  - `check_out_window_before_minutes`
+  - `check_out_window_after_minutes`
+  - `late_grace_minutes`
+  - `early_leave_grace_minutes`
+  - `work_minutes`
+  - `require_location`
+  - `default_site_id`
+  - `status`
 
-### 4.3 并发与限流对齐
-- **方案**：考勤打卡具有极强的时效性和集中性（如早上 8:55-9:00）。
-- **确认点**：BFF 层的打卡接口需要挂载限流中间件（Rate Limiter），如单 IP 10qps，单 Org 50qps。**策略为“直接降级”而非“排队”**：若触发限流，后端立即返回 `429 Too Many Requests`，前端捕获后直接进入 `fallback_mode`（拍摄水印照片），保护底层 GPU 资源的同时，不让员工在闸机口罚站等待。
+### `GET /api/v1/console/attendance/shift-assignments`
+
+- 可选查询参数：
+  - `date=YYYY-MM-DD`
+- 说明：返回当前组织下某日或全量的排班实例列表。
+
+### `POST /api/v1/console/attendance/shift-assignments`
+
+### `PUT /api/v1/console/attendance/shift-assignments/:id`
+
+- 当前字段：
+  - `assignment_date`
+  - `employee_id` 或 `group_id`（必须二选一）
+  - `site_id`
+  - `shift_template_id`
+  - `assignment_source`
+  - `status`
+  - `notes`
+
+### 4.1 员工注册
+
+### `POST /api/v1/attendance/enroll/ocr`
+
+- 请求体：`multipart/form-data`
+- 表单字段：
+  - `image`
+  - `id_type`
+- 说明：调用底层 OCR，返回提取字段、置信度和原始 JSON。
+
+### `POST /api/v1/attendance/enroll/detect`
+
+- 请求体：`multipart/form-data`
+- 表单字段：
+  - `picture`
+- 说明：调用底层 `FaceDetect`，用于人脸质量检测。
+
+### `GET /api/v1/attendance/enroll/check?id_number=...`
+
+- 说明：检查当前组织下该证件号是否已注册。
+- 当前返回：
+  - 已注册时返回 `enrolled=true` 与 `employee_no`
+  - 未注册时返回 `enrolled=false`
+
+### `POST /api/v1/attendance/enroll/submit`
+
+- 请求体：`multipart/form-data`
+- 当前必填字段：
+  - `id_number`
+  - `name`
+  - `phone`
+  - `face_image`
+- 当前可选字段：
+  - `session_id`
+  - `id_type`
+  - `raw_image_url`
+  - `raw_ocr_json`
+- 当前行为：
+  1. 校验员工是否已注册
+  2. 生成人脸底库并落员工表
+  3. 记录 OCR 数据回流
+- 当前特殊返回：
+  - 若已注册，接口直接返回冲突状态，并在响应体中带 `employee_no`
+
+### 4.2 员工打卡
+
+### `GET /api/v1/attendance/punch/config`
+
+- 当前实际路由是 `/attendance/punch/config`，不是历史文档中的 `/attendance/config`。
+- 返回当前组织打卡配置。
+
+### `POST /api/v1/attendance/punch/identity`
+
+- 请求体：JSON
+- 当前字段：
+  - `query`
+- 说明：根据输入内容匹配员工身份。
+
+### `POST /api/v1/attendance/punch/liveness/session`
+
+- 说明：创建 Attendance 域内的动作活体会话。
+- 当前行为：由 Attendance BFF 在后端内部编排底层 Action Liveness 能力，不再要求员工前端直接访问 `/api/v1/kyc/liveness/action/*`。
+
+### `POST /api/v1/attendance/punch/liveness/upload`
+
+- 请求体：`multipart/form-data`
+- 当前字段：
+  - `session_id`
+  - `video`
+- 说明：上传动作活体视频并由 Attendance BFF 内部提交到底层能力。
+
+### `POST /api/v1/attendance/punch/liveness/verify`
+
+- 请求体：JSON
+- 当前字段：
+  - `session_id`
+- 说明：轮询或验证动作活体任务结果，返回底层任务状态与详情。
+
+### `POST /api/v1/attendance/punch`
+
+- 请求体：`multipart/form-data`
+- 当前字段：
+  - `employee_no`
+  - `id_number`
+  - `punch_type`
+  - `fallback_mode`
+  - `latitude`
+  - `longitude`
+  - `liveness_image`
+  - `liveness_task_id`
+- 当前实现说明：
+  - 当前优先按 `employee_no` 匹配员工，未提供时才回退到 `id_number`。
+  - 当使用动作活体时，前端会先走 `/api/v1/attendance/punch/liveness/*` 获取和验证 `liveness_task_id`，再提交到本接口。
+  - 当使用静默或降级模式时，前端会上传 `liveness_image`。
+  - 当前接口最终统一返回成功消息，不会回传“5 分钟内命中的上一条打卡记录详情”。
+
+### 当前防抖行为
+
+- 当前服务层对 5 分钟内重复的相同打卡做防抖，不新增记录。
+- 但接口响应仍是通用成功结果，并未返回“上次记录状态详情”。
+
+### 4.3 员工自助查询
+
+### `POST /api/v1/attendance/self/otp`
+
+- 当前状态：关闭
+- 当前返回：403，表示在员工临时会话（employee session auth）实现前不开放自助查询入口
+
+### `GET /api/v1/attendance/self/records`
+
+- 当前状态：关闭
+- 当前返回：403，表示在员工临时会话（employee session auth）实现前不开放自助查询入口
+
+### 4.4 管理端接口
+
+### `GET /api/v1/console/attendance/magic-link`
+
+- 当前查询参数：
+  - `rotate=true`（可选，强制轮换 token）
+- 当前返回：
+  - `token`
+  - `enroll_url`
+  - `punch_url`
+
+### `GET /api/v1/console/attendance/records`
+
+- 当前行为：
+  - 返回最近 50 条记录
+  - 尚未实现后端分页、复杂筛选和导出
+
+### `PUT /api/v1/console/attendance/records/:id/review`
+
+- 请求体：
+  - `action`: `approve | reject`
+  - `decision_notes`（可选）
+  - `review_reason`（可选）
+- 当前行为：
+  - 更新 `attendance_punch_reviews` 中对应 review 的状态
+  - 同步把关联 `attendance_punch_events` 从 `manual_review` 推进到 `success` 或 `failed`
+  - 同步刷新对应员工当日的 `attendance_status_snapshots`
+
+### `GET /api/v1/console/attendance/stats`
+
+- 当前行为：返回组织级基础统计数据
+
+### `GET /api/v1/console/attendance/reviews`
+
+- 可选查询参数：
+  - `status`
+- 当前行为：
+  - 返回 review 列表，并带关联 punch event 与 employee 基础信息
+
+### `GET /api/v1/console/attendance/snapshots`
+
+- 可选查询参数：
+  - `date=YYYY-MM-DD`
+  - `employee_id`
+  - `group_id`
+- 当前行为：
+  - 返回状态快照列表，支持按日期、员工、组过滤
+
+### `GET /api/v1/console/attendance/timeline/:employee_id`
+
+- 当前行为：
+  - 返回某员工的 punch events 时间线
+  - 返回最近的 status snapshots
+
+### `GET /api/v1/console/attendance/policy`
+
+- 当前行为：
+  - 返回组织级默认 AttendancePolicy
+
+### `PUT /api/v1/console/attendance/policy`
+
+- 当前字段：
+  - `punch_mode`
+  - `allow_late_punch`
+  - `require_location`
+- 当前行为：
+  - 更新组织级默认 AttendancePolicy
+
+### `GET /api/v1/console/attendance/group-memberships`
+
+- 可选查询参数：
+  - `group_id`
+  - `employee_id`
+- 当前行为：
+  - 返回 group membership 列表
+
+### `POST /api/v1/console/attendance/group-memberships`
+
+### `PUT /api/v1/console/attendance/group-memberships/:id`
+
+- 当前字段：
+  - `group_id`
+  - `employee_id`
+  - `membership_role`
+  - `is_primary`
+  - `effective_from`
+  - `effective_to`
+  - `status`
+
+### `GET /api/v1/console/attendance/reports/daily`
+
+- 必选查询参数：
+  - `date=YYYY-MM-DD`
+- 可选查询参数：
+  - `group_id`
+  - `site_id`
+- 当前行为：
+  - 基于 `attendance_status_snapshots` 构建并返回日报读模型
+
+### `GET /api/v1/console/attendance/reports/monthly`
+
+- 必选查询参数：
+  - `month=YYYY-MM`
+- 可选查询参数：
+  - `group_id`
+  - `site_id`
+- 当前行为：
+  - 基于日报读模型聚合并返回月报读模型
+
+### `GET /api/v1/console/attendance/reports/export/daily`
+
+- 必选查询参数：
+  - `date=YYYY-MM-DD`
+- 可选查询参数：
+  - `group_id`
+  - `site_id`
+- 当前行为：
+  - 导出日报 CSV
+
+## 5. 当前已知差异与待补齐项
+
+- **员工端动作活体已收口**：动作活体当前已通过 Attendance BFF 路由承接，Attendance Magic Link 不再需要直接访问平台 KYC 动作活体路由。
+- **管理端权限边界已显式接入**：attendance 管理端当前已接入 Console JWT、组织上下文与 attendance 专项权限链路。
+- **报表与导出能力已接通**：当前已提供日报、月报与日报 CSV 导出接口，作为 P1 报表读模型的第一版后端交付。
+- **自助查询闭环未完成**：当前已主动关闭 `self/otp` 与 `self/records`，待员工临时会话方案落地后再恢复。
+- **异常复核能力已接通**：review 接口已可更新 review、event 与 snapshot，但专属权限点和更完整的审核台仍待继续演进。
+- **排班驱动状态已开始接通**：snapshot 在打卡与复核更新时会尝试解析 employee/group 级 `attendance_shift_assignments`，并回填 `shift_assignment_id`、`group_id`、基础迟到/早退分钟数。
+- **管理能力仍是 MVP**：记录查询目前是最近 50 条记录的简单接口，前端自行做筛选和分页。
+
+## 6. 目标态与当前态的使用原则
+
+- 若用于测试、联调、客户沟通，应优先以本文“当前接口契约”为准。
+- 若用于后续架构演进，可参考 `ATTENDANCE_APP_DESIGN.md` 中的目标方向，但不能将目标态描述当作已实现能力。
+
+## 7. 演进指导原则
+
+- **独立业务域**：Attendance 后续应按独立业务域演进，拥有自己的主数据、规则、状态机和报表口径。
+- **共享基础设施**：Attendance 不自行复制 Organization、Console 用户、角色权限、OAuth/STS、全局审计、用量等公共能力，而是复用平台共享基础设施。
+- **数据库策略**：
+  - 当前阶段优先采用同一 DB 实例内的业务域分表/分前缀模式。
+  - Attendance 自有表用于承载员工、门店/用户组、排班、地点、打卡事件、状态快照和报表读模型。
+  - 平台公共表继续承载租户、用户、权限、认证、审计、全局计量等横向能力。
+- **未来独立条件**：若 Attendance 在流量、查询压力、发布节奏、合规要求或运维 SLA 上明显独立于平台，再考虑拆分独立数据库或独立服务。
+- **拆分时的共享原则**：未来即使物理拆分，也应通过共享身份体系、组织上下文、事件同步或只读投影衔接公共能力，避免复制或双写核心公共主数据。

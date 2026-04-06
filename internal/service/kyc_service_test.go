@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"kyc-service/internal/models"
+	"kyc-service/internal/storage"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/go-redis/redis/v8"
@@ -42,6 +43,14 @@ func (m *MockStorageService) Upload(ctx context.Context, filename string, conten
 func (m *MockStorageService) GetPublicURL(internalPath string) string {
 	args := m.Called(internalPath)
 	return args.String(0)
+}
+
+func (m *MockStorageService) ResolveAccess(fullPath string) (*storage.ResolvedPath, error) {
+	return nil, nil
+}
+
+func (m *MockStorageService) GetAbsolutePath(filename string) string {
+	return filename
 }
 
 // --- Test Setup Helpers ---

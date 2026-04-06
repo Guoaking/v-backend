@@ -247,8 +247,10 @@ func GetHTTPStatusCode(code ResponseCode) int {
 		}
 		return http.StatusBadRequest
 	case code >= 2000 && code < 3000:
+		// Notice: CodeIdentityNotFound 以前映射为 http.StatusNotFound (404)
+		// 但为了前端拦截器处理和业务表达更顺畅，将这类的业务查询无果统一下调为 200 (OK)，由前端基于 JSON body 里的 Code 做判断。
 		if code == CodeIdentityNotFound {
-			return http.StatusNotFound
+			return http.StatusOK
 		}
 		if code == CodeFaceVerifyFailed || code == CodeLivenessFailed || code == CodeKYCFailed || code == CodeFaceNotMatch {
 			return http.StatusUnauthorized

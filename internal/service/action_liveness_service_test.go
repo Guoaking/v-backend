@@ -48,6 +48,10 @@ func (m *MockStorage) ResolveAccess(fullPath string) (*storage.ResolvedPath, err
 	}, nil
 }
 
+func (m *MockStorage) GetAbsolutePath(filename string) string {
+	return filename
+}
+
 func setupTestDB() *gorm.DB {
 	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
 	if err != nil {

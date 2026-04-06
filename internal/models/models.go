@@ -328,7 +328,7 @@ type OrganizationQuotas struct {
 type ImageAsset struct {
 	ID             string    `gorm:"primaryKey" json:"id"`
 	OrganizationID string    `gorm:"index" json:"organization_id"`
-	Hash           string    `gorm:"uniqueIndex" json:"hash"`
+	Hash           string    `gorm:"index" json:"hash"` // 取消 UniqueIndex，允许同一文件多次上传产生多条独立记录
 	FilePath       string    `json:"file_path"`
 	SafeFilename   string    `json:"safe_filename"`
 	ContentType    string    `json:"content_type"`
@@ -339,7 +339,7 @@ type ImageAsset struct {
 type VideoAsset struct {
 	ID             string    `gorm:"primaryKey" json:"id"`
 	OrganizationID string    `gorm:"index" json:"organization_id"`
-	Hash           string    `gorm:"uniqueIndex" json:"hash"`
+	Hash           string    `gorm:"index" json:"hash"` // 取消 UniqueIndex
 	FilePath       string    `json:"file_path"`
 	SafeFilename   string    `json:"safe_filename"`
 	ContentType    string    `json:"content_type"`

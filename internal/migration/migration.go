@@ -571,6 +571,10 @@ func Run(db *gorm.DB) error {
 				{models.PermTeamRead, "Team", "View Members", "View members"},
 				{models.PermTeamInvite, "Team", "Invite Members", "Invite members"},
 				{models.PermTeamWrite, "Team", "Modify Members", "Modify/remove members"},
+				{models.PermAttendanceRead, "Attendance", "View Attendance", "View attendance operational data"},
+				{models.PermAttendanceWrite, "Attendance", "Manage Attendance", "Manage attendance master data and policy"},
+				{models.PermAttendanceReview, "Attendance", "Review Attendance", "Review attendance exceptions"},
+				{models.PermAttendanceReport, "Attendance", "Export Attendance Reports", "View and export attendance reports"},
 				{models.PermBillingRead, "Billing", "View Billing", "View billing"},
 				{models.PermOrgBillingRead, "Billing", "View Organization Billing", "View org billing"},
 				{models.PermBillingWrite, "Billing", "Modify Billing", "Modify payment/subscription"},
@@ -605,11 +609,11 @@ func Run(db *gorm.DB) error {
 		}
 		seedRole("owner", "Owner", "系统所有者", allIDs)
 		// admin
-		seedRole("admin", "Administrator", "组织管理员", []string{models.PermOrgRead, models.PermTeamRead, models.PermTeamInvite, models.PermTeamWrite, models.PermOAuthRead, models.PermOAuthWrite, models.PermBillingRead, models.PermLogsRead, models.PermOrgAudit})
+		seedRole("admin", "Administrator", "组织管理员", []string{models.PermOrgRead, models.PermTeamRead, models.PermTeamInvite, models.PermTeamWrite, models.PermAttendanceRead, models.PermAttendanceWrite, models.PermAttendanceReview, models.PermAttendanceReport, models.PermOAuthRead, models.PermOAuthWrite, models.PermBillingRead, models.PermLogsRead, models.PermOrgAudit})
 		// developer
 		seedRole("developer", "Developer", "开发者", []string{models.PermOAuthRead, models.PermOAuthWrite, models.PermLogsRead})
 		// viewer
-		seedRole("viewer", "Viewer", "只读观察者", []string{models.PermOrgRead, models.PermTeamRead, models.PermOAuthRead, models.PermBillingRead, models.PermLogsRead})
+		seedRole("viewer", "Viewer", "只读观察者", []string{models.PermOrgRead, models.PermTeamRead, models.PermAttendanceRead, models.PermAttendanceReport, models.PermOAuthRead, models.PermBillingRead, models.PermLogsRead})
 	}
 
 	// 平台管理员种子（仅当不存在时创建）

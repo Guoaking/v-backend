@@ -109,6 +109,9 @@ func (s *KYCService) IngestImage(ctx context.Context, orgID string, file *multip
 	}
 	sum := hex.EncodeToString(h.Sum(nil))
 	var exist models.ImageAsset
+
+	// 如果哈希存在，说明物理文件已经上传过了。
+	// 直接复用已存在的资源记录，避免在仍存在唯一约束的数据库上产生重复插入错误。
 	if err := s.DB.Where("organization_id = ? AND hash = ?", orgID, sum).First(&exist).Error; err == nil {
 		return &exist, nil
 	}
@@ -155,24 +158,6 @@ func (s *KYCService) IngestImage(ctx context.Context, orgID string, file *multip
 		return nil, fmt.Errorf("unsupported file type: %v", ct)
 	}
 
-	// === 异步化落盘处理 ===
-	// 生成临时的 asset ID 和结构
-	asset := &models.ImageAsset{
-		ID:             utils.GenerateID(),
-		OrganizationID: orgID,
-		Hash:           sum,
-		SafeFilename:   safe,
-		ContentType:    ct,
-		SizeBytes:      size,
-		CreatedAt:      time.Now(),
-	}
-
-	// 提前创建一条记录，状态可以是 pending 或者由具体的 file_path 决定
-	asset.FilePath = "pending_upload"
-	if err := s.DB.Create(asset).Error; err != nil {
-		return nil, err
-	}
-
 	// Try to get the persistent temp path from the context (injected by AsyncMediaIngest middleware)
 	reqID := ""
 	if reqIDCtx := ctx.Value("request_id"); reqIDCtx != nil {
@@ -181,20 +166,45 @@ func (s *KYCService) IngestImage(ctx context.Context, orgID string, file *multip
 		}
 	}
 
-	// Create hierarchical path: images/YYYY/MM/DD/reqID_shortHash.ext
+	// Create hierarchical path: YYYY/MM/DD/reqID_shortHash.ext
 	now := time.Now()
 	shortHash := sum
 	if len(sum) > 16 {
 		shortHash = sum[:16]
 	}
 
-	uploadName := fmt.Sprintf("images/%04d/%02d/%02d/", now.Year(), now.Month(), now.Day())
+	var safeFileName string
 	if reqID != "" {
-		asset.SafeFilename = fmt.Sprintf("%s_%s%s", reqID, shortHash, filepath.Ext(file.Filename))
+		safeFileName = fmt.Sprintf("%s_%s%s", reqID, shortHash, filepath.Ext(file.Filename))
 	} else {
-		asset.SafeFilename = fmt.Sprintf("%s_%s%s", utils.GenerateID(), shortHash, filepath.Ext(file.Filename))
+		safeFileName = fmt.Sprintf("%s_%s%s", utils.GenerateID(), shortHash, filepath.Ext(file.Filename))
 	}
-	uploadName += asset.SafeFilename
+	uploadName := fmt.Sprintf("%04d/%02d/%02d/%s", now.Year(), now.Month(), now.Day(), safeFileName)
+
+	if strings.Contains(uploadName, "..") {
+		return nil, fmt.Errorf("invalid filename")
+	}
+
+	// Add the "images/" prefix so it matches the storage rules in config.yaml
+	uploadName = "images/" + uploadName
+
+	// === 异步化落盘处理 ===
+	// 生成临时的 asset ID 和结构
+	asset := &models.ImageAsset{
+		ID:             utils.GenerateID(),
+		OrganizationID: orgID,
+		Hash:           sum,
+		SafeFilename:   safeFileName,
+		// 直接通过 Storage 接口预先计算出它最终落盘的物理绝对路径，彻底抛弃 "pending_upload" 魔法字符串
+		FilePath:    s.Storage.GetAbsolutePath(uploadName),
+		ContentType: ct,
+		SizeBytes:   size,
+		CreatedAt:   time.Now(),
+	}
+
+	if err := s.DB.Create(asset).Error; err != nil {
+		return nil, err
+	}
 
 	// Try to get the pre-saved temp path from context
 	var tempPath string
@@ -204,8 +214,16 @@ func (s *KYCService) IngestImage(ctx context.Context, orgID string, file *multip
 		}
 	}
 
-	// If the middleware successfully saved it to disk, queue the task
-	if tempPath != "" {
+	// Sync or Async processing control via Context
+	// Allow caller to explicitly request synchronous processing
+	isSync := false
+	if syncVal := ctx.Value("sync_upload"); syncVal != nil {
+		if b, ok := syncVal.(bool); ok && b {
+			isSync = true
+		}
+	}
+
+	if !isSync && tempPath != "" {
 		asyncUploadQueue <- AsyncUploadTask{
 			AssetID:   asset.ID,
 			OrgID:     orgID,
@@ -215,7 +233,7 @@ func (s *KYCService) IngestImage(ctx context.Context, orgID string, file *multip
 			IsVideo:   false,
 			Service:   s,
 		}
-	} else {
+	} else if !isSync {
 		// Fallback: If the middleware didn't run or field name mismatched, do fallback asynchronous upload
 		// Read all file data into memory to pass to the goroutine
 		if _, err := f.Seek(0, io.SeekStart); err != nil {
@@ -243,6 +261,21 @@ func (s *KYCService) IngestImage(ctx context.Context, orgID string, file *multip
 
 			s.RecordAuditLog(bgCtx, "image.ingest.async", "image", assetID, "success", "")
 		}(asset.ID, uploadName, fileData)
+	} else {
+		// Synchronous Upload
+		if _, err := f.Seek(0, io.SeekStart); err != nil {
+			return nil, err
+		}
+
+		absPath, _, err := s.Storage.Upload(ctx, uploadName, f)
+		if err != nil {
+			return nil, fmt.Errorf("sync storage upload failed: %w", err)
+		}
+
+		// Update to ensure DB perfectly matches the actual saved path
+		if err := s.DB.Model(&models.ImageAsset{}).Where("id = ?", asset.ID).Update("file_path", absPath).Error; err != nil {
+			logger.GetLogger().WithError(err).Warnf("Failed to update image asset file_path for %s", asset.ID)
+		}
 	}
 
 	return asset, nil
@@ -261,6 +294,8 @@ func (s *KYCService) IngestVideo(ctx context.Context, orgID string, sessionID st
 	}
 	sum := hex.EncodeToString(h.Sum(nil))
 	var exist models.VideoAsset
+
+	// 与 ImageAsset 同理：若文件已存在则直接复用已有资源记录，避免唯一约束下重复插入失败。
 	if err := s.DB.Where("organization_id = ? AND hash = ?", orgID, sum).First(&exist).Error; err == nil {
 		return &exist, nil
 	}
@@ -312,11 +347,26 @@ func (s *KYCService) IngestVideo(ctx context.Context, orgID string, sessionID st
 		ext = ".webm" // Default to webm if unknown
 	}
 
-	// Create path: videos/YYYY/MM/DD/sessionID_timestamp.ext
-	// Note: We use "videos/" prefix which StorageService will strip before saving to BaseDir
-	relativePath := fmt.Sprintf("videos/%04d/%02d/%02d/%s_%d%s",
-		now.Year(), now.Month(), now.Day(),
-		sessionID, timestamp, ext)
+	// Create path: YYYY/MM/DD/sessionID_timestamp.ext
+	// Note: The StorageService will use its BaseDir and target prefix based on the config.
+
+	reqID := ""
+	if reqIDCtx := ctx.Value("request_id"); reqIDCtx != nil {
+		if sReqID, ok := reqIDCtx.(string); ok {
+			reqID = sReqID
+		}
+	}
+
+	var relativePath string
+	var safeFileName string
+	if reqID != "" {
+		safeFileName = fmt.Sprintf("%s_%s_%d%s", reqID, sessionID, timestamp, ext)
+	} else {
+		safeFileName = fmt.Sprintf("%s_%d%s", sessionID, timestamp, ext)
+	}
+
+	// Add the "videos/" prefix so it matches the storage rules in config.yaml
+	relativePath = fmt.Sprintf("videos/%04d/%02d/%02d/%s", now.Year(), now.Month(), now.Day(), safeFileName)
 
 	// Check for path traversal attempts just in case, though we generated it ourselves
 	if strings.Contains(relativePath, "..") {
@@ -335,26 +385,16 @@ func (s *KYCService) IngestVideo(ctx context.Context, orgID string, sessionID st
 		ID:             utils.GenerateID(),
 		OrganizationID: orgID,
 		Hash:           sum,
-		FilePath:       "pending_upload", // Placeholder
-		SafeFilename:   relativePath,
-		ContentType:    ct,
-		SizeBytes:      size,
-		CreatedAt:      time.Now(),
+		// 直接通过 Storage 接口预先计算出它最终落盘的物理绝对路径，彻底抛弃 "pending_upload" 魔法字符串
+		FilePath:     s.Storage.GetAbsolutePath(relativePath),
+		SafeFilename: safeFileName,
+		ContentType:  ct,
+		SizeBytes:    size,
+		CreatedAt:    time.Now(),
 	}
 
 	if err := s.DB.Create(asset).Error; err != nil {
 		return nil, err
-	}
-
-	reqID := ""
-	if reqIDCtx := ctx.Value("request_id"); reqIDCtx != nil {
-		if sReqID, ok := reqIDCtx.(string); ok {
-			reqID = sReqID
-		}
-	}
-	if reqID != "" {
-		asset.SafeFilename = fmt.Sprintf("%s_%s", reqID, asset.SafeFilename)
-		relativePath = fmt.Sprintf("videos/%04d/%02d/%02d/%s", now.Year(), now.Month(), now.Day(), asset.SafeFilename)
 	}
 
 	var tempPath string
@@ -364,7 +404,16 @@ func (s *KYCService) IngestVideo(ctx context.Context, orgID string, sessionID st
 		}
 	}
 
-	if tempPath != "" {
+	// Sync or Async processing control via Context
+	// Allow caller to explicitly request synchronous processing (useful for liveness checks that need immediate file access)
+	isSync := false
+	if syncVal := ctx.Value("sync_upload"); syncVal != nil {
+		if b, ok := syncVal.(bool); ok && b {
+			isSync = true
+		}
+	}
+
+	if !isSync && tempPath != "" {
 		asyncUploadQueue <- AsyncUploadTask{
 			AssetID:   asset.ID,
 			OrgID:     orgID,
@@ -374,8 +423,8 @@ func (s *KYCService) IngestVideo(ctx context.Context, orgID string, sessionID st
 			IsVideo:   true,
 			Service:   s,
 		}
-	} else {
-		// Read all file data into memory
+	} else if !isSync {
+		// Read all file data into memory for async
 		if _, err := f.Seek(0, io.SeekStart); err != nil {
 			return nil, err
 		}
@@ -401,6 +450,21 @@ func (s *KYCService) IngestVideo(ctx context.Context, orgID string, sessionID st
 
 			s.RecordAuditLog(bgCtx, "video.ingest.async", "video", assetID, "success", "")
 		}(asset.ID, orgID, relativePath, fileData)
+	} else {
+		// Synchronous Upload
+		if _, err := f.Seek(0, io.SeekStart); err != nil {
+			return nil, err
+		}
+
+		absPath, _, err := s.Storage.Upload(ctx, relativePath, f)
+		if err != nil {
+			return nil, fmt.Errorf("sync storage upload failed: %w", err)
+		}
+
+		// Optional: Update to ensure DB perfectly matches the actual saved path
+		if err := s.DB.Model(&models.VideoAsset{}).Where("id = ?", asset.ID).Update("file_path", absPath).Error; err != nil {
+			logger.GetLogger().WithError(err).Warnf("Failed to update video asset file_path for %s", asset.ID)
+		}
 	}
 
 	return asset, nil
